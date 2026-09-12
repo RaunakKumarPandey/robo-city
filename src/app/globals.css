@@ -1,0 +1,108 @@
+@import "tailwindcss";
+
+:root {
+  --bg-main: #07070F;
+  --color-primary: #FF2A85;
+  --color-secondary: #FF6B35;
+  --color-cyan: #00F0FF;
+  --color-purple: #8A2BE2;
+  --text-main: #F3F4F6;
+  --text-muted: #9CA3AF;
+  --font-display: var(--font-orbitron), sans-serif;
+  --font-sans: var(--font-rajdhani), sans-serif;
+}
+
+@theme inline {
+  --color-bg-main: var(--bg-main);
+  --color-neon-pink: var(--color-primary);
+  --color-sunset-orange: var(--color-secondary);
+  --color-cyber-cyan: var(--color-cyan);
+  --color-neon-purple: var(--color-purple);
+  --color-text-main: var(--text-main);
+  --color-text-muted: var(--text-muted);
+  --font-display: var(--font-display);
+  --font-sans: var(--font-sans);
+}
+
+html {
+  scroll-behavior: smooth;
+  color-scheme: dark;
+}
+
+body {
+  background-color: var(--bg-main);
+  color: var(--text-main);
+  min-height: 100vh;
+  overflow-x: hidden;
+  font-family: var(--font-sans, system-ui, sans-serif);
+  background-image: 
+    radial-gradient(circle at 50% 0%, rgba(138, 43, 226, 0.18), transparent 50%),
+    radial-gradient(circle at 100% 20%, rgba(255, 42, 133, 0.1), transparent 40%),
+    radial-gradient(circle at 0% 40%, rgba(0, 240, 255, 0.08), transparent 40%);
+  background-attachment: fixed;
+}
+
+/* Perspective Grid for Cyber Road */
+.perspective-grid {
+  perspective: 450px;
+}
+
+.grid-plane {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 200%;
+  transform-origin: 50% 0%;
+  transform: rotateX(72deg) translateY(-25%);
+  background-image: 
+    linear-gradient(to right, rgba(0, 240, 255, 0.15) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(255, 42, 133, 0.15) 1px, transparent 1px);
+  background-size: 50px 40px;
+  animation: grid-move 12s linear infinite;
+  mask-image: linear-gradient(to bottom, rgba(0,0,0,1) 0%, rgba(0,0,0,0) 80%);
+  -webkit-mask-image: linear-gradient(to bottom, rgba(0,0,0,1) 0%, rgba(0,0,0,0) 80%);
+}
+
+@keyframes grid-move {
+  0% {
+    background-position: 0 0;
+  }
+  100% {
+    background-position: 0 400px;
+  }
+}
+
+/* Subtle Film Grain */
+.bg-grain {
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.8' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)' opacity='0.035'/%3E%3C/svg%3E");
+}
+
+/* Custom Clean Scrollbar */
+::-webkit-scrollbar {
+  width: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: #07070F;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #1f1b38;
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #FF2A85;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .grid-plane {
+    animation: none;
+  }
+  * {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
