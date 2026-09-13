@@ -20,6 +20,11 @@ export async function fetchLeaderboardData(): Promise<LeaderboardEntry[]> {
           round3_score,
           total_score,
           updated_at
+        ),
+        members:team_members (
+          name,
+          branch,
+          year
         )
       `);
 
@@ -30,7 +35,7 @@ export async function fetchLeaderboardData(): Promise<LeaderboardEntry[]> {
 
     if (!data) return [];
 
-    // Flatten score objects
+    // Flatten score objects and members
     const list: Omit<LeaderboardEntry, "rank">[] = data.map((t: any) => {
       const scoreObj = Array.isArray(t.score) ? t.score[0] : t.score;
       return {
@@ -43,6 +48,7 @@ export async function fetchLeaderboardData(): Promise<LeaderboardEntry[]> {
         round3_score: scoreObj?.round3_score ?? 0,
         total_score: scoreObj?.total_score ?? 0,
         updated_at: scoreObj?.updated_at,
+        members: t.members || [],
       };
     });
 

@@ -138,8 +138,34 @@ CREATE INDEX IF NOT EXISTS idx_registration_members_registration_id ON registrat
 CREATE INDEX IF NOT EXISTS idx_robots_team_id ON robots(team_id);
 
 -- ==============================================================================
--- ROW LEVEL SECURITY (RLS) POLICIES
+-- REALTIME REPLICATION (For Live Leaderboard & Live Signals)
 -- ==============================================================================
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_publication_tables 
+    WHERE pubname = 'supabase_realtime' AND tablename = 'scores'
+  ) THEN
+    ALTER PUBLICATION supabase_realtime ADD TABLE scores;
+  END IF;
+  
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_publication_tables 
+    WHERE pubname = 'supabase_realtime' AND tablename = 'teams'
+  ) THEN
+    ALTER PUBLICATION supabase_realtime ADD TABLE teams;
+  END IF;
+  
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_publication_tables 
+    WHERE pubname = 'supabase_realtime' AND tablename = 'announcements'
+  ) THEN
+    ALTER PUBLICATION supabase_realtime ADD TABLE announcements;
+  END IF;
+EXCEPTION WHEN OTHERS THEN
+  -- Fallback if publication does not exist
+  NULL;
+END $$;
 ALTER TABLE teams ENABLE ROW LEVEL SECURITY;
 ALTER TABLE team_members ENABLE ROW LEVEL SECURITY;
 ALTER TABLE scores ENABLE ROW LEVEL SECURITY;

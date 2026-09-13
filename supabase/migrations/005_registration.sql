@@ -212,3 +212,7 @@ BEGIN
   );
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
+
+-- Grant execution permissions
+GRANT EXECUTE ON FUNCTION submit_team_registration TO anon, authenticated, service_role;
+

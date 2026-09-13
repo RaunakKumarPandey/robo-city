@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import crypto from "crypto";
-import { supabase } from "@/lib/supabase";
+import { getServiceSupabase } from "@/lib/supabase";
 import { GoogleFormPayload } from "@/types/database";
 
 /**
@@ -102,8 +102,10 @@ export async function POST(req: NextRequest) {
       );
     }
 
+    const db = getServiceSupabase();
+
     // 6. Execute Atomic PostgreSQL RPC Sync
-    const { data: rpcData, error: rpcError } = await supabase.rpc(
+    const { data: rpcData, error: rpcError } = await db.rpc(
       "sync_google_form_registration",
       {
         p_external_response_id: responseId,
@@ -146,9 +148,13 @@ export async function POST(req: NextRequest) {
       });
     }
 
-    // 7. Fallback direct execution if RPC is not loaded
+    if (rpcError) {
+      console.warn("RPC sync_google_form_registration unavailable or returned error:", rpcError);
+    }
+
+    // 7. Fallback direct execution if RPC is not loaded in Supabase
     // Check if duplicate response_id
-    const { data: existingReg } = await supabase
+    const { data: existingReg } = await db
       .from("registrations")
       .select("id, registration_number")
       .eq("source", "google_form")
@@ -161,48 +167,68 @@ export async function POST(req: NextRequest) {
         duplicate: true,
         registration_id: existingReg.id,
         registration_number: existingReg.registration_number,
-        message: "Registration already synchronized",
+        message: "Registration already synchronized (Idempotent replay)",
       });
     }
 
-    // Insert fallback team & registration
-    const { data: teamData } = await supabase
+    // Check for existing team
+    let teamId: string | null = null;
+    const { data: existingTeam } = await db
       .from("teams")
-      .insert({
-        team_name: teamName,
-        team_logo_url: null,
-        robot_image_url: payload.robot?.robot_image_url || null,
-      })
       .select("id")
+      .ilike("team_name", teamName)
       .maybeSingle();
 
-    const teamId = teamData?.id || null;
+    if (existingTeam) {
+      teamId = existingTeam.id;
+    } else {
+      const { data: teamData, error: teamErr } = await db
+        .from("teams")
+        .insert({
+          team_name: teamName,
+          team_logo_url: null,
+          robot_image_url: robotImageUrl,
+        })
+        .select("id")
+        .maybeSingle();
 
-    if (teamId) {
-      await supabase.from("scores").insert({
-        team_id: teamId,
-        round1_score: 0,
-        round2_score: 0,
-        round3_score: 0,
-      });
+      if (teamErr) {
+        console.error("Fallback team insert error:", teamErr);
+      }
+      teamId = teamData?.id || null;
 
-      if (robotName) {
-        await supabase.from("robots").insert({
+      if (teamId) {
+        await db.from("scores").insert({
           team_id: teamId,
-          robot_name: robotName,
-          robot_image_url: payload.robot?.robot_image_url || null,
+          round1_score: 0,
+          round2_score: 0,
+          round3_score: 0,
         });
+
+        if (robotName) {
+          await db.from("robots").insert({
+            team_id: teamId,
+            robot_name: robotName,
+            robot_image_url: robotImageUrl,
+          });
+        }
       }
     }
 
-    const randomSuffix = Math.floor(1000 + Math.random() * 9000);
-    const { data: newReg } = await supabase
+    // Insert registration record
+    const { data: newReg, error: regError } = await db
       .from("registrations")
       .insert({
         team_id: teamId,
         captain_name: captainName,
-        captain_email: captainEmail,
+        captain_email: captainEmail || "unknown@domain.com",
         captain_phone: captainPhone,
+        college_name: collegeName,
+        course: course,
+        branch: branch,
+        year: year,
+        responder_email: responderEmail,
+        declared_team_size: declaredTeamSize,
         status: "pending",
         source: "google_form",
         external_response_id: responseId,
@@ -210,23 +236,48 @@ export async function POST(req: NextRequest) {
         sync_status: "synced",
       })
       .select("id, registration_number")
-      .single();
+      .maybeSingle();
 
-    const regId = newReg?.id || `reg-${Date.now()}`;
-    const regNum = newReg?.registration_number || `RBV-${randomSuffix}`;
+    if (regError || !newReg) {
+      console.error("Fallback registration insert failed:", regError);
+      return NextResponse.json(
+        {
+          success: false,
+          error:
+            rpcError?.message ||
+            regError?.message ||
+            "Failed to save registration to database. Please run Supabase SQL migration 006.",
+        },
+        { status: 500 }
+      );
+    }
+
+    const regId = newReg.id;
+    const regNum = newReg.registration_number;
 
     if (members.length > 0) {
-      await supabase.from("registration_members").insert(
+      await db.from("registration_members").insert(
         members.map((m) => ({
           registration_id: regId,
-          name: m.name,
-          email: m.email,
-          phone: m.phone,
-          branch: m.branch,
-          year: m.year,
+          name: m.name || "Member",
+          email: m.email || "N/A",
+          phone: m.phone || null,
+          branch: m.branch || branch,
+          year: m.year || year,
           role: m.role || "Member",
         }))
       );
+
+      if (teamId) {
+        await db.from("team_members").insert(
+          members.map((m) => ({
+            team_id: teamId,
+            name: m.name || "Member",
+            branch: m.branch || branch,
+            year: m.year || year,
+          }))
+        );
+      }
     }
 
     return NextResponse.json({

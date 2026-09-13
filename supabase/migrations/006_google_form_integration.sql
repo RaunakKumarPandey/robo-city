@@ -217,3 +217,7 @@ BEGIN
   );
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
+
+-- Grant execution permissions
+GRANT EXECUTE ON FUNCTION sync_google_form_registration TO anon, authenticated, service_role;
+
