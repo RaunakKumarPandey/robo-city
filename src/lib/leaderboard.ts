@@ -55,13 +55,7 @@ export async function fetchLeaderboardData(): Promise<LeaderboardEntry[]> {
 
     // Flatten score objects and members
     const list: Omit<LeaderboardEntry, "rank">[] = data
-      .filter(
-        (t: any) =>
-          t.team_name &&
-          !t.team_name.startsWith("__") &&
-          !t.team_name.includes("GMT+") &&
-          !t.team_name.toLowerCase().includes("diagnostic")
-      )
+      .filter((t: any) => Boolean(t.team_name))
       .map((t: any) => {
         const rawScores = t.scores || t.score;
         const scoreObj = Array.isArray(rawScores) ? rawScores[0] : rawScores;
