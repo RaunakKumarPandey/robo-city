@@ -33,19 +33,23 @@ export default function ChampionsHQ() {
     try {
       const data = await fetchLeaderboardData();
       setTeams(data);
+      setConnectionStatus("LIVE");
     } catch {
       setError("Unable to load leaderboard data. Please try again.");
+      setConnectionStatus("OFFLINE");
     } finally {
       if (showLoading) setLoading(false);
     }
   }, []);
 
-  // Initial Load + Supabase Realtime Subscription
+  // Initial Load + Supabase Realtime Subscription + Auto Polling Fallback
   useEffect(() => {
+    let isMounted = true;
+
     // 1. Initial Load from Database
     loadLeaderboard(true);
 
-    // 2. Setup Single Realtime Channel for scores table
+    // 2. Setup Realtime Channel for scores table
     const channel = supabase
       .channel("scores-realtime-feed")
       .on(
@@ -56,7 +60,7 @@ export default function ChampionsHQ() {
           table: "scores",
         },
         (payload) => {
-          // Identify affected team ID
+          if (!isMounted) return;
           const teamId =
             (payload.new as any)?.team_id || (payload.old as any)?.team_id;
 
@@ -70,21 +74,26 @@ export default function ChampionsHQ() {
         }
       )
       .subscribe((status) => {
+        if (!isMounted) return;
         if (status === "SUBSCRIBED") {
           setConnectionStatus("LIVE");
-        } else if (
-          status === "CLOSED" ||
-          status === "CHANNEL_ERROR" ||
-          status === "TIMED_OUT"
-        ) {
-          setConnectionStatus("OFFLINE");
-        } else {
-          setConnectionStatus("CONNECTING");
+        } else if (status === "CHANNEL_ERROR" || status === "TIMED_OUT") {
+          // If websocket times out, fallback seamlessly to polling and keep connection LIVE if DB is reachable
+          loadLeaderboard(false);
         }
       });
 
-    // 3. Subscription Cleanup on unmount
+    // 3. Resilient Polling Fallback (every 8 seconds to ensure instant score sync across mobile & desktop)
+    const pollInterval = setInterval(() => {
+      if (isMounted && typeof document !== "undefined" && document.visibilityState === "visible") {
+        loadLeaderboard(false);
+      }
+    }, 8000);
+
+    // 4. Subscription & Interval Cleanup
     return () => {
+      isMounted = false;
+      clearInterval(pollInterval);
       supabase.removeChannel(channel);
     };
   }, [loadLeaderboard]);
