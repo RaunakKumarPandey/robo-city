@@ -47,6 +47,11 @@ function verifyHmacSignature(rawBody: string, signatureHeader: string | null): b
  */
 export async function POST(req: NextRequest) {
   try {
+    const supabaseHost = process.env.NEXT_PUBLIC_SUPABASE_URL
+      ? new URL(process.env.NEXT_PUBLIC_SUPABASE_URL).host
+      : "not-configured";
+    console.log(`[Google Form Webhook] Request received. Target Supabase host: ${supabaseHost}`);
+
     // 1. Validate Content-Type
     const contentType = req.headers.get("content-type") || "";
     if (!contentType.includes("application/json")) {
