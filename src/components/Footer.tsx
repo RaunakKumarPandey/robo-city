@@ -31,14 +31,21 @@ export default function Footer() {
             <span className="text-[#FF2A85] font-semibold">{eventData.eventName}</span> — {eventData.tagline}
           </div>
 
-          {/* Social / Contact Note */}
-          <div className="text-xs">
+          {/* Social / Contact & Admin Note */}
+          <div className="flex items-center gap-4 text-xs font-mono">
             <a
               href={`mailto:${eventData.email}`}
               className="text-zinc-400 transition-colors hover:text-[#00F0FF]"
             >
               {eventData.email}
             </a>
+            <span className="text-zinc-700">•</span>
+            <Link
+              href="/admin/login"
+              className="inline-flex items-center gap-1 text-zinc-500 transition-colors hover:text-[#FF2A85]"
+            >
+              <span>ADMIN DESK</span>
+            </Link>
           </div>
         </div>
       </div>
