@@ -54,23 +54,25 @@ export async function fetchLeaderboardData(): Promise<LeaderboardEntry[]> {
     if (!data) return [];
 
     // Flatten score objects and members
-    const list: Omit<LeaderboardEntry, "rank">[] = data.map((t: any) => {
-      const rawScores = t.scores || t.score;
-      const scoreObj = Array.isArray(rawScores) ? rawScores[0] : rawScores;
-      const rawMembers = t.team_members || t.members || [];
-      return {
-        id: t.id,
-        team_name: t.team_name,
-        team_logo_url: t.team_logo_url,
-        robot_image_url: t.robot_image_url,
-        round1_score: Number(scoreObj?.round1_score ?? 0),
-        round2_score: Number(scoreObj?.round2_score ?? 0),
-        round3_score: Number(scoreObj?.round3_score ?? 0),
-        total_score: Number(scoreObj?.total_score ?? 0),
-        updated_at: scoreObj?.updated_at,
-        members: Array.isArray(rawMembers) ? rawMembers : [],
-      };
-    });
+    const list: Omit<LeaderboardEntry, "rank">[] = data
+      .filter((t: any) => t.team_name && !t.team_name.startsWith("__"))
+      .map((t: any) => {
+        const rawScores = t.scores || t.score;
+        const scoreObj = Array.isArray(rawScores) ? rawScores[0] : rawScores;
+        const rawMembers = t.team_members || t.members || [];
+        return {
+          id: t.id,
+          team_name: t.team_name,
+          team_logo_url: t.team_logo_url,
+          robot_image_url: t.robot_image_url,
+          round1_score: Number(scoreObj?.round1_score ?? 0),
+          round2_score: Number(scoreObj?.round2_score ?? 0),
+          round3_score: Number(scoreObj?.round3_score ?? 0),
+          total_score: Number(scoreObj?.total_score ?? 0),
+          updated_at: scoreObj?.updated_at,
+          members: Array.isArray(rawMembers) ? rawMembers : [],
+        };
+      });
 
     // Sort by total_score DESC, tiebreak by team_name ASC
     list.sort((a, b) => {

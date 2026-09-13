@@ -24,24 +24,6 @@ export async function GET() {
       process.env.SUPABASE_SERVICE_ROLE_KEY.length > 10
     );
 
-    // Test RPC availability safely
-    let rpcStatus = "unknown";
-    try {
-      const { error: rpcErr } = await db.rpc("sync_google_form_registration", {
-        p_external_response_id: "diag-check-only",
-        p_team_name: "__DIAGNOSTIC_PROBE__",
-        p_captain_name: "Probe",
-        p_captain_email: "probe@domain.com",
-      });
-      if (rpcErr) {
-        rpcStatus = rpcErr.message || rpcErr.code || "RPC error";
-      } else {
-        rpcStatus = "RPC exists & callable";
-      }
-    } catch (e: any) {
-      rpcStatus = e?.message || "RPC exception";
-    }
-
     // 2. Fetch diagnostic counts directly from Supabase tables
     const [teamsRes, scoresRes, regsRes] = await Promise.all([
       db.from("teams").select("id, team_name", { count: "exact" }),
