@@ -560,8 +560,23 @@ GRANT EXECUTE ON FUNCTION submit_team_registration TO anon, authenticated, servi
 GRANT EXECUTE ON FUNCTION create_team_with_members TO anon, authenticated, service_role;
 GRANT EXECUTE ON FUNCTION update_team_scores TO authenticated;
 
--- Enable Realtime Broadcast for Live Leaderboard & Scores
-ALTER PUBLICATION supabase_realtime ADD TABLE scores;
-ALTER PUBLICATION supabase_realtime ADD TABLE teams;
-ALTER PUBLICATION supabase_realtime ADD TABLE announcements;
+-- Enable Realtime Broadcast for Live Leaderboard & Scores (Safely handled if already added)
+DO $$
+BEGIN
+  BEGIN
+    ALTER PUBLICATION supabase_realtime ADD TABLE scores;
+  EXCEPTION WHEN duplicate_object THEN NULL;
+  END;
+
+  BEGIN
+    ALTER PUBLICATION supabase_realtime ADD TABLE teams;
+  EXCEPTION WHEN duplicate_object THEN NULL;
+  END;
+
+  BEGIN
+    ALTER PUBLICATION supabase_realtime ADD TABLE announcements;
+  EXCEPTION WHEN duplicate_object THEN NULL;
+  END;
+END $$;
+
 
