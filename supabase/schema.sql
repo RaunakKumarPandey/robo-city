@@ -553,3 +553,15 @@ BEGIN
   );
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
+
+-- Grant execution permissions
+GRANT EXECUTE ON FUNCTION sync_google_form_registration TO anon, authenticated, service_role;
+GRANT EXECUTE ON FUNCTION submit_team_registration TO anon, authenticated, service_role;
+GRANT EXECUTE ON FUNCTION create_team_with_members TO anon, authenticated, service_role;
+GRANT EXECUTE ON FUNCTION update_team_scores TO authenticated;
+
+-- Enable Realtime Broadcast for Live Leaderboard & Scores
+ALTER PUBLICATION supabase_realtime ADD TABLE scores;
+ALTER PUBLICATION supabase_realtime ADD TABLE teams;
+ALTER PUBLICATION supabase_realtime ADD TABLE announcements;
+
