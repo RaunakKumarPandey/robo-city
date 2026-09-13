@@ -43,7 +43,7 @@ The script dynamically matches and normalizes the confirmed headers from your re
 
 | Property Name | Value | Description |
 | :--- | :--- | :--- |
-| `ROBO_WEBHOOK_URL` | `https://<YOUR_DEPLOYED_DOMAIN>/api/integrations/google-form` | Full URL to your website's webhook |
+| `ROBO_WEBHOOK_URL` | `https://robo-city.vercel.app/api/integrations/google-form` | Full URL to your website's webhook |
 | `ROBO_WEBHOOK_SECRET` | `robo-verse-26-gform-secret` | Shared secret (matches `GOOGLE_FORM_WEBHOOK_SECRET` in `.env.local`) |
 
 4. Click **Save script properties**.

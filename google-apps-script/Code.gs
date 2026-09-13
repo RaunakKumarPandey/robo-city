@@ -10,7 +10,7 @@
 // 1. Default Configuration
 var CONFIG = {
   // Production Webhook URL (Can be overridden via Script Properties "ROBO_WEBHOOK_URL")
-  WEBHOOK_URL: "https://your-domain.com/api/integrations/google-form",
+  WEBHOOK_URL: "https://robo-city.vercel.app/api/integrations/google-form",
   // Shared Secret (Can be overridden via Script Properties "ROBO_WEBHOOK_SECRET")
   WEBHOOK_SECRET: "robo-verse-26-gform-secret",
   // Expected sheet name (falls back to first sheet if not found)
