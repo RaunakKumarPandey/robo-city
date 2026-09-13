@@ -1,17 +1,47 @@
 import { NextResponse } from "next/server";
+import { getServiceSupabase } from "@/lib/supabase";
 import { fetchLeaderboardData } from "@/lib/leaderboard";
 
 export const dynamic = "force-dynamic";
 
 /**
  * GET /api/leaderboard
- * Returns public competition standings and registered team scores.
+ * Returns public competition standings, registered team scores, and database diagnostics.
  */
 export async function GET() {
   try {
+    const db = getServiceSupabase();
+
+    // 1. Fetch live leaderboard data
     const list = await fetchLeaderboardData();
+
+    // 2. Fetch diagnostic counts directly from Supabase tables
+    const [teamsRes, scoresRes, regsRes] = await Promise.all([
+      db.from("teams").select("id, team_name", { count: "exact" }),
+      db.from("scores").select("id, team_id", { count: "exact" }),
+      db.from("registrations").select("id, registration_number, sync_status", { count: "exact" }),
+    ]);
+
+    const teamCount = teamsRes.count ?? 0;
+    const scoreCount = scoresRes.count ?? 0;
+    const regCount = regsRes.count ?? 0;
+
+    // Identify teams with missing scores rows
+    const scoreTeamIds = new Set((scoresRes.data || []).map((s) => s.team_id));
+    const teamsWithMissingScores = (teamsRes.data || [])
+      .filter((t) => !scoreTeamIds.has(t.id))
+      .map((t) => ({ id: t.id, team_name: t.team_name }));
+
     return NextResponse.json({
       success: true,
+      diagnostics: {
+        total_teams_in_db: teamCount,
+        total_scores_in_db: scoreCount,
+        total_registrations_in_db: regCount,
+        teams_with_missing_scores_count: teamsWithMissingScores.length,
+        teams_with_missing_scores: teamsWithMissingScores,
+        leaderboard_rendered_count: list.length,
+      },
       count: list.length,
       data: list,
     });
@@ -22,3 +52,4 @@ export async function GET() {
     );
   }
 }
+
