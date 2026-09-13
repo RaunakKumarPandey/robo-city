@@ -6,6 +6,21 @@ import { LeaderboardEntry } from "@/types/database";
  * Calculates authoritative rank dynamically based on total_score DESC, team_name ASC.
  */
 export async function fetchLeaderboardData(): Promise<LeaderboardEntry[]> {
+  // If running in browser, fetch through /api/leaderboard for full service-level reliability
+  if (typeof window !== "undefined") {
+    try {
+      const res = await fetch("/api/leaderboard", { cache: "no-store" });
+      if (res.ok) {
+        const json = await res.json();
+        if (json.success && Array.isArray(json.data) && json.data.length > 0) {
+          return json.data;
+        }
+      }
+    } catch (e) {
+      console.warn("Leaderboard API fetch fallback to direct query:", e);
+    }
+  }
+
   try {
     const { data, error } = await supabase
       .from("teams")
@@ -39,7 +54,7 @@ export async function fetchLeaderboardData(): Promise<LeaderboardEntry[]> {
 
       return fallbackData.map((t, idx) => ({
         id: t.id,
-        team_name: t.team_name,
+        team_name: t.team_name || `Team ${idx + 1}`,
         team_logo_url: t.team_logo_url,
         robot_image_url: t.robot_image_url,
         round1_score: 0,
@@ -53,33 +68,31 @@ export async function fetchLeaderboardData(): Promise<LeaderboardEntry[]> {
 
     if (!data) return [];
 
-    // Flatten score objects and members
-    const list: Omit<LeaderboardEntry, "rank">[] = data
-      .filter((t: any) => Boolean(t.team_name))
-      .map((t: any) => {
-        const rawScores = t.scores || t.score;
-        const scoreObj = Array.isArray(rawScores) ? rawScores[0] : rawScores;
-        const rawMembers = t.team_members || t.members || [];
-        return {
-          id: t.id,
-          team_name: t.team_name,
-          team_logo_url: t.team_logo_url,
-          robot_image_url: t.robot_image_url,
-          round1_score: Number(scoreObj?.round1_score ?? 0),
-          round2_score: Number(scoreObj?.round2_score ?? 0),
-          round3_score: Number(scoreObj?.round3_score ?? 0),
-          total_score: Number(scoreObj?.total_score ?? 0),
-          updated_at: scoreObj?.updated_at,
-          members: Array.isArray(rawMembers) ? rawMembers : [],
-        };
-      });
+    // Flatten score objects and members with NO filter
+    const list: Omit<LeaderboardEntry, "rank">[] = (data || []).map((t: any) => {
+      const rawScores = t.scores || t.score;
+      const scoreObj = Array.isArray(rawScores) ? rawScores[0] : rawScores;
+      const rawMembers = t.team_members || t.members || [];
+      return {
+        id: t.id,
+        team_name: t.team_name || "Unnamed Team",
+        team_logo_url: t.team_logo_url,
+        robot_image_url: t.robot_image_url,
+        round1_score: Number(scoreObj?.round1_score ?? 0),
+        round2_score: Number(scoreObj?.round2_score ?? 0),
+        round3_score: Number(scoreObj?.round3_score ?? 0),
+        total_score: Number(scoreObj?.total_score ?? 0),
+        updated_at: scoreObj?.updated_at,
+        members: Array.isArray(rawMembers) ? rawMembers : [],
+      };
+    });
 
     // Sort by total_score DESC, tiebreak by team_name ASC
     list.sort((a, b) => {
       if (b.total_score !== a.total_score) {
         return b.total_score - a.total_score;
       }
-      return a.team_name.localeCompare(b.team_name);
+      return (a.team_name || "").localeCompare(b.team_name || "");
     });
 
     // Assign dynamic ranks: 1, 2, 3...

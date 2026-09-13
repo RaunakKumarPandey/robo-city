@@ -33,23 +33,19 @@ export default function ChampionsHQ() {
     try {
       const data = await fetchLeaderboardData();
       setTeams(data);
-      setConnectionStatus("LIVE");
     } catch {
       setError("Unable to load leaderboard data. Please try again.");
-      setConnectionStatus("OFFLINE");
     } finally {
       if (showLoading) setLoading(false);
     }
   }, []);
 
-  // Initial Load + Supabase Realtime Subscription + Auto Polling Fallback
+  // Initial Load + Supabase Realtime Subscription
   useEffect(() => {
-    let isMounted = true;
-
     // 1. Initial Load from Database
     loadLeaderboard(true);
 
-    // 2. Setup Realtime Channel for scores table
+    // 2. Setup Single Realtime Channel for scores table
     const channel = supabase
       .channel("scores-realtime-feed")
       .on(
@@ -60,7 +56,7 @@ export default function ChampionsHQ() {
           table: "scores",
         },
         (payload) => {
-          if (!isMounted) return;
+          // Identify affected team ID
           const teamId =
             (payload.new as any)?.team_id || (payload.old as any)?.team_id;
 
@@ -74,26 +70,21 @@ export default function ChampionsHQ() {
         }
       )
       .subscribe((status) => {
-        if (!isMounted) return;
         if (status === "SUBSCRIBED") {
           setConnectionStatus("LIVE");
-        } else if (status === "CHANNEL_ERROR" || status === "TIMED_OUT") {
-          // If websocket times out, fallback seamlessly to polling and keep connection LIVE if DB is reachable
-          loadLeaderboard(false);
+        } else if (
+          status === "CLOSED" ||
+          status === "CHANNEL_ERROR" ||
+          status === "TIMED_OUT"
+        ) {
+          setConnectionStatus("OFFLINE");
+        } else {
+          setConnectionStatus("CONNECTING");
         }
       });
 
-    // 3. Resilient Polling Fallback (every 8 seconds to ensure instant score sync across mobile & desktop)
-    const pollInterval = setInterval(() => {
-      if (isMounted && typeof document !== "undefined" && document.visibilityState === "visible") {
-        loadLeaderboard(false);
-      }
-    }, 8000);
-
-    // 4. Subscription & Interval Cleanup
+    // 3. Subscription Cleanup on unmount
     return () => {
-      isMounted = false;
-      clearInterval(pollInterval);
       supabase.removeChannel(channel);
     };
   }, [loadLeaderboard]);
@@ -122,13 +113,12 @@ export default function ChampionsHQ() {
 
             {/* Realtime Connection Status Pill */}
             <div
-              className={`inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-[11px] font-mono font-black uppercase tracking-wider ${
-                connectionStatus === "LIVE"
+              className={`inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-[11px] font-mono font-black uppercase tracking-wider ${connectionStatus === "LIVE"
                   ? "border-emerald-500/40 bg-emerald-500/15 text-emerald-400 shadow-[0_0_12px_rgba(16,185,129,0.3)]"
                   : connectionStatus === "CONNECTING"
-                  ? "border-amber-500/40 bg-amber-500/15 text-amber-400"
-                  : "border-red-500/40 bg-red-500/15 text-red-400"
-              }`}
+                    ? "border-amber-500/40 bg-amber-500/15 text-amber-400"
+                    : "border-red-500/40 bg-red-500/15 text-red-400"
+                }`}
             >
               {connectionStatus === "LIVE" && (
                 <>

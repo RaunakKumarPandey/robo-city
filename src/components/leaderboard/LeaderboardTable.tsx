@@ -2,7 +2,7 @@
 
 import { useState, useMemo } from "react";
 import { LeaderboardEntry } from "@/types/database";
-import { Search, Trophy, Filter, Eye, X, Bot, Clock, Sparkles } from "lucide-react";
+import { Search, Trophy, Eye, X, Clock } from "lucide-react";
 
 interface LeaderboardTableProps {
   teams: LeaderboardEntry[];
@@ -14,21 +14,15 @@ export default function LeaderboardTable({
   recentlyUpdatedId,
 }: LeaderboardTableProps) {
   const [searchQuery, setSearchQuery] = useState("");
-  const [filterMode, setFilterMode] = useState<"all" | "top10">("all");
   const [inspectingTeam, setInspectingTeam] = useState<LeaderboardEntry | null>(null);
 
-  // Filter & Search computation
+  // Search computation: displays all teams matching search query
   const displayedTeams = useMemo(() => {
-    let list = teams.filter((t) =>
-      t.team_name.toLowerCase().includes(searchQuery.toLowerCase().trim())
+    if (!searchQuery.trim()) return teams;
+    return teams.filter((t) =>
+      (t.team_name || "").toLowerCase().includes(searchQuery.toLowerCase().trim())
     );
-
-    if (filterMode === "top10") {
-      list = list.slice(0, 10);
-    }
-
-    return list;
-  }, [teams, searchQuery, filterMode]);
+  }, [teams, searchQuery]);
 
   const getRankBadge = (rank: number) => {
     const formatted = `#${String(rank).padStart(2, "0")}`;
@@ -62,7 +56,7 @@ export default function LeaderboardTable({
 
   return (
     <div className="space-y-6">
-      {/* Search & Filter Toolbar */}
+      {/* Search Toolbar & Team Counter */}
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         {/* Search */}
         <div className="relative flex-1 max-w-md">
@@ -73,33 +67,23 @@ export default function LeaderboardTable({
             type="text"
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            placeholder="Search teams..."
-            className="w-full rounded-lg border border-white/10 bg-white/5 py-2 pl-10 pr-3.5 text-xs text-white placeholder-zinc-500 backdrop-blur-sm transition-colors focus:border-[#00F0FF] focus:outline-none"
+            placeholder="Search teams by name..."
+            className="w-full rounded-lg border border-white/10 bg-white/5 py-2 pl-10 pr-10 text-xs text-white placeholder-zinc-500 backdrop-blur-sm transition-colors focus:border-[#00F0FF] focus:outline-none"
           />
+          {searchQuery && (
+            <button
+              onClick={() => setSearchQuery("")}
+              className="absolute inset-y-0 right-0 flex items-center pr-3 text-zinc-400 hover:text-white cursor-pointer"
+            >
+              <X className="h-4 w-4" />
+            </button>
+          )}
         </div>
 
-        {/* Filter Toggle Buttons */}
-        <div className="flex items-center gap-1 rounded-lg border border-white/10 bg-[#0A0718] p-1 text-xs font-mono">
-          <button
-            onClick={() => setFilterMode("all")}
-            className={`rounded-md px-3.5 py-1 font-bold uppercase transition-colors cursor-pointer ${
-              filterMode === "all"
-                ? "bg-[#00F0FF]/20 text-[#00F0FF] shadow-[0_0_10px_rgba(0,240,255,0.3)]"
-                : "text-zinc-400 hover:text-white"
-            }`}
-          >
-            ALL TEAMS ({teams.length})
-          </button>
-          <button
-            onClick={() => setFilterMode("top10")}
-            className={`rounded-md px-3.5 py-1 font-bold uppercase transition-colors cursor-pointer ${
-              filterMode === "top10"
-                ? "bg-[#FF2A85]/20 text-[#FF2A85] shadow-[0_0_10px_rgba(255,42,133,0.3)]"
-                : "text-zinc-400 hover:text-white"
-            }`}
-          >
-            TOP 10
-          </button>
+        {/* Total Teams Pill */}
+        <div className="flex items-center gap-2 rounded-lg border border-white/10 bg-[#0A0718] px-4 py-2 text-xs font-mono">
+          <span className="text-zinc-400 font-bold uppercase">ALL TEAMS:</span>
+          <span className="text-[#00F0FF] font-black">{displayedTeams.length} / {teams.length}</span>
         </div>
       </div>
 
