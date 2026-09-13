@@ -14,14 +14,14 @@ export async function fetchLeaderboardData(): Promise<LeaderboardEntry[]> {
         team_name,
         team_logo_url,
         robot_image_url,
-        score:scores (
+        scores (
           round1_score,
           round2_score,
           round3_score,
           total_score,
           updated_at
         ),
-        members:team_members (
+        team_members (
           name,
           branch,
           year
@@ -30,25 +30,45 @@ export async function fetchLeaderboardData(): Promise<LeaderboardEntry[]> {
 
     if (error) {
       console.error("Error fetching leaderboard data:", error);
-      return [];
+      // Fallback query simple teams if relation join has issues
+      const { data: fallbackData } = await supabase
+        .from("teams")
+        .select("id, team_name, team_logo_url, robot_image_url");
+
+      if (!fallbackData) return [];
+
+      return fallbackData.map((t, idx) => ({
+        id: t.id,
+        team_name: t.team_name,
+        team_logo_url: t.team_logo_url,
+        robot_image_url: t.robot_image_url,
+        round1_score: 0,
+        round2_score: 0,
+        round3_score: 0,
+        total_score: 0,
+        rank: idx + 1,
+        members: [],
+      }));
     }
 
     if (!data) return [];
 
     // Flatten score objects and members
     const list: Omit<LeaderboardEntry, "rank">[] = data.map((t: any) => {
-      const scoreObj = Array.isArray(t.score) ? t.score[0] : t.score;
+      const rawScores = t.scores || t.score;
+      const scoreObj = Array.isArray(rawScores) ? rawScores[0] : rawScores;
+      const rawMembers = t.team_members || t.members || [];
       return {
         id: t.id,
         team_name: t.team_name,
         team_logo_url: t.team_logo_url,
         robot_image_url: t.robot_image_url,
-        round1_score: scoreObj?.round1_score ?? 0,
-        round2_score: scoreObj?.round2_score ?? 0,
-        round3_score: scoreObj?.round3_score ?? 0,
-        total_score: scoreObj?.total_score ?? 0,
+        round1_score: Number(scoreObj?.round1_score ?? 0),
+        round2_score: Number(scoreObj?.round2_score ?? 0),
+        round3_score: Number(scoreObj?.round3_score ?? 0),
+        total_score: Number(scoreObj?.total_score ?? 0),
         updated_at: scoreObj?.updated_at,
-        members: t.members || [],
+        members: Array.isArray(rawMembers) ? rawMembers : [],
       };
     });
 
