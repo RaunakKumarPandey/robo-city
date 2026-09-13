@@ -122,12 +122,22 @@ export default function LeaderboardTable({
                   {/* Team */}
                   <td className="py-4 px-4 font-bold text-white font-sans text-sm">
                     <div className="flex items-center gap-3">
-                      <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-[#FF2A85]/10 text-[#FF2A85] text-xs font-mono font-black border border-[#FF2A85]/20 group-hover:scale-105 transition-transform">
+                      <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-[#FF2A85]/10 text-[#FF2A85] text-xs font-mono font-black border border-[#FF2A85]/20 group-hover:scale-105 transition-transform flex-shrink-0">
                         {team.team_name.charAt(0).toUpperCase()}
                       </div>
-                      <span className="group-hover:text-[#00F0FF] transition-colors">
-                        {team.team_name}
-                      </span>
+                      <div className="flex flex-col min-w-0">
+                        <span className="group-hover:text-[#00F0FF] transition-colors truncate font-extrabold text-white">
+                          {team.team_name}
+                        </span>
+                        {team.leader_name && (
+                          <span className="text-[11px] font-mono text-zinc-400 font-normal flex items-center gap-1.5 mt-0.5">
+                            <span className="inline-block px-1.5 py-0.2 rounded bg-white/5 border border-white/10 text-[9px] font-bold text-[#00F0FF] uppercase tracking-wider">
+                              LEAD
+                            </span>
+                            <span className="truncate text-zinc-300 font-sans">{team.leader_name}</span>
+                          </span>
+                        )}
+                      </div>
                     </div>
                   </td>
 
@@ -207,15 +217,25 @@ export default function LeaderboardTable({
               }`}
             >
               {/* Header */}
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  {getRankBadge(team.rank)}
-                  <h3 className="font-black text-white text-base truncate max-w-[200px]">
-                    {team.team_name}
-                  </h3>
+              <div className="flex items-start justify-between gap-2">
+                <div className="flex items-start gap-2.5 min-w-0">
+                  <div className="mt-0.5">{getRankBadge(team.rank)}</div>
+                  <div className="flex flex-col min-w-0">
+                    <h3 className="font-black text-white text-base truncate max-w-[200px] leading-tight">
+                      {team.team_name}
+                    </h3>
+                    {team.leader_name && (
+                      <span className="text-[11px] font-mono text-zinc-400 font-normal flex items-center gap-1.5 mt-1">
+                        <span className="inline-block px-1.5 py-0.2 rounded bg-white/5 border border-white/10 text-[9px] font-bold text-[#00F0FF] uppercase tracking-wider">
+                          LEAD
+                        </span>
+                        <span className="truncate text-zinc-300 font-sans">{team.leader_name}</span>
+                      </span>
+                    )}
+                  </div>
                 </div>
 
-                <span className="font-mono text-sm font-black text-[#00F0FF]">
+                <span className="font-mono text-sm font-black text-[#00F0FF] flex-shrink-0">
                   {team.total_score} PTS
                 </span>
               </div>
@@ -255,6 +275,14 @@ export default function LeaderboardTable({
                 <h2 className="text-xl font-black uppercase text-white tracking-tight">
                   {inspectingTeam.team_name}
                 </h2>
+                {inspectingTeam.leader_name && (
+                  <p className="mt-1 flex items-center gap-1.5 text-xs font-mono text-zinc-300">
+                    <span className="px-1.5 py-0.5 rounded bg-[#00F0FF]/15 border border-[#00F0FF]/30 text-[10px] font-bold text-[#00F0FF] uppercase">
+                      LEADER
+                    </span>
+                    <span className="font-sans font-medium text-white">{inspectingTeam.leader_name}</span>
+                  </p>
+                )}
               </div>
               <button
                 onClick={() => setInspectingTeam(null)}

@@ -40,6 +40,9 @@ export async function fetchLeaderboardData(): Promise<LeaderboardEntry[]> {
           name,
           branch,
           year
+        ),
+        registrations (
+          captain_name
         )
       `);
 
@@ -48,13 +51,14 @@ export async function fetchLeaderboardData(): Promise<LeaderboardEntry[]> {
       // Fallback query simple teams if relation join has issues
       const { data: fallbackData } = await supabase
         .from("teams")
-        .select("id, team_name, team_logo_url, robot_image_url");
+        .select("id, team_name, team_logo_url, robot_image_url, team_members(name)");
 
       if (!fallbackData) return [];
 
-      return fallbackData.map((t, idx) => ({
+      return fallbackData.map((t: any, idx: number) => ({
         id: t.id,
         team_name: t.team_name || `Team ${idx + 1}`,
+        leader_name: Array.isArray(t.team_members) && t.team_members[0]?.name ? t.team_members[0].name : null,
         team_logo_url: t.team_logo_url,
         robot_image_url: t.robot_image_url,
         round1_score: 0,
@@ -62,20 +66,26 @@ export async function fetchLeaderboardData(): Promise<LeaderboardEntry[]> {
         round3_score: 0,
         total_score: 0,
         rank: idx + 1,
-        members: [],
+        members: t.team_members || [],
       }));
     }
 
     if (!data) return [];
 
-    // Flatten score objects and members with NO filter
+    // Flatten score objects, members and leader name with NO filter
     const list: Omit<LeaderboardEntry, "rank">[] = (data || []).map((t: any) => {
       const rawScores = t.scores || t.score;
       const scoreObj = Array.isArray(rawScores) ? rawScores[0] : rawScores;
       const rawMembers = t.team_members || t.members || [];
+      const regObj = Array.isArray(t.registrations) ? t.registrations[0] : t.registrations;
+      const leaderName =
+        regObj?.captain_name ||
+        (Array.isArray(rawMembers) && rawMembers[0]?.name ? rawMembers[0].name : null);
+
       return {
         id: t.id,
         team_name: t.team_name || "Unnamed Team",
+        leader_name: leaderName,
         team_logo_url: t.team_logo_url,
         robot_image_url: t.robot_image_url,
         round1_score: Number(scoreObj?.round1_score ?? 0),

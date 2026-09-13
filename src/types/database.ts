@@ -63,6 +63,7 @@ export interface AdminUser {
 export interface LeaderboardEntry {
   id: string;
   team_name: string;
+  leader_name?: string | null;
   team_logo_url?: string | null;
   robot_image_url?: string | null;
   round1_score: number;

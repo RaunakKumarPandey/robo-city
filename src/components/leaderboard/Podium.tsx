@@ -36,6 +36,11 @@ export default function Podium({ topTeams, onSelectTeam }: PodiumProps) {
             <h3 className="mt-1 text-center font-black uppercase tracking-tight text-white text-base truncate max-w-full">
               {second.team_name}
             </h3>
+            {second.leader_name && (
+              <span className="text-[11px] font-mono text-zinc-400 font-normal truncate max-w-full">
+                Lead: <span className="text-zinc-200">{second.leader_name}</span>
+              </span>
+            )}
             <div className="mt-3 rounded-full border border-[#FF6B35]/30 bg-[#FF6B35]/10 px-3 py-1 font-mono text-xs font-bold text-[#FF6B35]">
               {second.total_score} PTS
             </div>
@@ -60,6 +65,11 @@ export default function Podium({ topTeams, onSelectTeam }: PodiumProps) {
             <h3 className="mt-1 text-center font-black uppercase tracking-tight text-white text-lg truncate max-w-full">
               {first.team_name}
             </h3>
+            {first.leader_name && (
+              <span className="text-[11px] font-mono text-zinc-300 font-normal truncate max-w-full">
+                Lead: <span className="text-[#00F0FF] font-medium">{first.leader_name}</span>
+              </span>
+            )}
             <div className="mt-3 inline-flex items-center gap-1.5 rounded-full border border-[#00F0FF]/40 bg-[#00F0FF]/15 px-4 py-1.5 font-mono text-sm font-black text-[#00F0FF] shadow-[0_0_15px_rgba(0,240,255,0.3)]">
               <Trophy className="h-4 w-4" />
               <span>{first.total_score} PTS</span>
@@ -82,6 +92,11 @@ export default function Podium({ topTeams, onSelectTeam }: PodiumProps) {
             <h3 className="mt-1 text-center font-black uppercase tracking-tight text-white text-base truncate max-w-full">
               {third.team_name}
             </h3>
+            {third.leader_name && (
+              <span className="text-[11px] font-mono text-zinc-400 font-normal truncate max-w-full">
+                Lead: <span className="text-zinc-200">{third.leader_name}</span>
+              </span>
+            )}
             <div className="mt-3 rounded-full border border-[#00F0FF]/30 bg-[#00F0FF]/10 px-3 py-1 font-mono text-xs font-bold text-[#00F0FF]">
               {third.total_score} PTS
             </div>
