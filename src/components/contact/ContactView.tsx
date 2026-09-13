@@ -282,7 +282,7 @@ export default function ContactView() {
                   <span>PERSONAL &amp; DIRECT QUERIES</span>
                 </div>
                 <span className="font-mono text-[11px] font-black text-zinc-500 uppercase">
-                  EVENT LEAD / COORDINATOR
+                  TEAM MEMBER
                 </span>
               </div>
 
@@ -292,7 +292,7 @@ export default function ContactView() {
                   <div className="relative h-full w-full overflow-hidden rounded-full bg-[#07070F]">
                     <Image
                       src="/images/raunak_pandey.png"
-                      alt="Raunak Pandey - Coordinator"
+                      alt="Raunak Pandey - Team Member"
                       fill
                       className="object-cover"
                       priority
@@ -305,7 +305,7 @@ export default function ContactView() {
                     RAUNAK PANDEY
                   </h2>
                   <p className="font-mono text-xs font-bold tracking-widest text-[#FF2A85] uppercase">
-                    ORGANIZER &amp; DIRECT COORDINATOR
+                    TEAM MEMBER
                   </p>
                   <p className="text-xs text-zinc-400 font-mono leading-relaxed pt-1">
                     For individual registration support, technical bot specs, squad verification, or emergency inquiries.
