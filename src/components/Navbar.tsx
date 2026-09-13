@@ -94,14 +94,23 @@ export default function Navbar() {
 
           <Link
             href="/admin/login"
-            className="inline-flex items-center gap-1.5 rounded-lg border border-white/10 bg-white/5 px-3 py-1 text-xs font-mono font-bold uppercase tracking-wider text-zinc-400 hover:border-[#FF2A85]/50 hover:bg-[#FF2A85]/10 hover:text-white transition-all shadow-sm"
+            className="inline-flex items-center gap-1.5 rounded-lg border border-[#FF2A85]/50 bg-[#FF2A85]/10 px-3.5 py-1 text-xs font-mono font-black uppercase tracking-wider text-white hover:border-[#00F0FF] hover:bg-[#00F0FF]/20 hover:text-[#00F0FF] transition-all shadow-[0_0_10px_rgba(255,42,133,0.3)]"
           >
+            <span className="text-[#FF2A85]">⚡</span>
             <span>ADMIN</span>
           </Link>
         </div>
 
-        {/* Mobile Hamburger Toggle */}
+        {/* Mobile Header Action Buttons */}
         <div className="flex md:hidden items-center gap-2">
+          {/* Mobile direct ADMIN link */}
+          <Link
+            href="/admin/login"
+            className="inline-flex items-center gap-1 rounded-lg border border-[#FF2A85]/60 bg-[#FF2A85]/20 px-2.5 py-1 text-[11px] font-mono font-black uppercase tracking-wider text-white shadow-[0_0_10px_rgba(255,42,133,0.4)]"
+          >
+            <span>ADMIN</span>
+          </Link>
+
           {/* Small pulse dot on mobile header */}
           <div className="flex items-center gap-1 rounded-full border border-red-500/40 bg-red-500/10 px-2 py-0.5 text-[10px] font-bold text-red-400">
             <span className="h-1.5 w-1.5 rounded-full bg-red-500 animate-pulse" />

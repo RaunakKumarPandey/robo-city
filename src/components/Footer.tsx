@@ -32,7 +32,7 @@ export default function Footer() {
           </div>
 
           {/* Social / Contact & Admin Note */}
-          <div className="flex items-center gap-4 text-xs font-mono">
+          <div className="flex items-center gap-3 text-xs font-mono">
             <a
               href={`mailto:${eventData.email}`}
               className="text-zinc-400 transition-colors hover:text-[#00F0FF]"
@@ -42,9 +42,9 @@ export default function Footer() {
             <span className="text-zinc-700">•</span>
             <Link
               href="/admin/login"
-              className="inline-flex items-center gap-1 text-zinc-500 transition-colors hover:text-[#FF2A85]"
+              className="inline-flex items-center gap-1.5 rounded-md border border-[#FF2A85]/30 bg-[#FF2A85]/10 px-2.5 py-1 text-[11px] font-bold text-zinc-300 hover:border-[#00F0FF] hover:text-[#00F0FF] hover:bg-[#00F0FF]/10 transition-colors"
             >
-              <span>ADMIN DESK</span>
+              <span>🔒 ADMIN DESK</span>
             </Link>
           </div>
         </div>
