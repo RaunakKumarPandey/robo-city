@@ -292,8 +292,8 @@ function sendToWebsiteWebhook(payload) {
   var secret = getWebhookSecret();
   var payloadString = JSON.stringify(payload);
 
-  // Generate HMAC SHA-256 Signature
-  var rawSignature = Utilities.computeHmacSha256Signature(payloadString, secret);
+  // Generate HMAC SHA-256 Signature (Explicitly using UTF-8)
+  var rawSignature = Utilities.computeHmacSha256Signature(payloadString, secret, Utilities.Charset.UTF_8);
   var signatureHex = rawSignature.map(function(byte) {
     var v = (byte < 0 ? byte + 256 : byte).toString(16);
     return v.length === 1 ? "0" + v : v;
