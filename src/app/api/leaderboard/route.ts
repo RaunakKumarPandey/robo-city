@@ -46,7 +46,6 @@ export async function GET() {
       diagnostics: {
         supabase_host: supabaseHost,
         has_service_role_key: hasServiceRoleKey,
-        rpc_status: rpcStatus,
         total_teams_in_db: teamCount,
         total_scores_in_db: scoreCount,
         total_registrations_in_db: regCount,
