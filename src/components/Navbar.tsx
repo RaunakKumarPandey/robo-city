@@ -82,8 +82,8 @@ export default function Navbar() {
           })}
         </div>
 
-        {/* Desktop LIVE SIGNAL Badge (Visual Placeholder) */}
-        <div className="hidden md:flex items-center">
+        {/* Desktop LIVE SIGNAL Badge & Admin Link */}
+        <div className="hidden md:flex items-center gap-3">
           <div className="inline-flex items-center gap-2 rounded-full border border-red-500/40 bg-red-500/10 px-3 py-1 text-xs font-black tracking-widest text-red-400 shadow-[0_0_12px_rgba(239,68,68,0.25)]">
             <span className="relative flex h-2 w-2">
               <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-red-400 opacity-75" />
@@ -91,6 +91,13 @@ export default function Navbar() {
             </span>
             <span className="text-[11px] uppercase font-mono font-bold">LIVE SIGNAL</span>
           </div>
+
+          <Link
+            href="/admin/login"
+            className="inline-flex items-center gap-1.5 rounded-lg border border-white/10 bg-white/5 px-3 py-1 text-xs font-mono font-bold uppercase tracking-wider text-zinc-400 hover:border-[#FF2A85]/50 hover:bg-[#FF2A85]/10 hover:text-white transition-all shadow-sm"
+          >
+            <span>ADMIN</span>
+          </Link>
         </div>
 
         {/* Mobile Hamburger Toggle */}
@@ -133,6 +140,15 @@ export default function Navbar() {
                 </Link>
               );
             })}
+
+            {/* Mobile Admin Link */}
+            <Link
+              href="/admin/login"
+              onClick={() => setIsOpen(false)}
+              className="flex items-center justify-between rounded-lg border border-white/10 bg-white/5 px-4 py-3 text-sm font-bold tracking-wider uppercase text-zinc-300 hover:border-[#FF2A85]/40 hover:bg-[#FF2A85]/20 hover:text-white transition-colors"
+            >
+              <span>ORGANIZER ADMIN DESK</span>
+            </Link>
 
             {/* Mobile LIVE SIGNAL Badge */}
             <div className="pt-2">
