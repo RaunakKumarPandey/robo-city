@@ -36,7 +36,13 @@ export default function Footer() {
           </div>
 
           {/* Social / Contact & Admin Portal */}
-          <div className="flex items-center gap-3 text-xs font-mono">
+          <div className="flex flex-wrap items-center justify-center gap-3 text-xs font-mono">
+            <Link
+              href="/team"
+              className="inline-flex items-center gap-1 rounded-lg border border-[#35D9FF]/40 bg-[#35D9FF]/10 px-3 py-1.5 text-[11px] font-bold text-[#35D9FF] hover:bg-[#35D9FF]/20 hover:text-white transition-colors"
+            >
+              <span>ORGANISING TEAM</span>
+            </Link>
             <a
               href={`mailto:${eventData.email}`}
               className="text-zinc-400 transition-colors hover:text-[#35D9FF]"

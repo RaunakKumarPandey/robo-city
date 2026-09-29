@@ -233,7 +233,28 @@ export default function AdminDashboardPage() {
           QUICK ACTIONS
         </h2>
 
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
+          <Link
+            href="/admin/organizing-team"
+            className="group flex flex-col justify-between rounded-xl border border-white/10 bg-[#0A0718]/80 p-5 transition-all duration-200 hover:-translate-y-1 hover:border-[#FF2D8D] hover:shadow-[0_0_20px_rgba(255,45,141,0.25)]"
+          >
+            <div className="space-y-3">
+              <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-[#FF2D8D]/10 text-[#FF2D8D]">
+                <Users className="h-5 w-5" />
+              </div>
+              <h3 className="font-black text-sm uppercase tracking-wider text-white">
+                ORGANISING TEAM
+              </h3>
+              <p className="text-xs text-zinc-400">
+                Add, edit member photos, roles, contact numbers, and publish live to site.
+              </p>
+            </div>
+            <div className="mt-6 flex items-center justify-between text-xs font-mono font-bold text-zinc-400 group-hover:text-[#FF2D8D]">
+              <span>MANAGE TEAM</span>
+              <ArrowRight className="h-3.5 w-3.5 transition-transform group-hover:translate-x-1" />
+            </div>
+          </Link>
+
           <Link
             href="/admin/teams"
             className="group flex flex-col justify-between rounded-xl border border-white/10 bg-[#0A0718]/80 p-5 transition-all duration-200 hover:-translate-y-1 hover:border-[#FF2A85] hover:shadow-[0_0_20px_rgba(255,42,133,0.25)]"
@@ -243,10 +264,10 @@ export default function AdminDashboardPage() {
                 <Users className="h-5 w-5" />
               </div>
               <h3 className="font-black text-sm uppercase tracking-wider text-white">
-                MANAGE TEAMS
+                PARTICIPANT TEAMS
               </h3>
               <p className="text-xs text-zinc-400">
-                Add, edit, or remove registered teams and crew members.
+                View registered participant teams and crew rosters.
               </p>
             </div>
             <div className="mt-6 flex items-center justify-between text-xs font-mono font-bold text-zinc-400 group-hover:text-[#FF2A85]">

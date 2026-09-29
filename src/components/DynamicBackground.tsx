@@ -35,6 +35,11 @@ const BG_MAP: Record<string, { image: string; tint: string; name: string }> = {
     tint: "rgba(53, 217, 255, 0.15)",
     name: "CENTRAL DISPATCH // COMMS TOWER",
   },
+  "/team": {
+    image: "/images/backgrounds/bg_home.jpg",
+    tint: "rgba(255, 45, 141, 0.15)",
+    name: "CENTRAL COMMAND // ORGANISING TEAM",
+  },
   "/register": {
     image: "/images/backgrounds/bg_home.jpg",
     tint: "rgba(255, 122, 61, 0.15)",

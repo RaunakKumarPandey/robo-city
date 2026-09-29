@@ -93,16 +93,23 @@ export default function Navbar() {
 
         {/* 3. Right Status & Quick Action Buttons */}
         <div className="hidden md:flex items-center gap-3">
-          {/* Status HUD Pill: ROBOVERSE // 2026 ● ONLINE */}
-          <div className="inline-flex items-center gap-2 rounded-full border border-[#35D9FF]/40 bg-[#35D9FF]/10 px-3 py-1 font-mono text-[11px] font-bold tracking-wider text-[#35D9FF] shadow-[0_0_12px_rgba(53,217,255,0.2)]">
+          {/* Organising Team Button (Replaced circled status badge) */}
+          <Link
+            href="/team"
+            className={`group relative inline-flex items-center gap-2 rounded-full border px-3.5 py-1.5 font-mono text-[11px] font-bold tracking-wider transition-all duration-200 ${
+              pathname === "/team"
+                ? "border-[#FF2D8D] bg-[#FF2D8D]/20 text-white shadow-[0_0_20px_rgba(255,45,141,0.5)]"
+                : "border-[#35D9FF]/40 bg-[#120B20]/80 text-[#35D9FF] shadow-[0_0_12px_rgba(53,217,255,0.2)] hover:border-[#35D9FF] hover:bg-[#35D9FF]/20 hover:text-white hover:shadow-[0_0_20px_rgba(53,217,255,0.5)]"
+            }`}
+          >
             <span className="relative flex h-2 w-2">
-              <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400 opacity-75" />
-              <span className="relative inline-flex h-2 w-2 rounded-full bg-emerald-400 shadow-[0_0_6px_#34d399]" />
+              <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-[#35D9FF] opacity-75" />
+              <span className="relative inline-flex h-2 w-2 rounded-full bg-[#35D9FF] shadow-[0_0_6px_#35D9FF]" />
             </span>
-            <span>ROBOVERSE // 2026</span>
-            <span className="text-white/40">|</span>
-            <span className="text-emerald-400 font-extrabold">ONLINE</span>
-          </div>
+            <span className="font-black text-white group-hover:text-[#35D9FF] transition-colors uppercase tracking-wider">
+              ORGANISING TEAM
+            </span>
+          </Link>
 
           {/* Quick Register CTA */}
           <Link
@@ -125,6 +132,15 @@ export default function Navbar() {
 
         {/* Mobile Header Buttons */}
         <div className="flex md:hidden items-center gap-2">
+          {/* Mobile Organising Team Link */}
+          <Link
+            href="/team"
+            className="inline-flex items-center gap-1 rounded-lg border border-[#35D9FF]/40 bg-[#35D9FF]/10 px-2 py-1 font-mono text-[10px] font-bold text-[#35D9FF]"
+          >
+            <span className="h-1.5 w-1.5 rounded-full bg-[#35D9FF]" />
+            <span>TEAM</span>
+          </Link>
+
           {/* Mobile Join Button */}
           <Link
             href="/register"
@@ -132,12 +148,6 @@ export default function Navbar() {
           >
             <span>JOIN</span>
           </Link>
-
-          {/* Status Indicator */}
-          <div className="flex items-center gap-1.5 rounded-full border border-emerald-500/40 bg-emerald-500/10 px-2 py-0.5 font-mono text-[10px] font-bold text-emerald-400">
-            <span className="h-1.5 w-1.5 rounded-full bg-emerald-400 animate-pulse shadow-[0_0_6px_#34d399]" />
-            <span>LIVE</span>
-          </div>
 
           <button
             onClick={() => setIsOpen(!isOpen)}
@@ -181,6 +191,23 @@ export default function Navbar() {
                 </Link>
               );
             })}
+
+            {/* Mobile Organising Team Link */}
+            <Link
+              href="/team"
+              onClick={() => setIsOpen(false)}
+              className={`flex items-center justify-between rounded-lg px-4 py-3 font-mono text-xs font-bold tracking-widest uppercase transition-all ${
+                pathname === "/team"
+                  ? "border border-[#FF2D8D]/60 bg-gradient-to-r from-[#FF2D8D]/25 to-transparent text-white shadow-[0_0_15px_rgba(255,45,141,0.3)]"
+                  : "text-[#35D9FF] bg-[#35D9FF]/10 border border-[#35D9FF]/20 hover:bg-[#35D9FF]/20"
+              }`}
+            >
+              <div className="flex items-center gap-2">
+                <span className="h-2 w-2 rounded-full bg-[#35D9FF] animate-ping" />
+                <span>ORGANISING TEAM</span>
+              </div>
+              <span className="text-[10px] font-bold text-zinc-400">HQ</span>
+            </Link>
 
             {/* Mobile Registration Button */}
             <Link

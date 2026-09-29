@@ -174,3 +174,20 @@ export interface RegistrationResult {
   status?: string;
   error?: string;
 }
+
+export interface OrganizingMember {
+  id: string;
+  name: string;
+  role: string;
+  category: "Faculty & Advisors" | "Core Squad" | "Technical Leads" | "Operations & Logistics";
+  photo_url?: string | null;
+  phone?: string | null;
+  email?: string | null;
+  linkedin?: string | null;
+  instagram?: string | null;
+  github?: string | null;
+  bio?: string | null;
+  display_order: number;
+  created_at?: string;
+  updated_at?: string;
+}
