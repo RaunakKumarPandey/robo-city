@@ -78,25 +78,28 @@ export default function DynamicBackground() {
         />
       </AnimatePresence>
 
-      {/* 2. Deep Vice City Contrast Overlays (Ensures razor-sharp text readability) */}
-      <div className="absolute inset-0 bg-gradient-to-b from-[#08070D]/88 via-[#120B20]/82 to-[#08070D]/95 backdrop-blur-[2px]" />
+      {/* 2. Balanced Cinematic Contrast Overlay (Crystal Clear Subject with Deep Dark Edges) */}
+      <div className="absolute inset-0 bg-gradient-to-b from-[#08070D]/75 via-[#08070D]/35 to-[#08070D]/90" />
 
       {/* 3. Dynamic Sector Color Tint Glow */}
       <div
         className="absolute inset-0 transition-colors duration-700"
         style={{
-          background: `radial-gradient(circle at 50% 25%, ${currentBg.tint} 0%, transparent 60%)`,
+          background: `radial-gradient(ellipse at 50% 35%, ${currentBg.tint} 0%, transparent 65%)`,
         }}
       />
 
-      {/* 4. GTA Cinematic Vignette */}
-      <div className="vignette-overlay absolute inset-0 opacity-80" />
+      {/* 4. Cinematic Outer Vignette (keeps center character/city crystal clear and recognized) */}
+      <div
+        className="absolute inset-0"
+        style={{
+          background:
+            "radial-gradient(ellipse at center, transparent 40%, rgba(8,7,13,0.5) 75%, rgba(8,7,13,0.92) 100%)",
+        }}
+      />
 
-      {/* 5. Subtle CRT Scanlines & Film Grain */}
-      <div className="scanlines bg-grain absolute inset-0 opacity-25" />
-
-      {/* 6. Minimal HUD Sector Watermark in bottom corner */}
-      <div className="hidden lg:flex absolute bottom-4 left-6 z-10 items-center gap-2 font-mono text-[10px] font-bold tracking-[0.25em] text-white/30 uppercase">
+      {/* 5. Minimal HUD Sector Watermark in bottom corner */}
+      <div className="hidden lg:flex absolute bottom-4 left-6 z-10 items-center gap-2 font-mono text-[10px] font-bold tracking-[0.25em] text-white/40 uppercase">
         <span className="h-1.5 w-1.5 rounded-full bg-[#FF2D8D] animate-ping" />
         <span>ZONE: {currentBg.name}</span>
       </div>
