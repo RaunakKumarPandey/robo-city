@@ -2,14 +2,34 @@ import { supabase } from "@/lib/supabase";
 import { OrganizingMember } from "@/types/database";
 import { initialOrganizingTeam } from "@/data/initialOrganizingTeam";
 
-const LOCAL_STORAGE_KEY = "robocity_organizing_team_v1";
-
 /**
- * Fetches all organizing team members from Supabase, or API/Local fallback.
+ * Fetches all organizing team members from Supabase & API.
+ * Ensures fresh data for all visitors across all devices.
  */
 export async function fetchOrganizingTeam(): Promise<OrganizingMember[]> {
+  // 1. Try fetching via API route (bypasses RLS and works universally across all visitors)
+  if (typeof window !== "undefined") {
+    try {
+      const res = await fetch("/api/organizing-team", {
+        cache: "no-store",
+        headers: { "Pragma": "no-cache" },
+      });
+      if (res.ok) {
+        const json = await res.json();
+        if (json.success && Array.isArray(json.data) && json.data.length > 0) {
+          return json.data.sort(
+            (a: OrganizingMember, b: OrganizingMember) =>
+              (a.display_order ?? 0) - (b.display_order ?? 0)
+          );
+        }
+      }
+    } catch {
+      // Fall through to direct Supabase query
+    }
+  }
+
+  // 2. Try direct Supabase query
   try {
-    // 1. Try fetching from Supabase table
     const { data, error } = await supabase
       .from("organizing_team")
       .select("*")
@@ -19,30 +39,16 @@ export async function fetchOrganizingTeam(): Promise<OrganizingMember[]> {
       return data as OrganizingMember[];
     }
   } catch (err) {
-    console.warn("Supabase fetch failed, falling back to local store:", err);
+    console.warn("Supabase fetch fallback:", err);
   }
 
-  // 2. Client-side localStorage fallback check
-  if (typeof window !== "undefined") {
-    try {
-      const stored = localStorage.getItem(LOCAL_STORAGE_KEY);
-      if (stored) {
-        const parsed = JSON.parse(stored);
-        if (Array.isArray(parsed) && parsed.length > 0) {
-          return parsed.sort((a, b) => (a.display_order ?? 0) - (b.display_order ?? 0));
-        }
-      }
-    } catch {
-      // Ignore JSON parse error
-    }
-  }
-
-  // 3. Fallback to initial seed data
+  // 3. Fallback to default initial seed list
   return initialOrganizingTeam;
 }
 
 /**
- * Saves a new organizing member (admin action)
+ * Saves a new or updated organizing member (admin action).
+ * Persists to Supabase via server API for global visibility.
  */
 export async function saveOrganizingMember(
   member: Omit<OrganizingMember, "id"> & { id?: string }
@@ -54,8 +60,29 @@ export async function saveOrganizingMember(
     updated_at: new Date().toISOString(),
   };
 
+  // 1. Send to server API endpoint (which writes to Supabase database)
   try {
-    // 1. Try saving to Supabase
+    const res = await fetch("/api/organizing-team", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(record),
+    });
+
+    if (res.ok) {
+      const json = await res.json();
+      if (json.success) {
+        if (typeof window !== "undefined") {
+          window.dispatchEvent(new Event("organizing_team_updated"));
+        }
+        return { success: true, data: json.data || record };
+      }
+    }
+  } catch (err) {
+    console.warn("API save failed, attempting direct Supabase upsert:", err);
+  }
+
+  // 2. Attempt direct Supabase upsert
+  try {
     const { data, error } = await supabase
       .from("organizing_team")
       .upsert([record], { onConflict: "id" })
@@ -63,69 +90,61 @@ export async function saveOrganizingMember(
       .maybeSingle();
 
     if (!error && data) {
-      syncToLocalCache(data as OrganizingMember);
+      if (typeof window !== "undefined") {
+        window.dispatchEvent(new Event("organizing_team_updated"));
+      }
       return { success: true, data: data as OrganizingMember };
     }
+    if (error) {
+      return { success: false, error: error.message };
+    }
   } catch (err) {
-    console.warn("Supabase upsert failed:", err);
+    return { success: false, error: String(err) };
   }
 
-  // 2. Save to client-side localStorage fallback
   if (typeof window !== "undefined") {
-    try {
-      syncToLocalCache(record);
-      return { success: true, data: record };
-    } catch (e) {
-      return { success: false, error: "Failed to save locally: " + String(e) };
-    }
+    window.dispatchEvent(new Event("organizing_team_updated"));
   }
 
   return { success: true, data: record };
 }
 
 /**
- * Deletes an organizing member (admin action)
+ * Deletes an organizing member (admin action).
  */
 export async function deleteOrganizingMember(
   id: string
 ): Promise<{ success: boolean; error?: string }> {
+  // 1. Delete via server API endpoint
   try {
-    // 1. Try deleting from Supabase
-    await supabase.from("organizing_team").delete().eq("id", id);
+    const res = await fetch(`/api/organizing-team?id=${encodeURIComponent(id)}`, {
+      method: "DELETE",
+    });
+
+    if (res.ok) {
+      const json = await res.json();
+      if (json.success) {
+        if (typeof window !== "undefined") {
+          window.dispatchEvent(new Event("organizing_team_updated"));
+        }
+        return { success: true };
+      }
+    }
   } catch (err) {
-    console.warn("Supabase delete failed:", err);
+    console.warn("API delete failed:", err);
   }
 
-  // 2. Delete from local cache
-  if (typeof window !== "undefined") {
-    try {
-      const current = await fetchOrganizingTeam();
-      const filtered = current.filter((m) => m.id !== id);
-      localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(filtered));
-      window.dispatchEvent(new Event("organizing_team_updated"));
-    } catch {
-      // Ignore
-    }
-  }
-
-  return { success: true };
-}
-
-function syncToLocalCache(record: OrganizingMember) {
-  if (typeof window === "undefined") return;
+  // 2. Direct Supabase delete
   try {
-    const raw = localStorage.getItem(LOCAL_STORAGE_KEY);
-    let list: OrganizingMember[] = raw ? JSON.parse(raw) : [...initialOrganizingTeam];
-    const index = list.findIndex((m) => m.id === record.id);
-    if (index >= 0) {
-      list[index] = record;
-    } else {
-      list.push(record);
+    const { error } = await supabase.from("organizing_team").delete().eq("id", id);
+    if (!error) {
+      if (typeof window !== "undefined") {
+        window.dispatchEvent(new Event("organizing_team_updated"));
+      }
+      return { success: true };
     }
-    list.sort((a, b) => (a.display_order ?? 0) - (b.display_order ?? 0));
-    localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(list));
-    window.dispatchEvent(new Event("organizing_team_updated"));
-  } catch {
-    // Ignore
+    return { success: false, error: error.message };
+  } catch (err) {
+    return { success: false, error: String(err) };
   }
 }

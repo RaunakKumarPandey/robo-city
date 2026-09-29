@@ -1,9 +1,13 @@
 import { NextResponse } from "next/server";
-import { supabase } from "@/lib/supabase";
+import { getServiceSupabase } from "@/lib/supabase";
 import { initialOrganizingTeam } from "@/data/initialOrganizingTeam";
 import { OrganizingMember } from "@/types/database";
 
+export const dynamic = "force-dynamic";
+
 export async function GET() {
+  const supabase = getServiceSupabase();
+
   try {
     const { data, error } = await supabase
       .from("organizing_team")
@@ -11,24 +15,42 @@ export async function GET() {
       .order("display_order", { ascending: true });
 
     if (!error && data && data.length > 0) {
-      return NextResponse.json({ success: true, data });
+      return NextResponse.json(
+        { success: true, data },
+        {
+          headers: {
+            "Cache-Control": "no-store, no-cache, must-revalidate, proxy-revalidate",
+          },
+        }
+      );
     }
-  } catch {
-    // Ignore error and return seed data
+  } catch (err) {
+    console.error("API GET organizing_team error:", err);
   }
 
-  return NextResponse.json({ success: true, data: initialOrganizingTeam });
+  return NextResponse.json(
+    { success: true, data: initialOrganizingTeam },
+    {
+      headers: {
+        "Cache-Control": "no-store, no-cache, must-revalidate, proxy-revalidate",
+      },
+    }
+  );
 }
 
 export async function POST(request: Request) {
+  const supabase = getServiceSupabase();
+
   try {
     const body = (await request.json()) as Partial<OrganizingMember>;
+    const memberId = body.id || `org-${Date.now()}`;
+
     const record: OrganizingMember = {
-      id: body.id || `org-${Date.now()}`,
-      name: body.name || "Crew Member",
-      role: body.role || "Squad Lead",
+      id: memberId,
+      name: body.name || "Operative",
+      role: body.role || "Core Member",
       category: body.category || "Core Squad",
-      year: body.year || null,
+      year: body.year || "Final Year",
       photo_url: body.photo_url || null,
       phone: body.phone || null,
       email: body.email || null,
@@ -36,29 +58,56 @@ export async function POST(request: Request) {
       instagram: body.instagram || null,
       github: body.github || null,
       bio: body.bio || null,
-      display_order: body.display_order ?? 99,
+      display_order: Number(body.display_order) || 99,
       updated_at: new Date().toISOString(),
     };
 
-    try {
-      const { data, error } = await supabase
-        .from("organizing_team")
-        .upsert([record], { onConflict: "id" })
-        .select()
-        .maybeSingle();
+    const { data, error } = await supabase
+      .from("organizing_team")
+      .upsert([record], { onConflict: "id" })
+      .select()
+      .maybeSingle();
 
-      if (!error && data) {
-        return NextResponse.json({ success: true, data });
-      }
-    } catch {
-      // Return record as fallback
+    if (error) {
+      console.error("Supabase upsert error:", error);
+      return NextResponse.json({ success: false, error: error.message, data: record });
     }
 
-    return NextResponse.json({ success: true, data: record });
+    return NextResponse.json({ success: true, data: data || record });
   } catch (err) {
     return NextResponse.json(
       { success: false, error: (err as Error).message },
-      { status: 400 }
+      { status: 500 }
+    );
+  }
+}
+
+export async function DELETE(request: Request) {
+  const supabase = getServiceSupabase();
+
+  try {
+    const { searchParams } = new URL(request.url);
+    const id = searchParams.get("id");
+
+    if (!id) {
+      return NextResponse.json(
+        { success: false, error: "Missing member id" },
+        { status: 400 }
+      );
+    }
+
+    const { error } = await supabase.from("organizing_team").delete().eq("id", id);
+
+    if (error) {
+      console.error("Supabase delete error:", error);
+      return NextResponse.json({ success: false, error: error.message });
+    }
+
+    return NextResponse.json({ success: true });
+  } catch (err) {
+    return NextResponse.json(
+      { success: false, error: (err as Error).message },
+      { status: 500 }
     );
   }
 }
