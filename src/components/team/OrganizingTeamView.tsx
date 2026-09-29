@@ -12,7 +12,6 @@ import {
   Sparkles,
   ExternalLink,
   Plus,
-  ShieldCheck,
   Zap,
   GraduationCap,
 } from "lucide-react";
@@ -136,21 +135,6 @@ export default function OrganizingTeamView() {
     <div className="relative min-h-screen w-full px-3 pt-28 pb-20 sm:px-6 lg:px-8 xl:px-12">
       {/* 1. HERO HEADER */}
       <div className="mx-auto max-w-5xl text-center">
-        {/* Status Pill */}
-        <div className="mb-4 inline-flex items-center gap-2 rounded-full border border-[#FF2D8D]/40 bg-[#120B20]/80 px-4 py-1.5 backdrop-blur-xl shadow-[0_0_20px_rgba(255,45,141,0.3)]">
-          <span className="relative flex h-2 w-2">
-            <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-[#FF2D8D] opacity-75" />
-            <span className="relative inline-flex h-2 w-2 rounded-full bg-[#FF2D8D]" />
-          </span>
-          <span className="font-mono text-xs font-black tracking-widest text-[#FF4FB3] uppercase">
-            IEEE STUDENT BRANCH MMMUT
-          </span>
-          <span className="h-3 w-[1px] bg-white/20" />
-          <span className="font-mono text-xs font-bold tracking-wider text-[#35D9FF]">
-            ROBOVERSE &apos;26 HQ
-          </span>
-        </div>
-
         {/* Title */}
         <h1 className="text-4xl sm:text-6xl md:text-7xl font-black uppercase tracking-tight leading-[0.95]">
           <span className="block text-white drop-shadow-[0_4px_20px_rgba(0,0,0,0.9)]">
@@ -160,29 +144,6 @@ export default function OrganizingTeamView() {
             COMMAND TEAM
           </span>
         </h1>
-
-        {/* Tagline */}
-        <p className="mx-auto mt-4 max-w-2xl font-sans text-sm sm:text-base text-zinc-300 drop-shadow-[0_2px_4px_rgba(0,0,0,0.8)]">
-          The minds, roboticists, and visionaries engineering the ultimate battleground. Reach out to squad leads for competition queries, technical verification, and logistics dispatch.
-        </p>
-
-        {/* Admin Quick Action Pill */}
-        <div className="mt-6 flex flex-wrap items-center justify-center gap-3">
-          <Link
-            href="/admin/organizing-team"
-            className="inline-flex items-center gap-2 rounded-lg border border-[#35D9FF]/40 bg-[#35D9FF]/10 px-4 py-2 font-mono text-xs font-bold tracking-wider text-[#35D9FF] backdrop-blur-md hover:bg-[#35D9FF]/20 hover:border-[#35D9FF] transition-all shadow-[0_0_15px_rgba(53,217,255,0.2)]"
-          >
-            <ShieldCheck className="h-4 w-4" />
-            <span>ADMIN: ADD / EDIT TEAM MEMBERS</span>
-          </Link>
-          <Link
-            href="/contact"
-            className="inline-flex items-center gap-2 rounded-lg border border-white/10 bg-white/5 px-4 py-2 font-mono text-xs font-bold tracking-wider text-zinc-300 backdrop-blur-md hover:bg-white/10 hover:text-white transition-all"
-          >
-            <Mail className="h-4 w-4 text-[#FF7A3D]" />
-            <span>CENTRAL DISPATCH</span>
-          </Link>
-        </div>
       </div>
 
       {/* 2. SEARCH & FILTER CONTROLS */}
