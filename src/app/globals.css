@@ -1,25 +1,29 @@
 @import "tailwindcss";
 
 :root {
-  --bg-main: #07070F;
-  --color-primary: #FF2A85;
-  --color-secondary: #FF6B35;
-  --color-cyan: #00F0FF;
-  --color-purple: #8A2BE2;
-  --text-main: #F3F4F6;
-  --text-muted: #9CA3AF;
+  --bg-main: #08070D;
+  --bg-dark-purple: #120B20;
+  --color-neon-pink: #FF2D8D;
+  --color-hot-pink: #FF4FB3;
+  --color-sunset-orange: #FF7A3D;
+  --color-cyan: #35D9FF;
+  --color-cream: #FFE8C7;
+  --color-white: #F5F5F5;
+  --text-main: #F5F5F5;
+  --text-muted: #A3A3B8;
   --font-display: var(--font-orbitron), sans-serif;
   --font-sans: var(--font-rajdhani), sans-serif;
 }
 
 @theme inline {
-  --color-bg-main: var(--bg-main);
-  --color-neon-pink: var(--color-primary);
-  --color-sunset-orange: var(--color-secondary);
-  --color-cyber-cyan: var(--color-cyan);
-  --color-neon-purple: var(--color-purple);
-  --color-text-main: var(--text-main);
-  --color-text-muted: var(--text-muted);
+  --color-deep-black: #08070D;
+  --color-dark-purple: #120B20;
+  --color-neon-pink: #FF2D8D;
+  --color-hot-pink: #FF4FB3;
+  --color-sunset-orange: #FF7A3D;
+  --color-cyan: #35D9FF;
+  --color-warm-cream: #FFE8C7;
+  --color-vice-white: #F5F5F5;
   --font-display: var(--font-display);
   --font-sans: var(--font-sans);
 }
@@ -35,70 +39,106 @@ body {
   min-height: 100vh;
   overflow-x: hidden;
   font-family: var(--font-sans, system-ui, sans-serif);
-  background-image: 
-    radial-gradient(circle at 50% 0%, rgba(138, 43, 226, 0.18), transparent 50%),
-    radial-gradient(circle at 100% 20%, rgba(255, 42, 133, 0.1), transparent 40%),
-    radial-gradient(circle at 0% 40%, rgba(0, 240, 255, 0.08), transparent 40%);
-  background-attachment: fixed;
 }
 
-/* Perspective Grid for Cyber Road */
-.perspective-grid {
-  perspective: 450px;
+/* Vice City HUD Panels */
+.hud-panel {
+  background: rgba(18, 11, 32, 0.75);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid rgba(255, 45, 141, 0.2);
+  box-shadow: 0 10px 40px -10px rgba(8, 7, 13, 0.9), 0 0 20px -5px rgba(255, 45, 141, 0.15);
 }
 
-.grid-plane {
-  position: absolute;
-  inset: 0;
-  width: 100%;
-  height: 200%;
-  transform-origin: 50% 0%;
-  transform: rotateX(72deg) translateY(-25%);
-  background-image: 
-    linear-gradient(to right, rgba(0, 240, 255, 0.15) 1px, transparent 1px),
-    linear-gradient(to bottom, rgba(255, 42, 133, 0.15) 1px, transparent 1px);
-  background-size: 50px 40px;
-  animation: grid-move 12s linear infinite;
-  mask-image: linear-gradient(to bottom, rgba(0,0,0,1) 0%, rgba(0,0,0,0) 80%);
-  -webkit-mask-image: linear-gradient(to bottom, rgba(0,0,0,1) 0%, rgba(0,0,0,0) 80%);
+.hud-panel:hover {
+  border-color: rgba(53, 217, 255, 0.4);
+  box-shadow: 0 10px 40px -10px rgba(8, 7, 13, 0.9), 0 0 25px -5px rgba(53, 217, 255, 0.25);
 }
 
-@keyframes grid-move {
-  0% {
-    background-position: 0 0;
-  }
-  100% {
-    background-position: 0 400px;
-  }
+/* Neon Text Glow Utilities */
+.neon-text-pink {
+  color: #FF2D8D;
+  text-shadow: 0 0 12px rgba(255, 45, 141, 0.6), 0 0 30px rgba(255, 45, 141, 0.3);
 }
 
-/* Subtle Film Grain */
+.neon-text-cyan {
+  color: #35D9FF;
+  text-shadow: 0 0 12px rgba(53, 217, 255, 0.6), 0 0 30px rgba(53, 217, 255, 0.3);
+}
+
+.neon-text-orange {
+  color: #FF7A3D;
+  text-shadow: 0 0 12px rgba(255, 122, 61, 0.6), 0 0 30px rgba(255, 122, 61, 0.3);
+}
+
+/* Vice City Sunset Gradient Text */
+.gradient-vice-sunset {
+  background: linear-gradient(135deg, #FF2D8D 0%, #FF7A3D 50%, #35D9FF 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+.gradient-vice-hot {
+  background: linear-gradient(135deg, #FF4FB3 0%, #FF2D8D 50%, #FF7A3D 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+.gradient-vice-cyan {
+  background: linear-gradient(135deg, #35D9FF 0%, #FF2D8D 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+/* Cinematic Scanlines & Film Grain Overlay */
+.scanlines {
+  background: linear-gradient(
+    rgba(18, 11, 32, 0) 50%, 
+    rgba(8, 7, 13, 0.35) 50%
+  ), linear-gradient(
+    90deg,
+    rgba(255, 45, 141, 0.03),
+    rgba(53, 217, 255, 0.01),
+    rgba(255, 122, 61, 0.03)
+  );
+  background-size: 100% 3px, 6px 100%;
+}
+
 .bg-grain {
-  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.8' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)' opacity='0.035'/%3E%3C/svg%3E");
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.75' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)' opacity='0.04'/%3E%3C/svg%3E");
+}
+
+/* Cinematic Vignette Overlay */
+.vignette-overlay {
+  background: radial-gradient(circle at center, transparent 35%, rgba(8, 7, 13, 0.75) 85%, #08070D 100%);
 }
 
 /* Custom Clean Scrollbar */
 ::-webkit-scrollbar {
-  width: 8px;
+  width: 7px;
 }
 
 ::-webkit-scrollbar-track {
-  background: #07070F;
+  background: #08070D;
 }
 
 ::-webkit-scrollbar-thumb {
-  background: #1f1b38;
+  background: #1e1233;
   border-radius: 4px;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: #FF2A85;
+  background: #FF2D8D;
+}
+
+/* Hide default cursor on desktop when HUD reticle is active */
+@media (hover: hover) and (min-width: 768px) {
+  .custom-cursor-active, .custom-cursor-active * {
+    cursor: none !important;
+  }
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .grid-plane {
-    animation: none;
-  }
   * {
     animation-duration: 0.01ms !important;
     animation-iteration-count: 1 !important;

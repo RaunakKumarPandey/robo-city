@@ -2,7 +2,7 @@
 
 import { useState, useMemo } from "react";
 import { LeaderboardEntry } from "@/types/database";
-import { Search, Trophy, Eye, X, Clock } from "lucide-react";
+import { Search, Trophy, Eye, X, Clock, Zap, Crosshair } from "lucide-react";
 
 interface LeaderboardTableProps {
   teams: LeaderboardEntry[];
@@ -28,21 +28,21 @@ export default function LeaderboardTable({
     const formatted = `#${String(rank).padStart(2, "0")}`;
     if (rank === 1) {
       return (
-        <span className="inline-flex items-center gap-1 rounded-md bg-[#FFAA00]/20 border border-[#FFAA00]/60 px-2.5 py-0.5 font-mono text-xs font-black text-[#FFAA00] shadow-[0_0_12px_rgba(255,170,0,0.35)]">
+        <span className="inline-flex items-center gap-1 rounded-md bg-[#FFE8C7]/20 border border-[#FFE8C7]/60 px-2.5 py-0.5 font-mono text-xs font-black text-[#FFE8C7] shadow-[0_0_12px_rgba(255,232,199,0.35)]">
           {formatted}
         </span>
       );
     }
     if (rank === 2) {
       return (
-        <span className="inline-flex items-center gap-1 rounded-md bg-[#FF6B35]/20 border border-[#FF6B35]/60 px-2.5 py-0.5 font-mono text-xs font-black text-[#FF6B35] shadow-[0_0_10px_rgba(255,107,53,0.3)]">
+        <span className="inline-flex items-center gap-1 rounded-md bg-[#FF7A3D]/20 border border-[#FF7A3D]/60 px-2.5 py-0.5 font-mono text-xs font-black text-[#FF7A3D] shadow-[0_0_10px_rgba(255,122,61,0.3)]">
           {formatted}
         </span>
       );
     }
     if (rank === 3) {
       return (
-        <span className="inline-flex items-center gap-1 rounded-md bg-[#00F0FF]/20 border border-[#00F0FF]/60 px-2.5 py-0.5 font-mono text-xs font-black text-[#00F0FF] shadow-[0_0_10px_rgba(0,240,255,0.3)]">
+        <span className="inline-flex items-center gap-1 rounded-md bg-[#35D9FF]/20 border border-[#35D9FF]/60 px-2.5 py-0.5 font-mono text-xs font-black text-[#35D9FF] shadow-[0_0_10px_rgba(53,217,255,0.3)]">
           {formatted}
         </span>
       );
@@ -60,15 +60,15 @@ export default function LeaderboardTable({
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         {/* Search */}
         <div className="relative flex-1 max-w-md">
-          <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3.5 text-zinc-500">
+          <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3.5 text-zinc-400">
             <Search className="h-4 w-4" />
           </div>
           <input
             type="text"
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            placeholder="Search teams by name..."
-            className="w-full rounded-lg border border-white/10 bg-white/5 py-2 pl-10 pr-10 text-xs text-white placeholder-zinc-500 backdrop-blur-sm transition-colors focus:border-[#00F0FF] focus:outline-none"
+            placeholder="Search syndicate / team name..."
+            className="w-full rounded-xl border border-white/15 bg-[#120B20]/80 py-2.5 pl-10 pr-10 font-mono text-xs text-white placeholder-zinc-500 backdrop-blur-md transition-colors focus:border-[#35D9FF] focus:outline-none"
           />
           {searchQuery && (
             <button
@@ -81,119 +81,69 @@ export default function LeaderboardTable({
         </div>
 
         {/* Total Teams Pill */}
-        <div className="flex items-center gap-2 rounded-lg border border-white/10 bg-[#0A0718] px-4 py-2 text-xs font-mono">
-          <span className="text-zinc-400 font-bold uppercase">ALL TEAMS:</span>
-          <span className="text-[#00F0FF] font-black">{displayedTeams.length} / {teams.length}</span>
+        <div className="flex items-center gap-2 rounded-xl border border-white/10 bg-[#120B20]/80 px-4 py-2 text-xs font-mono backdrop-blur-md">
+          <span className="text-zinc-400 font-bold uppercase">SYNDICATES:</span>
+          <span className="text-[#35D9FF] font-black">{displayedTeams.length} / {teams.length}</span>
         </div>
       </div>
 
       {/* Desktop Table View */}
-      <div className="hidden overflow-hidden rounded-xl border border-white/10 bg-[#0A0718]/85 backdrop-blur-md md:block shadow-[0_0_30px_rgba(0,0,0,0.6)]">
+      <div className="hidden overflow-hidden rounded-2xl border border-white/10 bg-[#120B20]/85 backdrop-blur-xl md:block shadow-[0_15px_40px_rgba(0,0,0,0.7)]">
         <table className="w-full text-left text-xs font-mono">
           <thead className="border-b border-white/10 bg-white/5 text-zinc-400 uppercase tracking-widest">
             <tr>
               <th className="py-4 px-4 font-bold w-20">RANK</th>
-              <th className="py-4 px-4 font-bold">TEAM</th>
-              <th className="py-4 px-4 font-bold text-center">R1</th>
-              <th className="py-4 px-4 font-bold text-center">R2</th>
-              <th className="py-4 px-4 font-bold text-center">R3</th>
-              <th className="py-4 px-4 font-bold text-center text-[#00F0FF]">TOTAL</th>
-              <th className="py-4 px-4 text-right font-bold w-24">INSPECT</th>
+              <th className="py-4 px-4 font-bold">CREW / SYNDICATE</th>
+              <th className="py-4 px-4 font-bold text-center">R1 BUILD</th>
+              <th className="py-4 px-4 font-bold text-center">R2 RAMPAGE</th>
+              <th className="py-4 px-4 font-bold text-center">R3 RUN</th>
+              <th className="py-4 px-4 font-bold text-center text-[#35D9FF]">TOTAL XP</th>
+              <th className="py-4 px-4 font-bold text-center w-24">INTEL</th>
             </tr>
           </thead>
-          <tbody className="divide-y divide-white/5 text-zinc-300">
+          <tbody className="divide-y divide-white/5">
             {displayedTeams.map((team) => {
-              const isRecentlyUpdated = recentlyUpdatedId === team.id;
+              const isUpdated = recentlyUpdatedId === team.id;
               return (
                 <tr
                   key={team.id}
-                  onClick={() => setInspectingTeam(team)}
-                  className={`group transition-all duration-300 hover:bg-white/[0.04] cursor-pointer ${
-                    isRecentlyUpdated
-                      ? "bg-[#00F0FF]/15 shadow-[0_0_20px_rgba(0,240,255,0.25)] animate-pulse"
-                      : ""
+                  className={`transition-colors duration-200 hover:bg-white/5 ${
+                    isUpdated ? "bg-[#35D9FF]/15 animate-pulse" : ""
                   }`}
                 >
-                  {/* Rank */}
-                  <td className="py-4 px-4 font-bold">
-                    {getRankBadge(team.rank)}
-                  </td>
-
-                  {/* Team */}
-                  <td className="py-4 px-4 font-bold text-white font-sans text-sm">
-                    <div className="flex items-center gap-3">
-                      <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-[#FF2A85]/10 text-[#FF2A85] text-xs font-mono font-black border border-[#FF2A85]/20 group-hover:scale-105 transition-transform flex-shrink-0">
-                        {team.team_name.charAt(0).toUpperCase()}
-                      </div>
-                      <div className="flex flex-col min-w-0">
-                        <span className="group-hover:text-[#00F0FF] transition-colors truncate font-extrabold text-white">
-                          {team.team_name}
-                        </span>
-                        {team.leader_name && (
-                          <span className="text-[11px] font-mono text-zinc-400 font-normal flex items-center gap-1.5 mt-0.5">
-                            <span className="inline-block px-1.5 py-0.2 rounded bg-white/5 border border-white/10 text-[9px] font-bold text-[#00F0FF] uppercase tracking-wider">
-                              LEAD
-                            </span>
-                            <span className="truncate text-zinc-300 font-sans">{team.leader_name}</span>
-                          </span>
-                        )}
-                      </div>
+                  <td className="py-4 px-4">{getRankBadge(team.rank)}</td>
+                  <td className="py-4 px-4">
+                    <div className="font-bold text-white text-sm">
+                      {team.team_name}
                     </div>
+                    {team.leader_name && (
+                      <div className="text-[11px] text-zinc-400">
+                        Cap: {team.leader_name}
+                      </div>
+                    )}
                   </td>
-
-                  {/* R1 */}
-                  <td className="py-4 px-4 text-center font-mono">
-                    <span
-                      className={`rounded px-2.5 py-1 ${
-                        team.round1_score > 0
-                          ? "bg-white/5 text-white font-bold"
-                          : "text-zinc-600"
-                      }`}
+                  <td className="py-4 px-4 text-center text-zinc-300">
+                    {team.round1_score !== null && team.round1_score !== undefined ? team.round1_score : "—"}
+                  </td>
+                  <td className="py-4 px-4 text-center text-zinc-300">
+                    {team.round2_score !== null && team.round2_score !== undefined ? team.round2_score : "—"}
+                  </td>
+                  <td className="py-4 px-4 text-center text-zinc-300">
+                    {team.round3_score !== null && team.round3_score !== undefined ? team.round3_score : "—"}
+                  </td>
+                  <td className="py-4 px-4 text-center">
+                    <span className="font-black text-sm text-transparent bg-clip-text bg-gradient-to-r from-[#FF2D8D] to-[#35D9FF]">
+                      {team.total_score}
+                    </span>
+                  </td>
+                  <td className="py-4 px-4 text-center">
+                    <button
+                      onClick={() => setInspectingTeam(team)}
+                      title="Inspect Team Scores"
+                      className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-white/10 bg-white/5 text-zinc-400 hover:border-[#35D9FF] hover:bg-[#35D9FF]/10 hover:text-white transition-colors cursor-pointer"
                     >
-                      {team.round1_score}
-                    </span>
-                  </td>
-
-                  {/* R2 */}
-                  <td className="py-4 px-4 text-center font-mono">
-                    <span
-                      className={`rounded px-2.5 py-1 ${
-                        team.round2_score > 0
-                          ? "bg-white/5 text-white font-bold"
-                          : "text-zinc-600"
-                      }`}
-                    >
-                      {team.round2_score}
-                    </span>
-                  </td>
-
-                  {/* R3 */}
-                  <td className="py-4 px-4 text-center font-mono">
-                    <span
-                      className={`rounded px-2.5 py-1 ${
-                        team.round3_score > 0
-                          ? "bg-white/5 text-white font-bold"
-                          : "text-zinc-600"
-                      }`}
-                    >
-                      {team.round3_score}
-                    </span>
-                  </td>
-
-                  {/* Total */}
-                  <td className="py-4 px-4 text-center font-bold font-mono">
-                    <span className="inline-flex items-center gap-1.5 rounded-full border border-[#00F0FF]/30 bg-[#00F0FF]/10 px-3 py-1 text-sm text-[#00F0FF] shadow-[0_0_12px_rgba(0,240,255,0.2)]">
-                      <Trophy className="h-3.5 w-3.5" />
-                      <span>{team.total_score} PTS</span>
-                    </span>
-                  </td>
-
-                  {/* Inspect Action */}
-                  <td className="py-4 px-4 text-right">
-                    <div className="inline-flex items-center gap-1 rounded-md border border-white/10 bg-white/5 px-2.5 py-1 text-[11px] font-mono text-zinc-400 group-hover:border-[#00F0FF]/40 group-hover:text-white transition-colors">
-                      <Eye className="h-3 w-3" />
-                      <span>VIEW</span>
-                    </div>
+                      <Eye className="h-4 w-4" />
+                    </button>
                   </td>
                 </tr>
               );
@@ -202,173 +152,85 @@ export default function LeaderboardTable({
         </table>
       </div>
 
-      {/* Mobile Stacked Card List */}
+      {/* Mobile Cards View */}
       <div className="grid grid-cols-1 gap-3.5 md:hidden">
-        {displayedTeams.map((team) => {
-          const isRecentlyUpdated = recentlyUpdatedId === team.id;
-          return (
-            <div
-              key={team.id}
-              onClick={() => setInspectingTeam(team)}
-              className={`rounded-xl border border-white/10 bg-[#0A0718]/90 p-4 backdrop-blur-md space-y-3 transition-all cursor-pointer ${
-                isRecentlyUpdated
-                  ? "border-[#00F0FF] bg-[#00F0FF]/10 shadow-[0_0_20px_rgba(0,240,255,0.25)]"
-                  : ""
-              }`}
-            >
-              {/* Header */}
-              <div className="flex items-start justify-between gap-2">
-                <div className="flex items-start gap-2.5 min-w-0">
-                  <div className="mt-0.5">{getRankBadge(team.rank)}</div>
-                  <div className="flex flex-col min-w-0">
-                    <h3 className="font-black text-white text-base truncate max-w-[200px] leading-tight">
-                      {team.team_name}
-                    </h3>
-                    {team.leader_name && (
-                      <span className="text-[11px] font-mono text-zinc-400 font-normal flex items-center gap-1.5 mt-1">
-                        <span className="inline-block px-1.5 py-0.2 rounded bg-white/5 border border-white/10 text-[9px] font-bold text-[#00F0FF] uppercase tracking-wider">
-                          LEAD
-                        </span>
-                        <span className="truncate text-zinc-300 font-sans">{team.leader_name}</span>
-                      </span>
-                    )}
+        {displayedTeams.map((team) => (
+          <div
+            key={team.id}
+            onClick={() => setInspectingTeam(team)}
+            className="rounded-xl border border-white/10 bg-[#120B20]/90 p-4 font-mono shadow-md cursor-pointer hover:border-[#35D9FF]/40 transition-colors"
+          >
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2.5">
+                {getRankBadge(team.rank)}
+                <div>
+                  <div className="font-bold text-white text-sm">
+                    {team.team_name}
                   </div>
+                  {team.leader_name && (
+                    <div className="text-[10px] text-zinc-400">
+                      Cap: {team.leader_name}
+                    </div>
+                  )}
                 </div>
-
-                <span className="font-mono text-sm font-black text-[#00F0FF] flex-shrink-0">
-                  {team.total_score} PTS
-                </span>
               </div>
-
-              {/* Score Chips */}
-              <div className="grid grid-cols-3 gap-2 text-center font-mono text-xs">
-                <div className="rounded border border-white/5 bg-black/40 p-2">
-                  <span className="text-[10px] text-zinc-400 block">R1</span>
-                  <span className="font-bold text-white">{team.round1_score}</span>
-                </div>
-                <div className="rounded border border-white/5 bg-black/40 p-2">
-                  <span className="text-[10px] text-zinc-400 block">R2</span>
-                  <span className="font-bold text-white">{team.round2_score}</span>
-                </div>
-                <div className="rounded border border-white/5 bg-black/40 p-2">
-                  <span className="text-[10px] text-zinc-400 block">R3</span>
-                  <span className="font-bold text-white">{team.round3_score}</span>
+              <div className="text-right">
+                <div className="font-mono text-base font-black text-[#35D9FF]">
+                  XP {team.total_score}
                 </div>
               </div>
             </div>
-          );
-        })}
+          </div>
+        ))}
       </div>
 
-      {/* ========================================================================= */}
-      {/* TEAM DETAILS INSPECTION MODAL (READ ONLY) */}
-      {/* ========================================================================= */}
+      {/* Team Inspection Modal */}
       {inspectingTeam && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4 backdrop-blur-sm">
-          <div className="relative w-full max-w-md rounded-2xl border border-white/10 bg-[#0A0718] p-6 sm:p-8 shadow-[0_0_50px_rgba(0,0,0,0.9)] max-h-[90vh] overflow-y-auto">
-            {/* Header */}
-            <div className="flex items-center justify-between border-b border-white/10 pb-4 mb-6">
-              <div>
-                <span className="font-mono text-xs font-bold text-[#00F0FF] uppercase">
-                  RANK #{String(inspectingTeam.rank).padStart(2, "0")} // DOSSIER
-                </span>
-                <h2 className="text-xl font-black uppercase text-white tracking-tight">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4 backdrop-blur-md">
+          <div className="relative w-full max-w-md rounded-2xl border border-white/10 bg-[#120B20] p-6 shadow-2xl space-y-6">
+            <div className="flex items-center justify-between border-b border-white/10 pb-4">
+              <div className="space-y-1">
+                <div className="font-mono text-[10px] font-bold tracking-widest text-[#35D9FF] uppercase">
+                  CREW TELEMETRY DOSSIER
+                </div>
+                <h3 className="font-mono text-xl font-black text-white">
                   {inspectingTeam.team_name}
-                </h2>
-                {inspectingTeam.leader_name && (
-                  <p className="mt-1 flex items-center gap-1.5 text-xs font-mono text-zinc-300">
-                    <span className="px-1.5 py-0.5 rounded bg-[#00F0FF]/15 border border-[#00F0FF]/30 text-[10px] font-bold text-[#00F0FF] uppercase">
-                      LEADER
-                    </span>
-                    <span className="font-sans font-medium text-white">{inspectingTeam.leader_name}</span>
-                  </p>
-                )}
+                </h3>
               </div>
               <button
                 onClick={() => setInspectingTeam(null)}
-                className="rounded-lg p-1.5 text-zinc-400 hover:bg-white/10 hover:text-white cursor-pointer"
+                className="rounded-lg p-1.5 text-zinc-400 hover:bg-white/10 hover:text-white"
               >
                 <X className="h-5 w-5" />
               </button>
             </div>
 
-            {/* Content */}
-            <div className="space-y-6">
-              {/* Media Asset Preview */}
-              {inspectingTeam.robot_image_url && (
-                <div className="rounded-xl border border-white/10 bg-black/40 p-3 text-center">
-                  <span className="font-mono text-[10px] text-zinc-500 uppercase block mb-1">
-                    ROBOT ASSET
-                  </span>
-                  <p className="text-xs text-zinc-400 break-all font-mono">
-                    {inspectingTeam.robot_image_url}
-                  </p>
-                </div>
-              )}
-
-              {/* Tournament Scores Breakdown */}
-              <div className="rounded-xl border border-[#00F0FF]/30 bg-[#00F0FF]/5 p-5 space-y-4">
-                <div className="flex items-center justify-between border-b border-[#00F0FF]/20 pb-2">
-                  <span className="font-mono text-xs font-black text-[#00F0FF] uppercase">
-                    COMPETITION STANDINGS
-                  </span>
-                  <Trophy className="h-4 w-4 text-[#00F0FF]" />
-                </div>
-
-                <div className="grid grid-cols-3 gap-2 text-center font-mono">
-                  <div className="rounded bg-black/40 p-2.5">
-                    <span className="text-[10px] text-zinc-400 uppercase block">ROUND 1</span>
-                    <span className="font-bold text-white text-base">
-                      {inspectingTeam.round1_score}
-                    </span>
-                  </div>
-                  <div className="rounded bg-black/40 p-2.5">
-                    <span className="text-[10px] text-zinc-400 uppercase block">ROUND 2</span>
-                    <span className="font-bold text-white text-base">
-                      {inspectingTeam.round2_score}
-                    </span>
-                  </div>
-                  <div className="rounded bg-black/40 p-2.5">
-                    <span className="text-[10px] text-zinc-400 uppercase block">ROUND 3</span>
-                    <span className="font-bold text-white text-base">
-                      {inspectingTeam.round3_score}
-                    </span>
-                  </div>
-                </div>
-
-                <div className="rounded-lg bg-[#00F0FF]/15 border border-[#00F0FF]/40 p-3 flex items-center justify-between font-mono">
-                  <span className="text-xs font-bold text-zinc-300 uppercase">
-                    OFFICIAL TOTAL
-                  </span>
-                  <span className="text-xl font-black text-[#00F0FF]">
-                    {inspectingTeam.total_score} PTS
-                  </span>
+            <div className="grid grid-cols-3 gap-3 text-center">
+              <div className="rounded-xl border border-white/10 bg-[#08070D] p-3 font-mono">
+                <div className="text-[10px] text-zinc-400">R1 BUILD</div>
+                <div className="mt-1 text-lg font-black text-white">
+                  {inspectingTeam.round1_score ?? "—"}
                 </div>
               </div>
-
-              {/* Timestamp */}
-              {inspectingTeam.updated_at && (
-                <div className="flex items-center justify-center gap-1.5 font-mono text-[11px] text-zinc-500">
-                  <Clock className="h-3.5 w-3.5" />
-                  <span>
-                    Last Updated:{" "}
-                    {new Date(inspectingTeam.updated_at).toLocaleTimeString([], {
-                      hour: "2-digit",
-                      minute: "2-digit",
-                    })}
-                  </span>
+              <div className="rounded-xl border border-white/10 bg-[#08070D] p-3 font-mono">
+                <div className="text-[10px] text-zinc-400">R2 RAMPAGE</div>
+                <div className="mt-1 text-lg font-black text-[#FF7A3D]">
+                  {inspectingTeam.round2_score ?? "—"}
                 </div>
-              )}
+              </div>
+              <div className="rounded-xl border border-white/10 bg-[#08070D] p-3 font-mono">
+                <div className="text-[10px] text-zinc-400">R3 RUN</div>
+                <div className="mt-1 text-lg font-black text-[#35D9FF]">
+                  {inspectingTeam.round3_score ?? "—"}
+                </div>
+              </div>
             </div>
 
-            {/* Footer */}
-            <div className="mt-6 flex justify-end">
-              <button
-                onClick={() => setInspectingTeam(null)}
-                className="rounded-lg border border-white/10 bg-white/5 px-5 py-2 text-xs font-mono font-bold text-zinc-300 uppercase hover:bg-white/10 cursor-pointer"
-              >
-                CLOSE
-              </button>
+            <div className="rounded-xl border border-[#35D9FF]/30 bg-[#35D9FF]/10 p-4 text-center font-mono">
+              <div className="text-xs text-zinc-300">TOTAL ACCUMULATED SCORE</div>
+              <div className="mt-1 text-3xl font-black text-white">
+                XP {inspectingTeam.total_score}
+              </div>
             </div>
           </div>
         </div>

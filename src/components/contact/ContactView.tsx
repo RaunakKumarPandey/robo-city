@@ -82,20 +82,20 @@ export default function ContactView() {
         {/* PAGE HEADER */}
         {/* ========================================================================= */}
         <div className="mb-12 text-center space-y-3">
-          <div className="inline-flex items-center gap-2 rounded-full border border-[#00F0FF]/30 bg-[#00F0FF]/10 px-4 py-1 text-xs font-mono font-bold tracking-widest text-[#00F0FF] uppercase shadow-[0_0_15px_rgba(0,240,255,0.2)]">
-            <Radio className="h-3.5 w-3.5 animate-pulse text-[#00F0FF]" />
-            <span>ROBO CITY // COMMS &amp; DISPATCH</span>
+          <div className="inline-flex items-center gap-2 rounded-full border border-[#35D9FF]/40 bg-[#120B20]/80 px-4 py-1.5 text-xs font-mono font-bold tracking-widest text-[#35D9FF] uppercase shadow-[0_0_20px_rgba(53,217,255,0.25)] backdrop-blur-xl">
+            <Radio className="h-3.5 w-3.5 animate-pulse text-[#FF2D8D]" />
+            <span>VICE CITY &apos;26 // COMMS &amp; DISPATCH</span>
           </div>
 
-          <h1 className="text-3xl sm:text-5xl lg:text-6xl font-black uppercase tracking-tight text-white font-mono leading-tight">
-            CONTACT{" "}
-            <span className="text-transparent bg-clip-text bg-gradient-to-r from-[#FF2A85] via-[#FF6B35] to-[#00F0FF] filter drop-shadow-[0_0_20px_rgba(255,42,133,0.4)]">
-              CONTROL DESK
+          <h1 className="text-4xl sm:text-6xl lg:text-7xl font-black uppercase tracking-tight text-white font-mono leading-tight">
+            CENTRAL{" "}
+            <span className="text-transparent bg-clip-text bg-gradient-to-r from-[#FF2D8D] via-[#FF7A3D] to-[#35D9FF] filter drop-shadow-[0_0_20px_rgba(255,45,141,0.5)]">
+              DISPATCH
             </span>
           </h1>
 
-          <p className="mx-auto max-w-2xl text-xs sm:text-sm text-zinc-400 font-mono tracking-wider">
-            FOR EVENT REGULATIONS, SOCIETY INQUIRIES, OR DIRECT COORDINATOR SUPPORT — CONNECT THROUGH ANY OFFICIAL CHANNEL BELOW.
+          <p className="mx-auto max-w-2xl text-xs sm:text-sm text-zinc-300 font-mono tracking-wider">
+            FOR COMPETITION PROTOCOLS, SPONSORSHIPS, OR DIRECT COORDINATOR DISPATCH — CONNECT VIA OFFICIAL CHANNELS.
           </p>
         </div>
 

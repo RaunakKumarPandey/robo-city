@@ -1,3 +1,5 @@
+"use client";
+
 import Link from "next/link";
 import { CityLocation } from "@/types";
 import {
@@ -9,7 +11,6 @@ import {
   CircleDollarSign,
   Users,
   ArrowRight,
-  Radio,
 } from "lucide-react";
 
 interface CityLocationCardProps {
@@ -43,39 +44,39 @@ export default function CityLocationCard({ location }: CityLocationCardProps) {
     switch (location.themeColor) {
       case "pink":
         return {
-          borderHover: "hover:border-[#FF2A85]/80 hover:shadow-[0_0_25px_rgba(255,42,133,0.35)]",
-          badge: "bg-[#FF2A85]/15 text-[#FF2A85] border-[#FF2A85]/30",
-          iconBg: "bg-[#FF2A85]/10 text-[#FF2A85] border-[#FF2A85]/30 group-hover:bg-[#FF2A85] group-hover:text-white",
-          accentText: "text-[#FF2A85]",
-          dotColor: "bg-[#FF2A85]",
-          glowColor: "rgba(255,42,133,0.2)",
+          borderHover: "hover:border-[#FF2D8D] hover:shadow-[0_0_30px_rgba(255,45,141,0.35)]",
+          badge: "bg-[#FF2D8D]/15 text-[#FF4FB3] border-[#FF2D8D]/40",
+          iconBg: "bg-[#FF2D8D]/15 text-[#FF4FB3] border-[#FF2D8D]/30 group-hover:bg-[#FF2D8D] group-hover:text-white",
+          accentText: "text-[#FF4FB3]",
+          dotColor: "bg-[#FF2D8D]",
+          glowColor: "rgba(255,45,141,0.3)",
         };
       case "orange":
         return {
-          borderHover: "hover:border-[#FF6B35]/80 hover:shadow-[0_0_25px_rgba(255,107,53,0.35)]",
-          badge: "bg-[#FF6B35]/15 text-[#FF6B35] border-[#FF6B35]/30",
-          iconBg: "bg-[#FF6B35]/10 text-[#FF6B35] border-[#FF6B35]/30 group-hover:bg-[#FF6B35] group-hover:text-white",
-          accentText: "text-[#FF6B35]",
-          dotColor: "bg-[#FF6B35]",
-          glowColor: "rgba(255,107,53,0.2)",
+          borderHover: "hover:border-[#FF7A3D] hover:shadow-[0_0_30px_rgba(255,122,61,0.35)]",
+          badge: "bg-[#FF7A3D]/15 text-[#FF7A3D] border-[#FF7A3D]/40",
+          iconBg: "bg-[#FF7A3D]/15 text-[#FF7A3D] border-[#FF7A3D]/30 group-hover:bg-[#FF7A3D] group-hover:text-white",
+          accentText: "text-[#FF7A3D]",
+          dotColor: "bg-[#FF7A3D]",
+          glowColor: "rgba(255,122,61,0.3)",
         };
       case "cyan":
         return {
-          borderHover: "hover:border-[#00F0FF]/80 hover:shadow-[0_0_25px_rgba(0,240,255,0.35)]",
-          badge: "bg-[#00F0FF]/15 text-[#00F0FF] border-[#00F0FF]/30",
-          iconBg: "bg-[#00F0FF]/10 text-[#00F0FF] border-[#00F0FF]/30 group-hover:bg-[#00F0FF] group-hover:text-black",
-          accentText: "text-[#00F0FF]",
-          dotColor: "bg-[#00F0FF]",
-          glowColor: "rgba(0,240,255,0.2)",
+          borderHover: "hover:border-[#35D9FF] hover:shadow-[0_0_30px_rgba(53,217,255,0.35)]",
+          badge: "bg-[#35D9FF]/15 text-[#35D9FF] border-[#35D9FF]/40",
+          iconBg: "bg-[#35D9FF]/15 text-[#35D9FF] border-[#35D9FF]/30 group-hover:bg-[#35D9FF] group-hover:text-black",
+          accentText: "text-[#35D9FF]",
+          dotColor: "bg-[#35D9FF]",
+          glowColor: "rgba(53,217,255,0.3)",
         };
       case "purple":
         return {
-          borderHover: "hover:border-[#8A2BE2]/80 hover:shadow-[0_0_25px_rgba(138,43,226,0.35)]",
-          badge: "bg-[#8A2BE2]/15 text-[#8A2BE2] border-[#8A2BE2]/30",
-          iconBg: "bg-[#8A2BE2]/10 text-[#8A2BE2] border-[#8A2BE2]/30 group-hover:bg-[#8A2BE2] group-hover:text-white",
-          accentText: "text-[#8A2BE2]",
-          dotColor: "bg-[#8A2BE2]",
-          glowColor: "rgba(138,43,226,0.2)",
+          borderHover: "hover:border-[#FF4FB3] hover:shadow-[0_0_30px_rgba(255,79,179,0.35)]",
+          badge: "bg-[#FF4FB3]/15 text-[#FF4FB3] border-[#FF4FB3]/40",
+          iconBg: "bg-[#FF4FB3]/15 text-[#FF4FB3] border-[#FF4FB3]/30 group-hover:bg-[#FF4FB3] group-hover:text-white",
+          accentText: "text-[#FF4FB3]",
+          dotColor: "bg-[#FF4FB3]",
+          glowColor: "rgba(255,79,179,0.3)",
         };
     }
   };
@@ -85,33 +86,33 @@ export default function CityLocationCard({ location }: CityLocationCardProps) {
   return (
     <Link
       href={location.href}
-      className={`group relative flex flex-col justify-between overflow-hidden rounded-xl border border-white/10 bg-[#0A0718]/80 p-5 sm:p-6 backdrop-blur-md transition-all duration-300 hover:-translate-y-1.5 ${theme.borderHover}`}
+      className={`group relative flex flex-col justify-between overflow-hidden rounded-2xl border border-white/10 bg-[#120B20]/80 p-6 backdrop-blur-xl transition-all duration-300 hover:-translate-y-1.5 shadow-[0_10px_30px_rgba(0,0,0,0.6)] ${theme.borderHover}`}
     >
-      {/* Subtle Background Glow on Hover */}
+      {/* Background radial glow on hover */}
       <div
-        className="pointer-events-none absolute -right-10 -top-10 h-36 w-36 rounded-full opacity-0 blur-3xl transition-opacity duration-300 group-hover:opacity-60"
+        className="pointer-events-none absolute -right-10 -top-10 h-40 w-40 rounded-full opacity-0 blur-3xl transition-opacity duration-300 group-hover:opacity-60"
         style={{ backgroundColor: theme.glowColor }}
       />
 
       <div>
         {/* Top Node Header */}
-        <div className="flex items-center justify-between gap-2 border-b border-white/5 pb-3">
+        <div className="flex items-center justify-between gap-2 border-b border-white/10 pb-3.5">
           <div className="flex items-center gap-2">
             <span className={`h-2 w-2 rounded-full ${theme.dotColor} shadow-[0_0_8px_currentColor]`} />
-            <span className="font-mono text-[11px] font-bold tracking-widest text-zinc-400 uppercase">
-              DISTRICT {location.number}
+            <span className="font-mono text-xs font-bold tracking-widest text-zinc-300 uppercase">
+              SECTOR {location.number}
             </span>
           </div>
 
           {/* Status Badge */}
           {location.status && (
             <div
-              className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-0.5 text-[10px] font-black tracking-wider uppercase ${theme.badge}`}
+              className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-0.5 font-mono text-[10px] font-black tracking-wider uppercase ${theme.badge}`}
             >
               {location.statusType === "live" && (
                 <span className="relative flex h-1.5 w-1.5">
                   <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-cyan-400 opacity-75" />
-                  <span className="relative inline-flex h-1.5 w-1.5 rounded-full bg-[#00F0FF]" />
+                  <span className="relative inline-flex h-1.5 w-1.5 rounded-full bg-[#35D9FF]" />
                 </span>
               )}
               <span>{location.status}</span>
@@ -122,33 +123,31 @@ export default function CityLocationCard({ location }: CityLocationCardProps) {
         {/* Card Body: Icon & Titles */}
         <div className="mt-5 flex items-start gap-4">
           <div
-            className={`flex h-12 w-12 shrink-0 items-center justify-center rounded-lg border transition-all duration-300 group-hover:scale-105 ${theme.iconBg}`}
+            className={`flex h-12 w-12 shrink-0 items-center justify-center rounded-xl border transition-all duration-300 group-hover:scale-110 shadow-lg ${theme.iconBg}`}
           >
             {getIcon()}
           </div>
 
           <div className="space-y-1">
-            <h3 className="text-lg sm:text-xl font-black uppercase tracking-tight text-white group-hover:text-white">
+            <h3 className="text-xl font-black uppercase tracking-tight text-white group-hover:text-white">
               {location.title}
             </h3>
-            <p className={`font-mono text-[11px] font-bold tracking-wider uppercase ${theme.accentText}`}>
+            <p className={`font-mono text-xs font-bold tracking-wider uppercase ${theme.accentText}`}>
               {location.subtitle}
             </p>
           </div>
         </div>
 
         {/* Description */}
-        <p className="mt-4 text-xs sm:text-sm text-zinc-400 leading-relaxed">
+        <p className="mt-4 font-sans text-xs sm:text-sm text-zinc-300 leading-relaxed">
           {location.description}
         </p>
       </div>
 
-      {/* Footer Navigation CTA */}
-      <div className="mt-6 flex items-center justify-between border-t border-white/5 pt-4 text-xs font-black tracking-widest text-zinc-400 uppercase transition-colors group-hover:text-white">
-        <span>ENTER DISTRICT</span>
-        <div className="flex h-7 w-7 items-center justify-center rounded-md border border-white/10 bg-white/5 transition-all duration-200 group-hover:border-white/30 group-hover:bg-white/15 group-hover:translate-x-1">
-          <ArrowRight className="h-3.5 w-3.5" />
-        </div>
+      {/* Card Action Footer */}
+      <div className="mt-6 flex items-center justify-between border-t border-white/10 pt-3.5 font-mono text-xs font-bold tracking-wider uppercase text-zinc-400 group-hover:text-white">
+        <span>ACCESS SECTOR</span>
+        <ArrowRight className="h-4 w-4 transition-transform duration-200 group-hover:translate-x-1 text-[#35D9FF]" />
       </div>
     </Link>
   );

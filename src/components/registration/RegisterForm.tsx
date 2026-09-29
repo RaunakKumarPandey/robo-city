@@ -173,24 +173,24 @@ export default function RegisterForm() {
         {/* PAGE HERO HEADER */}
         {/* ========================================================================= */}
         <div className="text-center space-y-3">
-          <div className="inline-flex items-center gap-2 rounded-full border border-[#FF6B35]/30 bg-[#FF6B35]/10 px-4 py-1 text-xs font-mono font-bold tracking-widest text-[#FF6B35] uppercase shadow-[0_0_15px_rgba(255,107,53,0.2)]">
-            <Users className="h-3.5 w-3.5 text-[#00F0FF]" />
-            <span>ROBO CITY // REGISTRATION DESK</span>
+          <div className="inline-flex items-center gap-2 rounded-full border border-[#FF7A3D]/40 bg-[#120B20]/80 px-4 py-1.5 text-xs font-mono font-bold tracking-widest text-[#FF7A3D] uppercase shadow-[0_0_20px_rgba(255,122,61,0.25)] backdrop-blur-xl">
+            <Users className="h-3.5 w-3.5 text-[#35D9FF]" />
+            <span>VICE CITY &apos;26 // SYNDICATE RECRUITMENT</span>
           </div>
 
-          <h1 className="text-3xl sm:text-5xl md:text-6xl font-black uppercase tracking-tight text-white leading-tight font-mono">
+          <h1 className="text-4xl sm:text-6xl md:text-7xl font-black uppercase tracking-tight text-white leading-tight font-mono">
             BUILD YOUR{" "}
-            <span className="text-transparent bg-clip-text bg-gradient-to-r from-[#FF2A85] via-[#FF6B35] to-[#FFAA00] filter drop-shadow-[0_0_20px_rgba(255,42,133,0.4)]">
+            <span className="text-transparent bg-clip-text bg-gradient-to-r from-[#FF2D8D] via-[#FF7A3D] to-[#35D9FF] filter drop-shadow-[0_0_25px_rgba(255,45,141,0.5)]">
               CREW
             </span>
           </h1>
 
-          <p className="font-mono text-xs sm:text-sm font-bold tracking-widest text-[#00F0FF] uppercase">
-            ENTER ROBO CITY
+          <p className="font-mono text-sm sm:text-base font-black tracking-widest text-[#FFE8C7] uppercase drop-shadow-[0_0_8px_rgba(255,232,199,0.4)]">
+            3–5 PLAYERS. ONE MACHINE. ONE MISSION.
           </p>
 
-          <p className="mx-auto max-w-xl text-xs sm:text-sm text-zinc-400 font-mono tracking-wider">
-            BUILD YOUR CREW. BUILD YOUR BOT. OWN THE CITY.
+          <p className="mx-auto max-w-xl text-xs sm:text-sm text-zinc-300 font-sans tracking-wide">
+            Form your engineering syndicate and register your machine to enter the Robo City Grand Prix.
           </p>
         </div>
 
@@ -594,21 +594,20 @@ export default function RegisterForm() {
               <button
                 type="submit"
                 disabled={submitting || members.length < 3 || members.length > 5}
-                className={`w-full flex items-center justify-center gap-2 rounded-xl py-4 text-sm font-mono font-black tracking-wider uppercase text-white shadow-[0_0_25px_rgba(255,42,133,0.35)] transition-all ${
+                className={`w-full flex items-center justify-center gap-2.5 rounded-xl py-4 font-mono text-sm sm:text-base font-black tracking-widest uppercase text-white shadow-[0_0_30px_rgba(255,45,141,0.45)] transition-all ${
                   submitting || members.length < 3
                     ? "bg-zinc-700 cursor-not-allowed opacity-60"
-                    : "bg-gradient-to-r from-[#FF2A85] via-[#FF6B35] to-[#FFAA00] hover:scale-[1.01] cursor-pointer"
+                    : "bg-gradient-to-r from-[#FF2D8D] via-[#FF7A3D] to-[#35D9FF] hover:shadow-[0_0_40px_rgba(255,45,141,0.7)] hover:scale-[1.01] cursor-pointer"
                 }`}
               >
                 {submitting ? (
                   <>
-                    <Loader2 className="h-5 w-5 animate-spin" />
-                    <span>REGISTERING CREW...</span>
+                    <Loader2 className="h-5 w-5 animate-spin text-[#FFE8C7]" />
+                    <span>ENTERING VICE CITY DATABASE...</span>
                   </>
                 ) : (
                   <>
-                    <span>SUBMIT REGISTRATION</span>
-                    <ChevronRight className="h-5 w-5" />
+                    <span>ENTER VICE CITY →</span>
                   </>
                 )}
               </button>
