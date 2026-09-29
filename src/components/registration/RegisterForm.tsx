@@ -175,7 +175,7 @@ export default function RegisterForm() {
         <div className="text-center space-y-3">
           <div className="inline-flex items-center gap-2 rounded-full border border-[#FF7A3D]/40 bg-[#120B20]/80 px-4 py-1.5 text-xs font-mono font-bold tracking-widest text-[#FF7A3D] uppercase shadow-[0_0_20px_rgba(255,122,61,0.25)] backdrop-blur-xl">
             <Users className="h-3.5 w-3.5 text-[#35D9FF]" />
-            <span>VICE CITY &apos;26 // SYNDICATE RECRUITMENT</span>
+            <span>ROBOVERSE &apos;26 // SYNDICATE RECRUITMENT</span>
           </div>
 
           <h1 className="text-4xl sm:text-6xl md:text-7xl font-black uppercase tracking-tight text-white leading-tight font-mono">
@@ -603,11 +603,11 @@ export default function RegisterForm() {
                 {submitting ? (
                   <>
                     <Loader2 className="h-5 w-5 animate-spin text-[#FFE8C7]" />
-                    <span>ENTERING VICE CITY DATABASE...</span>
+                    <span>ENTERING ROBOVERSE DATABASE...</span>
                   </>
                 ) : (
                   <>
-                    <span>ENTER VICE CITY →</span>
+                    <span>ENTER ROBOVERSE →</span>
                   </>
                 )}
               </button>

@@ -45,7 +45,7 @@ export default function HeroSection() {
         animate="visible"
         className="relative z-10 mx-auto flex max-w-5xl flex-1 flex-col items-center justify-center px-4 text-center sm:px-6 lg:px-8"
       >
-        {/* TOP STATUS PILL: 🔴 VICE CITY // GRAND PRIX 2026 */}
+        {/* TOP STATUS PILL: 🔴 ROBOVERSE // GRAND PRIX 2026 */}
         <motion.div variants={itemVariants} className="mb-4 sm:mb-6">
           <div className="inline-flex items-center gap-2.5 rounded-full border border-[#FF2D8D]/40 bg-[#120B20]/80 px-4 py-1.5 backdrop-blur-xl shadow-[0_0_20px_rgba(255,45,141,0.3)]">
             <span className="relative flex h-2.5 w-2.5">
@@ -57,7 +57,7 @@ export default function HeroSection() {
             </span>
             <span className="h-3 w-[1px] bg-white/20" />
             <span className="font-mono text-xs font-bold tracking-wider text-[#35D9FF]">
-              VICE CITY &apos;26 // GRAND PRIX
+              ROBOVERSE &apos;26 // GRAND PRIX
             </span>
           </div>
         </motion.div>
@@ -69,14 +69,14 @@ export default function HeroSection() {
           </span>
         </motion.div>
 
-        {/* MAIN DISPLAY HEADLINE: ROBO CITY // VICE CITY '26 */}
+        {/* MAIN DISPLAY HEADLINE: ROBO CITY // ROBOVERSE '26 */}
         <motion.div variants={itemVariants} className="mb-4 sm:mb-6">
           <h1 className="text-5xl font-black tracking-tight sm:text-7xl md:text-8xl lg:text-9xl uppercase leading-[0.9]">
             <span className="block text-white font-extrabold drop-shadow-[0_4px_20px_rgba(0,0,0,0.9)]">
               ROBO CITY
             </span>
             <span className="block text-transparent bg-clip-text bg-gradient-to-r from-[#FF2D8D] via-[#FF7A3D] to-[#35D9FF] filter drop-shadow-[0_0_35px_rgba(255,45,141,0.6)]">
-              VICE CITY &apos;26
+              ROBOVERSE &apos;26
             </span>
           </h1>
         </motion.div>

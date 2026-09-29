@@ -6,7 +6,7 @@ export const cityLocations: CityLocation[] = [
     number: "01",
     title: "ROBO CITY HQ",
     subtitle: "EVENT INTEL & TIMELINE",
-    description: "Full intelligence briefing on Vice City '26, organizer credentials, schedule, and regulations.",
+    description: "Full intelligence briefing on RoboVerse '26, organizer credentials, schedule, and regulations.",
     href: "/about",
     iconName: "building",
     status: "INTEL",

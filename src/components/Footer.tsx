@@ -21,7 +21,7 @@ export default function Footer() {
           <div className="space-y-1">
             <div className="flex items-center justify-center sm:justify-start gap-2">
               <span className="font-mono text-sm font-black tracking-widest text-white uppercase">
-                ROBO CITY // VICE CITY &apos;26
+                ROBO CITY // ROBOVERSE &apos;26
               </span>
               <span className="h-1.5 w-1.5 rounded-full bg-[#35D9FF] shadow-[0_0_6px_#35D9FF]" />
             </div>

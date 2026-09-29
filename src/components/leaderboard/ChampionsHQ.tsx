@@ -170,7 +170,7 @@ export default function ChampionsHQ() {
               <Loader2 className="h-8 w-8 animate-spin" />
             </div>
             <p className="font-mono text-xs font-bold uppercase tracking-widest text-zinc-400">
-              ACQUIRING VICE CITY LEADERBOARD TELEMETRY...
+              ACQUIRING ROBOVERSE LEADERBOARD TELEMETRY...
             </p>
           </div>
         ) : teams.length === 0 ? (

@@ -47,7 +47,7 @@ export default function Navbar() {
       }`}
     >
       <div className="mx-auto flex max-w-7xl items-center justify-between px-4 py-3 sm:px-6 lg:px-8">
-        {/* 1. Left Brand Logo: IEEE Badge + ROBO CITY // VICE CITY '26 */}
+        {/* 1. Left Brand Logo: IEEE Badge + ROBO CITY // ROBOVERSE '26 */}
         <Link href="/" className="group flex items-center gap-3">
           <div className="relative flex h-10 w-10 items-center justify-center rounded-lg bg-gradient-to-br from-[#FF2D8D] via-[#FF7A3D] to-[#35D9FF] p-[2px] shadow-[0_0_15px_rgba(255,45,141,0.4)] transition-transform duration-200 group-hover:scale-105">
             <div className="flex h-full w-full items-center justify-center rounded-[6px] bg-[#08070D]">
@@ -63,7 +63,7 @@ export default function Navbar() {
               ROBO CITY
             </span>
             <span className="font-mono text-[9px] font-extrabold tracking-[0.25em] text-[#FFE8C7]/80 uppercase -mt-0.5 flex items-center gap-1.5">
-              <span>VICE CITY &apos;26</span>
+              <span>ROBOVERSE &apos;26</span>
             </span>
           </div>
         </Link>
@@ -93,13 +93,13 @@ export default function Navbar() {
 
         {/* 3. Right Status & Quick Action Buttons */}
         <div className="hidden md:flex items-center gap-3">
-          {/* Status HUD Pill: VICE CITY // 2026 ● ONLINE */}
+          {/* Status HUD Pill: ROBOVERSE // 2026 ● ONLINE */}
           <div className="inline-flex items-center gap-2 rounded-full border border-[#35D9FF]/40 bg-[#35D9FF]/10 px-3 py-1 font-mono text-[11px] font-bold tracking-wider text-[#35D9FF] shadow-[0_0_12px_rgba(53,217,255,0.2)]">
             <span className="relative flex h-2 w-2">
               <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400 opacity-75" />
               <span className="relative inline-flex h-2 w-2 rounded-full bg-emerald-400 shadow-[0_0_6px_#34d399]" />
             </span>
-            <span>VICE CITY // 2026</span>
+            <span>ROBOVERSE // 2026</span>
             <span className="text-white/40">|</span>
             <span className="text-emerald-400 font-extrabold">ONLINE</span>
           </div>
@@ -155,7 +155,7 @@ export default function Navbar() {
           {/* Mobile HUD Top Bar */}
           <div className="flex items-center justify-between border-b border-white/10 pb-3 mb-3">
             <div className="font-mono text-[10px] font-bold tracking-widest text-zinc-400 uppercase">
-              GPS: 26.73° N, 83.43° E // VICE CITY
+              GPS: 26.73° N, 83.43° E // ROBOVERSE
             </div>
             <div className="font-mono text-[10px] font-black tracking-widest text-[#35D9FF]">
               SYSTEM READY

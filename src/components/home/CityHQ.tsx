@@ -96,7 +96,7 @@ export default function CityHQ() {
           </h2>
 
           <p className="mt-4 mx-auto max-w-2xl font-sans text-sm sm:text-base text-zinc-300 leading-relaxed">
-            Robo City // Vice City &apos;26 is organized by <strong className="text-white">{eventData.organizer}</strong> at Madan Mohan Malaviya University of Technology, Gorakhpur.
+            Robo City // RoboVerse &apos;26 is organized by <strong className="text-white">{eventData.organizer}</strong> at Madan Mohan Malaviya University of Technology, Gorakhpur.
           </p>
         </div>
 

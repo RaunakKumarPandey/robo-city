@@ -41,7 +41,7 @@ export default function RegistrationSuccess({
         <div className="space-y-2">
           <div className="inline-flex items-center gap-1.5 rounded-full border border-[#35D9FF]/40 bg-[#35D9FF]/10 px-3.5 py-0.5 text-xs font-mono font-bold tracking-widest text-[#35D9FF] uppercase">
             <Sparkles className="h-3.5 w-3.5" />
-            <span>WELCOME TO VICE CITY &apos;26</span>
+            <span>WELCOME TO ROBOVERSE &apos;26</span>
           </div>
           <h1 className="text-3xl sm:text-4xl font-black uppercase tracking-tight text-white font-mono">
             SYNDICATE REGISTERED
@@ -54,7 +54,7 @@ export default function RegistrationSuccess({
         {/* Registration ID Banner */}
         <div className="rounded-2xl border border-white/10 bg-[#08070D]/80 p-6 space-y-3 shadow-inner">
           <span className="text-[11px] font-mono font-bold tracking-widest text-zinc-400 uppercase block">
-            VICE CITY REGISTRATION ID
+            ROBOVERSE REGISTRATION ID
           </span>
           <div className="flex items-center justify-center gap-3">
             <span className="font-mono text-3xl sm:text-4xl font-black tracking-wider text-transparent bg-clip-text bg-gradient-to-r from-[#35D9FF] via-[#FF2D8D] to-[#FFE8C7] filter drop-shadow-[0_0_15px_rgba(53,217,255,0.4)]">

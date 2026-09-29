@@ -84,7 +84,7 @@ export default function ContactView() {
         <div className="mb-12 text-center space-y-3">
           <div className="inline-flex items-center gap-2 rounded-full border border-[#35D9FF]/40 bg-[#120B20]/80 px-4 py-1.5 text-xs font-mono font-bold tracking-widest text-[#35D9FF] uppercase shadow-[0_0_20px_rgba(53,217,255,0.25)] backdrop-blur-xl">
             <Radio className="h-3.5 w-3.5 animate-pulse text-[#FF2D8D]" />
-            <span>VICE CITY &apos;26 // COMMS &amp; DISPATCH</span>
+            <span>ROBOVERSE &apos;26 // COMMS &amp; DISPATCH</span>
           </div>
 
           <h1 className="text-4xl sm:text-6xl lg:text-7xl font-black uppercase tracking-tight text-white font-mono leading-tight">

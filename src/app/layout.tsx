@@ -22,13 +22,12 @@ const rajdhani = Rajdhani({
 });
 
 export const metadata: Metadata = {
-  title: "ROBO CITY // VICE CITY '26 — IEEE Student Branch MMMUT",
+  title: "ROBO CITY // ROBOVERSE '26 — IEEE Student Branch MMMUT",
   description:
-    "ROBO CITY // VICE CITY '26: A futuristic GTA Vice City-inspired digital robotics festival by IEEE Student Branch, MMMUT Gorakhpur. Build your crew. Build your bot. Own the city.",
+    "ROBO CITY // ROBOVERSE '26: A futuristic digital robotics festival by IEEE Student Branch, MMMUT Gorakhpur. Build your crew. Build your bot. Own the city.",
   keywords: [
     "ROBO CITY",
-    "VICE CITY 26",
-    "RoboVerse",
+    "ROBOVERSE",
     "RoboVerse'26",
     "IEEE",
     "IEEE-SB MMMUT",

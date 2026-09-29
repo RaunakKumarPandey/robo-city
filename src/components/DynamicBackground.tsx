@@ -8,7 +8,7 @@ const BG_MAP: Record<string, { image: string; tint: string; name: string }> = {
   "/": {
     image: "/images/backgrounds/bg_home.jpg",
     tint: "rgba(255, 45, 141, 0.12)",
-    name: "VICE CITY // WATERFRONT SUNSET",
+    name: "ROBOVERSE // WATERFRONT SUNSET",
   },
   "/missions": {
     image: "/images/backgrounds/bg_missions.jpg",
