@@ -9,80 +9,65 @@
 
 // 1. Default Configuration
 var CONFIG = {
-  // Production Webhook URL (Can be overridden via Script Properties "ROBO_WEBHOOK_URL")
+  // Production Webhook URL
   WEBHOOK_URL: "https://robo-city.vercel.app/api/integrations/google-form",
-  // Shared Secret (Can be overridden via Script Properties "ROBO_WEBHOOK_SECRET")
+  // Shared Secret
   WEBHOOK_SECRET: "robo-verse-26-gform-secret",
   // Expected sheet name (falls back to first sheet if not found)
   SHEET_NAME: "ROBOVERSE'26 (Responses)"
 };
 
 /**
- * Flexible header mapping dictionary (Case-insensitive & whitespace-normalized)
+ * ==============================================================================
+ * 0. ONE-TIME PERMISSION AUTHORIZATION (Forces Google Auth Dialog)
+ * ==============================================================================
  */
-var FIELD_MAP = {
-  timestamp: ["timestamp", "date", "submission time", "time"],
-  responderEmail: ["email address", "responder email", "username"],
-  teamName: ["team name", "crew name", "team", "team_name"],
-  collegeName: ["college name", "college", "institute", "institute name", "university"],
-  teamSize: ["team size", "size of team", "total members", "no of members"],
-  leaderName: ["leader name", "captain name", "name", "your name", "full name"],
-  branch: ["branch", "department", "dept"],
-  course: ["course", "program", "degree"],
-  year: ["year", "academic year"],
-  leaderEmail: ["email address", "leader email", "captain email", "your email", "email"],
-  leaderPhone: ["phone", "contact", "mobile", "whatsapp", "phone number", "contact number", "mobile number"],
-  robotName: ["robot name", "bot name", "robot", "bot"],
-  robotImageUrl: ["robot image", "bot photo", "image url", "photo url", "bot image"]
-};
-
-/**
- * Retrieve Webhook URL from Script Properties or default
- */
-function getWebhookUrl() {
-  var props = PropertiesService.getScriptProperties();
-  return props.getProperty("ROBO_WEBHOOK_URL") || props.getProperty("WEBHOOK_URL") || CONFIG.WEBHOOK_URL;
-}
-
-/**
- * Retrieve Shared Secret from Script Properties or default
- */
-function getWebhookSecret() {
-  var props = PropertiesService.getScriptProperties();
-  return props.getProperty("ROBO_WEBHOOK_SECRET") || props.getProperty("GOOGLE_FORM_WEBHOOK_SECRET") || CONFIG.WEBHOOK_SECRET;
-}
-
-/**
- * Helper: Find response sheet
- */
-function getResponseSheet() {
-  var ss = SpreadsheetApp.getActiveSpreadsheet();
-  var sheet = ss.getSheetByName(CONFIG.SHEET_NAME);
-  if (!sheet) {
-    sheet = ss.getSheets()[0];
-  }
-  return sheet;
+function authorizeScript() {
+  var test = UrlFetchApp.fetch("https://robo-city.vercel.app/api/leaderboard");
+  Logger.log("Authorization Successful! Status: " + test.getResponseCode());
 }
 
 /**
  * ==============================================================================
- * UTILITY: Print and inspect all confirmed headers in Google Sheet
+ * 1. TEST CONNECTION (Dropdown mein sabse upar)
  * ==============================================================================
  */
-function logSheetHeaders() {
-  var sheet = getResponseSheet();
-  var headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
-  Logger.log("=== DETECTED GOOGLE SHEET HEADERS (" + headers.length + " columns) ===");
-  for (var i = 0; i < headers.length; i++) {
-    Logger.log("Column " + (i + 1) + ": '" + headers[i] + "'");
-  }
-  Logger.log("===============================================================");
+function testWebhookConnection() {
+  var testPayload = {
+    source: "google_form",
+    response_id: "test-" + Date.now(),
+    submitted_at: new Date().toISOString(),
+    team: {
+      team_name: "CYBER VIPERS " + Math.floor(Math.random() * 1000),
+      captain_name: "Test Leader",
+      captain_email: "leader@test.com",
+      captain_phone: "+91 9876543210",
+      college_name: "MMMUT Gorakhpur",
+      branch: "ECE",
+      course: "B.Tech",
+      year: "3rd",
+      responder_email: "responder@test.com",
+      declared_team_size: 3
+    },
+    members: [
+      { name: "Test Leader", email: "leader@test.com", phone: "+91 9876543210", branch: "ECE", year: "3rd", role: "Captain" },
+      { name: "Crew Member 2", email: "member2@test.com", phone: "", branch: "ECE", year: "3rd", role: "Driver" },
+      { name: "Crew Member 3", email: "member3@test.com", phone: "", branch: "CSE", year: "2nd", role: "Programmer" }
+    ]
+  };
+
+  Logger.log("Testing Webhook URL: " + getWebhookUrl());
+  var res = sendToWebsiteWebhook(testPayload);
+  Logger.log("=== TEST CONNECTION RESULT ===");
+  Logger.log("Status Code: " + res.statusCode);
+  Logger.log("Success: " + res.success);
+  Logger.log("Response Message: " + res.message);
+  Logger.log("Full Result: " + JSON.stringify(res, null, 2));
 }
 
 /**
  * ==============================================================================
- * 1. ONE-TIME BULK IMPORT OF EXISTING RESPONSES
- * Run this function from Apps Script Editor to import all existing responses
+ * 2. ONE-TIME BULK IMPORT OF EXISTING RESPONSES
  * ==============================================================================
  */
 function importExistingResponses() {
@@ -115,6 +100,9 @@ function importExistingResponses() {
       }
     } else {
       failedCount++;
+      if (failedCount <= 3) {
+        Logger.log("❌ Row " + r + " Failed (HTTP " + result.statusCode + "): " + result.message);
+      }
     }
   }
 
@@ -131,8 +119,7 @@ function importExistingResponses() {
 
 /**
  * ==============================================================================
- * 2. REAL-TIME TRIGGER FOR NEW FORM SUBMISSIONS
- * Install this via: Triggers -> Add Trigger -> onFormSubmit -> On form submit
+ * 3. REAL-TIME TRIGGER FOR NEW FORM SUBMISSIONS
  * ==============================================================================
  */
 function onFormSubmit(e) {
@@ -148,31 +135,55 @@ function onFormSubmit(e) {
 }
 
 /**
- * ==============================================================================
- * Core Sync Logic for a Single Row
- * ==============================================================================
+ * Flexible header mapping dictionary (Case-insensitive & whitespace-normalized)
  */
+var FIELD_MAP = {
+  timestamp: ["timestamp", "date", "submission time", "time"],
+  responderEmail: ["email address", "responder email", "username"],
+  teamName: ["team name", "crew name", "team", "team_name"],
+  collegeName: ["college name", "college", "institute", "institute name", "university"],
+  teamSize: ["team size", "size of team", "total members", "no of members"],
+  leaderName: ["leader name", "captain name", "name", "your name", "full name"],
+  branch: ["branch", "department", "dept"],
+  course: ["course", "program", "degree"],
+  year: ["year", "academic year"],
+  leaderEmail: ["email address", "leader email", "captain email", "your email", "email"],
+  leaderPhone: ["phone", "contact", "mobile", "whatsapp", "phone number", "contact number", "mobile number"],
+  robotName: ["robot name", "bot name", "robot", "bot"],
+  robotImageUrl: ["robot image", "bot photo", "image url", "photo url", "bot image"]
+};
+
+function getWebhookUrl() {
+  var props = PropertiesService.getScriptProperties();
+  return props.getProperty("ROBO_WEBHOOK_URL") || props.getProperty("WEBHOOK_URL") || CONFIG.WEBHOOK_URL;
+}
+
+function getWebhookSecret() {
+  var props = PropertiesService.getScriptProperties();
+  return props.getProperty("ROBO_WEBHOOK_SECRET") || props.getProperty("GOOGLE_FORM_WEBHOOK_SECRET") || CONFIG.WEBHOOK_SECRET;
+}
+
+function getResponseSheet() {
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var sheet = ss.getSheetByName(CONFIG.SHEET_NAME);
+  if (!sheet) {
+    sheet = ss.getSheets()[0];
+  }
+  return sheet;
+}
+
 function syncRowToRoboCity(sheet, rowNumber) {
   var headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
   var rowValues = sheet.getRange(rowNumber, 1, 1, sheet.getLastColumn()).getValues()[0];
   
-  // Extract normalized payload
   var payload = buildPayloadFromRow(headers, rowValues, rowNumber);
-  
-  // Dispatch HTTP POST with HMAC SHA-256
   var result = sendToWebsiteWebhook(payload);
-  
-  // Update status columns in Google Sheet
   updateSyncStatusInSheet(sheet, rowNumber, headers, result);
 
   return result;
 }
 
-/**
- * Converts row data into standard JSON payload using normalized mapping
- */
 function buildPayloadFromRow(headers, rowValues, rowNumber) {
-  // Build lookup map: normalized_header -> array of { originalHeader, value }
   var cellMap = {};
   for (var i = 0; i < headers.length; i++) {
     var hRaw = String(headers[i]).trim();
@@ -181,7 +192,6 @@ function buildPayloadFromRow(headers, rowValues, rowNumber) {
     cellMap[hNorm].push({ original: hRaw, value: rowValues[i] });
   }
 
-  // Helper: Retrieve value from alias list
   function getValue(aliasList) {
     for (var a = 0; a < aliasList.length; a++) {
       var target = aliasList[a].toLowerCase().replace(/[\s_-]+/g, " ");
@@ -200,7 +210,6 @@ function buildPayloadFromRow(headers, rowValues, rowNumber) {
     return "";
   }
 
-  // Extract confirmed fields
   var timestamp = getValue(FIELD_MAP.timestamp);
   var responderEmail = getValue(FIELD_MAP.responderEmail);
   var teamName = getValue(FIELD_MAP.teamName);
@@ -215,17 +224,11 @@ function buildPayloadFromRow(headers, rowValues, rowNumber) {
   var robotName = getValue(FIELD_MAP.robotName);
   var robotImageUrl = getValue(FIELD_MAP.robotImageUrl);
 
-  // If leaderEmail equals responderEmail or is empty, use available
   var finalCaptainEmail = leaderEmail || responderEmail || "leader@domain.com";
-
-  // Parse declared team size
   var declaredSize = parseInt(teamSizeRaw, 10);
   if (isNaN(declaredSize)) declaredSize = 3;
 
-  // Build members array
   var members = [];
-
-  // Member 1 (Captain / Leader)
   if (leaderName) {
     members.push({
       name: leaderName,
@@ -237,7 +240,6 @@ function buildPayloadFromRow(headers, rowValues, rowNumber) {
     });
   }
 
-  // Scan for additional member columns (e.g. Member 2 Name, Member 3 Name...)
   for (var m = 2; m <= 5; m++) {
     var mPrefix = "member " + m;
     var tmPrefix = "team member " + m;
@@ -254,7 +256,6 @@ function buildPayloadFromRow(headers, rowValues, rowNumber) {
     }
   }
 
-  // Deterministic External Response ID (prevents duplicate imports)
   var cleanTimestamp = timestamp ? new Date(timestamp).getTime() : "no-ts";
   var deterministicId = "gform-row-" + rowNumber + "-" + cleanTimestamp;
 
@@ -282,17 +283,11 @@ function buildPayloadFromRow(headers, rowValues, rowNumber) {
   };
 }
 
-/**
- * ==============================================================================
- * HMAC SHA-256 Webhook Dispatcher
- * ==============================================================================
- */
 function sendToWebsiteWebhook(payload) {
   var url = getWebhookUrl();
   var secret = getWebhookSecret();
   var payloadString = JSON.stringify(payload);
 
-  // Generate HMAC SHA-256 Signature (Explicitly using UTF-8)
   var rawSignature = Utilities.computeHmacSha256Signature(payloadString, secret, Utilities.Charset.UTF_8);
   var signatureHex = rawSignature.map(function(byte) {
     var v = (byte < 0 ? byte + 256 : byte).toString(16);
@@ -338,9 +333,6 @@ function sendToWebsiteWebhook(payload) {
   }
 }
 
-/**
- * Writes Sync Status, Robo City Reg ID, and Timestamp back to Google Sheet
- */
 function updateSyncStatusInSheet(sheet, rowNumber, headers, result) {
   var statusCol = -1;
   var regIdCol = -1;
@@ -369,7 +361,6 @@ function updateSyncStatusInSheet(sheet, rowNumber, headers, result) {
     sheet.getRange(1, timeCol).setValue("Synced At");
   }
 
-  // Compute status text
   var statusText = "SYNCED";
   if (!result.success) {
     statusText = "FAILED";
@@ -384,36 +375,4 @@ function updateSyncStatusInSheet(sheet, rowNumber, headers, result) {
     sheet.getRange(rowNumber, regIdCol).setValue(result.registrationNumber);
   }
   sheet.getRange(rowNumber, timeCol).setValue(new Date().toLocaleString());
-}
-
-/**
- * Test Connection Function
- */
-function testWebhookConnection() {
-  var testPayload = {
-    source: "google_form",
-    response_id: "test-" + Date.now(),
-    submitted_at: new Date().toISOString(),
-    team: {
-      team_name: "CYBER VIPERS " + Math.floor(Math.random() * 1000),
-      captain_name: "Test Leader",
-      captain_email: "leader@test.com",
-      captain_phone: "+91 9876543210",
-      college_name: "MMMUT Gorakhpur",
-      branch: "ECE",
-      course: "B.Tech",
-      year: "3rd",
-      responder_email: "responder@test.com",
-      declared_team_size: 3
-    },
-    members: [
-      { name: "Test Leader", email: "leader@test.com", phone: "+91 9876543210", branch: "ECE", year: "3rd", role: "Captain" },
-      { name: "Crew Member 2", email: "member2@test.com", phone: "", branch: "ECE", year: "3rd", role: "Driver" },
-      { name: "Crew Member 3", email: "member3@test.com", phone: "", branch: "CSE", year: "2nd", role: "Programmer" }
-    ]
-  };
-
-  var res = sendToWebsiteWebhook(testPayload);
-  Logger.log("=== TEST CONNECTION RESULT ===");
-  Logger.log(JSON.stringify(res, null, 2));
 }

@@ -47,17 +47,17 @@ export default function Navbar() {
         <Link href="/" className="group flex items-center gap-2.5">
           <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-gradient-to-br from-[#FF2A85] via-[#8A2BE2] to-[#00F0FF] p-[2px] transition-transform duration-200 group-hover:scale-105 shadow-[0_0_12px_rgba(255,42,133,0.3)]">
             <div className="flex h-full w-full items-center justify-center rounded-[6px] bg-[#07070F]">
-              <span className="font-mono text-xs font-black tracking-wider text-[#00F0FF]">
-                RC
+              <span className="font-mono text-[10px] font-black tracking-wider text-[#00F0FF]">
+                IEEE
               </span>
             </div>
           </div>
           <div className="flex flex-col">
             <span className="font-black text-lg tracking-widest text-transparent bg-clip-text bg-gradient-to-r from-[#FF2A85] via-[#FF6B35] to-[#00F0FF] uppercase">
-              ROBO CITY
+              ROBOVERSE &apos;26
             </span>
             <span className="text-[9px] font-bold tracking-widest text-zinc-400 uppercase -mt-1">
-              RoboVerse &apos;26
+              ROBO CITY
             </span>
           </div>
         </Link>
