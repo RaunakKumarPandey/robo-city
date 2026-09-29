@@ -9,8 +9,6 @@ import {
   Wrench,
   Calendar,
   Building2,
-  Sparkles,
-  ShieldCheck,
   Flame,
   Coins,
   Medal,
@@ -100,51 +98,29 @@ export default function CityHQ() {
           </p>
         </div>
 
-        {/* 2. 6 EVENT HIGHLIGHT CARDS */}
-        <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3 mb-24">
+        {/* 2. 6 EVENT HIGHLIGHT CARDS (COMPACT) */}
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 mb-24">
           {intelCards.map((card) => {
             const IconComponent = card.icon;
             return (
               <div
                 key={card.number}
-                className={`group relative flex flex-col justify-between overflow-hidden rounded-2xl border bg-[#120B20]/80 p-6 backdrop-blur-xl transition-all duration-300 hover:-translate-y-1.5 shadow-[0_10px_30px_rgba(0,0,0,0.6)] ${card.borderColor}`}
+                className={`group relative flex flex-col overflow-hidden rounded-2xl border bg-[#120B20]/80 p-5 backdrop-blur-xl transition-all duration-300 hover:-translate-y-1 shadow-[0_8px_25px_rgba(0,0,0,0.5)] ${card.borderColor}`}
               >
-                {/* Node Header */}
-                <div className="flex items-center justify-between border-b border-white/10 pb-3">
-                  <div className="flex items-center gap-2">
-                    <span className="h-1.5 w-1.5 rounded-full bg-white/40" />
-                    <span className="font-mono text-[11px] font-bold tracking-widest text-zinc-400 uppercase">
-                      INTEL SPEC
-                    </span>
-                  </div>
-                  <span className={`font-mono text-xs font-black tracking-wider ${card.numberColor}`}>
-                    #{card.number}
-                  </span>
-                </div>
-
-                {/* Body */}
-                <div className="mt-5 space-y-3">
+                <div className="space-y-3">
                   <div
-                    className={`inline-flex h-12 w-12 items-center justify-center rounded-xl border border-white/10 shadow-lg ${card.iconBg}`}
+                    className={`inline-flex h-11 w-11 items-center justify-center rounded-xl border border-white/10 shadow-md ${card.iconBg}`}
                   >
-                    <IconComponent className="h-6 w-6" />
+                    <IconComponent className="h-5 w-5" />
                   </div>
 
-                  <h3 className="text-lg font-black uppercase tracking-tight text-white">
+                  <h3 className="text-base sm:text-lg font-black uppercase tracking-tight text-white">
                     {card.title}
                   </h3>
 
                   <p className="font-sans text-xs sm:text-sm text-zinc-300 leading-relaxed">
                     {card.description}
                   </p>
-                </div>
-
-                {/* Accent Footer */}
-                <div className="mt-6 flex items-center justify-between border-t border-white/10 pt-3">
-                  <span className="font-mono text-[10px] font-bold uppercase tracking-widest text-zinc-400">
-                    VERIFIED // IEEE-SB MMMUT
-                  </span>
-                  <Sparkles className="h-3.5 w-3.5 text-[#35D9FF]" />
                 </div>
               </div>
             );
