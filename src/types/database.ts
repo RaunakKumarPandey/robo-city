@@ -180,6 +180,7 @@ export interface OrganizingMember {
   name: string;
   role: string;
   category: "Faculty & Advisors" | "Core Squad" | "Technical Leads" | "Operations & Logistics";
+  year?: "Final Year" | "3rd Year" | "2nd Year" | "1st Year" | "Faculty / Advisor" | "Alumni" | string | null;
   photo_url?: string | null;
   phone?: string | null;
   email?: string | null;

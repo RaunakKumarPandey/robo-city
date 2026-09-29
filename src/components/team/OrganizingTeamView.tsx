@@ -14,6 +14,7 @@ import {
   Plus,
   ShieldCheck,
   Zap,
+  GraduationCap,
 } from "lucide-react";
 import { OrganizingMember } from "@/types/database";
 import { fetchOrganizingTeam } from "@/lib/team";
@@ -44,16 +45,25 @@ function GithubIcon({ className }: { className?: string }) {
 
 const CATEGORIES = [
   "ALL SQUADS",
-  "FACULTY & ADVISORS",
   "CORE SQUAD",
-  "TECHNICAL LEADS",
   "OPERATIONS & LOGISTICS",
+  "TECHNICAL LEADS",
+  "FACULTY & ADVISORS",
+] as const;
+
+const YEAR_FILTERS = [
+  "ALL YEARS",
+  "FINAL YEAR",
+  "3RD YEAR",
+  "2ND YEAR",
+  "FACULTY / ADVISOR",
 ] as const;
 
 export default function OrganizingTeamView() {
   const [members, setMembers] = useState<OrganizingMember[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedCategory, setSelectedCategory] = useState<string>("ALL SQUADS");
+  const [selectedYear, setSelectedYear] = useState<string>("ALL YEARS");
   const [searchQuery, setSearchQuery] = useState("");
 
   const loadMembers = async () => {
@@ -75,6 +85,7 @@ export default function OrganizingTeamView() {
 
   const filteredMembers = useMemo(() => {
     return members.filter((m) => {
+      // 1. Squad category match
       const matchCat =
         selectedCategory === "ALL SQUADS" ||
         m.category.toLowerCase() === selectedCategory.toLowerCase() ||
@@ -83,15 +94,43 @@ export default function OrganizingTeamView() {
         (selectedCategory === "CORE SQUAD" && m.category.includes("Core")) ||
         (selectedCategory === "FACULTY & ADVISORS" && m.category.includes("Faculty"));
 
+      // 2. Year filter match
+      const memberYear = (m.year || "").toLowerCase();
+      const matchYear =
+        selectedYear === "ALL YEARS" ||
+        (selectedYear === "FINAL YEAR" && (memberYear.includes("final") || memberYear.includes("4"))) ||
+        (selectedYear === "3RD YEAR" && memberYear.includes("3")) ||
+        (selectedYear === "2ND YEAR" && memberYear.includes("2")) ||
+        (selectedYear === "FACULTY / ADVISOR" && (memberYear.includes("faculty") || memberYear.includes("advisor") || m.category.includes("Faculty")));
+
+      // 3. Search query match
       const matchSearch =
         !searchQuery ||
         m.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
         m.role.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        (m.year && m.year.toLowerCase().includes(searchQuery.toLowerCase())) ||
         (m.bio && m.bio.toLowerCase().includes(searchQuery.toLowerCase()));
 
-      return matchCat && matchSearch;
+      return matchCat && matchYear && matchSearch;
     });
-  }, [members, selectedCategory, searchQuery]);
+  }, [members, selectedCategory, selectedYear, searchQuery]);
+
+  const getYearBadgeStyle = (year?: string | null, category?: string) => {
+    const y = (year || "").toLowerCase();
+    if (y.includes("final") || y.includes("4")) {
+      return "border-[#FF7A3D]/40 bg-[#FF7A3D]/15 text-[#FF7A3D]";
+    }
+    if (y.includes("3")) {
+      return "border-[#35D9FF]/40 bg-[#35D9FF]/15 text-[#35D9FF]";
+    }
+    if (y.includes("2")) {
+      return "border-[#FF2D8D]/40 bg-[#FF2D8D]/15 text-[#FF2D8D]";
+    }
+    if (y.includes("faculty") || y.includes("advisor") || category?.includes("Faculty")) {
+      return "border-[#A855F7]/40 bg-[#A855F7]/15 text-[#C084FC]";
+    }
+    return "border-white/20 bg-white/5 text-zinc-300";
+  };
 
   return (
     <div className="relative min-h-screen w-full px-4 pt-28 pb-20 sm:px-6 lg:px-8">
@@ -148,8 +187,9 @@ export default function OrganizingTeamView() {
 
       {/* 2. SEARCH & FILTER CONTROLS */}
       <div className="mx-auto mt-12 max-w-6xl space-y-6">
+        {/* Squad Tabs & Search Row */}
         <div className="flex flex-col md:flex-row items-center justify-between gap-4">
-          {/* Category Tabs */}
+          {/* Squad Category Tabs */}
           <div className="flex flex-wrap items-center justify-center gap-1.5 rounded-2xl border border-white/10 bg-[#120B20]/80 p-1.5 backdrop-blur-xl shadow-[0_10px_30px_rgba(0,0,0,0.5)]">
             {CATEGORIES.map((cat) => {
               const active = selectedCategory === cat;
@@ -176,10 +216,34 @@ export default function OrganizingTeamView() {
               type="text"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder="Search member, role..."
+              placeholder="Search member, role, year..."
               className="w-full rounded-xl border border-white/10 bg-[#120B20]/80 pl-10 pr-4 py-2 font-mono text-xs text-white placeholder-zinc-500 backdrop-blur-xl transition-colors focus:border-[#35D9FF] focus:outline-none focus:ring-1 focus:ring-[#35D9FF]"
             />
           </div>
+        </div>
+
+        {/* Year Filter Sub-Pills */}
+        <div className="flex flex-wrap items-center gap-2 pt-1 pb-1">
+          <span className="font-mono text-xs font-bold text-zinc-400 uppercase flex items-center gap-1 mr-1">
+            <GraduationCap className="h-3.5 w-3.5 text-[#35D9FF]" />
+            <span>BATCH / YEAR:</span>
+          </span>
+          {YEAR_FILTERS.map((yr) => {
+            const active = selectedYear === yr;
+            return (
+              <button
+                key={yr}
+                onClick={() => setSelectedYear(yr)}
+                className={`rounded-lg px-3 py-1 font-mono text-[11px] font-bold tracking-wider uppercase transition-all ${
+                  active
+                    ? "border border-[#35D9FF] bg-[#35D9FF]/20 text-[#35D9FF] shadow-[0_0_12px_rgba(53,217,255,0.4)]"
+                    : "border border-white/10 bg-white/5 text-zinc-400 hover:text-white hover:bg-white/10"
+                }`}
+              >
+                {yr}
+              </button>
+            );
+          })}
         </div>
 
         {/* Member Count Watermark */}
@@ -201,7 +265,7 @@ export default function OrganizingTeamView() {
               NO OPERATIVES FOUND IN THIS SECTOR
             </div>
             <p className="mt-1 text-xs text-zinc-400">
-              Try adjusting your search criteria or switch category filters.
+              Try adjusting your search criteria or switch squad/year filters.
             </p>
           </div>
         ) : (
@@ -230,11 +294,23 @@ export default function OrganizingTeamView() {
                   <div className="absolute bottom-2 right-2 h-2 w-2 border-b border-r border-white/30" />
 
                   <div>
-                    {/* Top Squad Pill */}
-                    <div className="mb-4 flex items-center justify-between">
-                      <span className="rounded-md border border-[#35D9FF]/30 bg-[#35D9FF]/10 px-2.5 py-0.5 font-mono text-[10px] font-extrabold tracking-wider text-[#35D9FF] uppercase">
-                        {member.category}
-                      </span>
+                    {/* Top Squad & Year Pill Strip */}
+                    <div className="mb-4 flex flex-wrap items-center justify-between gap-1.5">
+                      <div className="flex flex-wrap items-center gap-1.5">
+                        <span className="rounded-md border border-[#35D9FF]/30 bg-[#35D9FF]/10 px-2.5 py-0.5 font-mono text-[10px] font-extrabold tracking-wider text-[#35D9FF] uppercase">
+                          {member.category}
+                        </span>
+                        {member.year && (
+                          <span
+                            className={`rounded-md border px-2 py-0.5 font-mono text-[10px] font-bold uppercase ${getYearBadgeStyle(
+                              member.year,
+                              member.category
+                            )}`}
+                          >
+                            {member.year}
+                          </span>
+                        )}
+                      </div>
                       <span className="font-mono text-[10px] font-bold text-zinc-500">
                         #{String(member.display_order).padStart(2, "0")}
                       </span>

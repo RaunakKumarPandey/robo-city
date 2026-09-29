@@ -28,6 +28,7 @@ export async function POST(request: Request) {
       name: body.name || "Crew Member",
       role: body.role || "Squad Lead",
       category: body.category || "Core Squad",
+      year: body.year || null,
       photo_url: body.photo_url || null,
       phone: body.phone || null,
       email: body.email || null,

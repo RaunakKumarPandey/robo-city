@@ -19,6 +19,7 @@ import {
   Image as ImageIcon,
   Sparkles,
   Zap,
+  GraduationCap,
 } from "lucide-react";
 import { OrganizingMember } from "@/types/database";
 import {
@@ -32,6 +33,15 @@ const SQUAD_CATEGORIES = [
   "Core Squad",
   "Technical Leads",
   "Operations & Logistics",
+] as const;
+
+const YEAR_OPTIONS = [
+  "Final Year",
+  "3rd Year",
+  "2nd Year",
+  "1st Year",
+  "Faculty / Advisor",
+  "Alumni",
 ] as const;
 
 export default function AdminOrganizingTeamPage() {
@@ -51,6 +61,7 @@ export default function AdminOrganizingTeamPage() {
   const [formName, setFormName] = useState("");
   const [formRole, setFormRole] = useState("");
   const [formCategory, setFormCategory] = useState<OrganizingMember["category"]>("Core Squad");
+  const [formYear, setFormYear] = useState<string>("Final Year");
   const [formPhotoUrl, setFormPhotoUrl] = useState("");
   const [formPhone, setFormPhone] = useState("");
   const [formEmail, setFormEmail] = useState("");
@@ -81,6 +92,7 @@ export default function AdminOrganizingTeamPage() {
     setFormName("");
     setFormRole("");
     setFormCategory("Core Squad");
+    setFormYear("Final Year");
     setFormPhotoUrl("");
     setFormPhone("");
     setFormEmail("");
@@ -97,6 +109,7 @@ export default function AdminOrganizingTeamPage() {
     setFormName(member.name);
     setFormRole(member.role);
     setFormCategory(member.category);
+    setFormYear(member.year || (member.category.includes("Faculty") ? "Faculty / Advisor" : "Final Year"));
     setFormPhotoUrl(member.photo_url || "");
     setFormPhone(member.phone || "");
     setFormEmail(member.email || "");
@@ -135,6 +148,7 @@ export default function AdminOrganizingTeamPage() {
       name: formName.trim(),
       role: formRole.trim(),
       category: formCategory,
+      year: formYear,
       photo_url: formPhotoUrl.trim() || null,
       phone: formPhone.trim() || null,
       email: formEmail.trim() || null,
@@ -284,13 +298,18 @@ export default function AdminOrganizingTeamPage() {
                     )}
                   </div>
                   <div>
-                    <div className="flex items-center gap-2">
+                    <div className="flex flex-wrap items-center gap-2">
                       <h4 className="font-mono text-base font-black text-white uppercase">
                         {member.name}
                       </h4>
                       <span className="rounded bg-[#35D9FF]/10 px-2 py-0.5 font-mono text-[10px] font-bold text-[#35D9FF]">
                         {member.category}
                       </span>
+                      {member.year && (
+                        <span className="rounded bg-[#FF7A3D]/10 border border-[#FF7A3D]/30 px-2 py-0.5 font-mono text-[10px] font-bold text-[#FF7A3D]">
+                          {member.year}
+                        </span>
+                      )}
                     </div>
                     <p className="font-mono text-xs font-semibold text-[#FF4FB3]">
                       {member.role}
@@ -387,7 +406,7 @@ export default function AdminOrganizingTeamPage() {
                 </div>
               </div>
 
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                 <div>
                   <label className="block font-mono text-xs font-bold text-zinc-300 uppercase mb-1">
                     Squad Category
@@ -397,7 +416,7 @@ export default function AdminOrganizingTeamPage() {
                     onChange={(e) =>
                       setFormCategory(e.target.value as OrganizingMember["category"])
                     }
-                    className="w-full rounded-xl border border-white/10 bg-[#160E2E] px-3.5 py-2 font-mono text-xs text-white focus:border-[#35D9FF] focus:outline-none"
+                    className="w-full rounded-xl border border-white/10 bg-[#160E2E] px-3 py-2 font-mono text-xs text-white focus:border-[#35D9FF] focus:outline-none"
                   >
                     {SQUAD_CATEGORIES.map((cat) => (
                       <option key={cat} value={cat}>
@@ -409,14 +428,31 @@ export default function AdminOrganizingTeamPage() {
 
                 <div>
                   <label className="block font-mono text-xs font-bold text-zinc-300 uppercase mb-1">
-                    Display Priority Order
+                    Academic Year / Batch
+                  </label>
+                  <select
+                    value={formYear}
+                    onChange={(e) => setFormYear(e.target.value)}
+                    className="w-full rounded-xl border border-[#35D9FF]/40 bg-[#160E2E] px-3 py-2 font-mono text-xs text-white focus:border-[#35D9FF] focus:outline-none"
+                  >
+                    {YEAR_OPTIONS.map((yr) => (
+                      <option key={yr} value={yr}>
+                        {yr}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block font-mono text-xs font-bold text-zinc-300 uppercase mb-1">
+                    Priority Order
                   </label>
                   <input
                     type="number"
                     value={formOrder}
                     onChange={(e) => setFormOrder(Number(e.target.value))}
                     min={1}
-                    className="w-full rounded-xl border border-white/10 bg-white/5 px-3.5 py-2 font-mono text-xs text-white focus:border-[#35D9FF] focus:outline-none"
+                    className="w-full rounded-xl border border-white/10 bg-white/5 px-3 py-2 font-mono text-xs text-white focus:border-[#35D9FF] focus:outline-none"
                   />
                 </div>
               </div>
