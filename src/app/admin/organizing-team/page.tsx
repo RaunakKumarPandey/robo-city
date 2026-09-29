@@ -57,7 +57,7 @@ export default function AdminOrganizingTeamPage() {
   const [editingMember, setEditingMember] = useState<OrganizingMember | null>(null);
   const [saving, setSaving] = useState(false);
 
-  // Form Fields
+  // Form Fields (All optional - no field is mandatory)
   const [formName, setFormName] = useState("");
   const [formRole, setFormRole] = useState("");
   const [formCategory, setFormCategory] = useState<OrganizingMember["category"]>("Core Squad");
@@ -106,10 +106,10 @@ export default function AdminOrganizingTeamPage() {
 
   const handleOpenEditModal = (member: OrganizingMember) => {
     setEditingMember(member);
-    setFormName(member.name);
-    setFormRole(member.role);
-    setFormCategory(member.category);
-    setFormYear(member.year || (member.category.includes("Faculty") ? "Faculty / Advisor" : "Final Year"));
+    setFormName(member.name || "");
+    setFormRole(member.role || "");
+    setFormCategory(member.category || "Core Squad");
+    setFormYear(member.year || (member.category?.includes("Faculty") ? "Faculty / Advisor" : "Final Year"));
     setFormPhotoUrl(member.photo_url || "");
     setFormPhone(member.phone || "");
     setFormEmail(member.email || "");
@@ -137,18 +137,17 @@ export default function AdminOrganizingTeamPage() {
 
   const handleSaveMember = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!formName.trim() || !formRole.trim()) {
-      notify("error", "Name and Role are required fields!");
-      return;
-    }
 
     setSaving(true);
+    const memberName = formName.trim() || "Operative";
+    const memberRole = formRole.trim() || "Core Member";
+
     const payload: OrganizingMember = {
       id: editingMember ? editingMember.id : `org-${Date.now()}`,
-      name: formName.trim(),
-      role: formRole.trim(),
-      category: formCategory,
-      year: formYear,
+      name: memberName,
+      role: memberRole,
+      category: formCategory || "Core Squad",
+      year: formYear || "Final Year",
       photo_url: formPhotoUrl.trim() || null,
       phone: formPhone.trim() || null,
       email: formEmail.trim() || null,
@@ -166,7 +165,7 @@ export default function AdminOrganizingTeamPage() {
       notify(
         "success",
         editingMember
-          ? `Updated member: ${payload.name}`
+          ? `Saved updates for ${payload.name}`
           : `Added new member: ${payload.name}`
       );
       setModalOpen(false);
@@ -374,16 +373,15 @@ export default function AdminOrganizingTeamPage() {
               </h2>
             </div>
 
-            {/* Form */}
-            <form onSubmit={handleSaveMember} className="space-y-4">
+            {/* Form with noValidate to prevent browser blocking */}
+            <form onSubmit={handleSaveMember} noValidate className="space-y-4">
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
                   <label className="block font-mono text-xs font-bold text-zinc-300 uppercase mb-1">
-                    Full Name *
+                    Full Name
                   </label>
                   <input
                     type="text"
-                    required
                     value={formName}
                     onChange={(e) => setFormName(e.target.value)}
                     placeholder="e.g. Alex Mercer"
@@ -393,11 +391,10 @@ export default function AdminOrganizingTeamPage() {
 
                 <div>
                   <label className="block font-mono text-xs font-bold text-zinc-300 uppercase mb-1">
-                    Designation / Role *
+                    Designation / Role
                   </label>
                   <input
                     type="text"
-                    required
                     value={formRole}
                     onChange={(e) => setFormRole(e.target.value)}
                     placeholder="e.g. Technical Head"
@@ -457,17 +454,17 @@ export default function AdminOrganizingTeamPage() {
                 </div>
               </div>
 
-              {/* Photo Input & Preview */}
+              {/* Photo Input & Upload */}
               <div>
                 <label className="block font-mono text-xs font-bold text-zinc-300 uppercase mb-1">
-                  Photo URL or Upload
+                  Photo URL or Local Upload
                 </label>
                 <div className="flex gap-2">
                   <input
-                    type="url"
-                    value={formPhotoUrl.startsWith("data:") ? "(Uploaded local image)" : formPhotoUrl}
+                    type="text"
+                    value={formPhotoUrl.startsWith("data:") ? "(Local Image Uploaded)" : formPhotoUrl}
                     onChange={(e) => setFormPhotoUrl(e.target.value)}
-                    placeholder="https://... image link"
+                    placeholder="Paste image URL here or click Upload"
                     className="flex-1 rounded-xl border border-white/10 bg-white/5 px-3.5 py-2 font-mono text-xs text-white focus:border-[#35D9FF] focus:outline-none"
                   />
                   <label className="flex items-center gap-1.5 cursor-pointer rounded-xl border border-white/10 bg-white/10 px-3 py-2 font-mono text-xs font-bold text-zinc-200 hover:bg-white/20 transition-colors">
@@ -480,6 +477,15 @@ export default function AdminOrganizingTeamPage() {
                       className="hidden"
                     />
                   </label>
+                  {formPhotoUrl && (
+                    <button
+                      type="button"
+                      onClick={() => setFormPhotoUrl("")}
+                      className="rounded-xl border border-rose-500/30 bg-rose-500/10 px-2.5 py-2 font-mono text-xs text-rose-400 hover:bg-rose-500/20"
+                    >
+                      Clear
+                    </button>
+                  )}
                 </div>
 
                 {formPhotoUrl && (
@@ -496,14 +502,14 @@ export default function AdminOrganizingTeamPage() {
                 )}
               </div>
 
-              {/* Contact Information */}
+              {/* Contact Information (All non-blocking text inputs) */}
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
                   <label className="block font-mono text-xs font-bold text-zinc-300 uppercase mb-1">
                     Phone / Mobile Number
                   </label>
                   <input
-                    type="tel"
+                    type="text"
                     value={formPhone}
                     onChange={(e) => setFormPhone(e.target.value)}
                     placeholder="+91 98765 43210"
@@ -516,7 +522,7 @@ export default function AdminOrganizingTeamPage() {
                     Email Address
                   </label>
                   <input
-                    type="email"
+                    type="text"
                     value={formEmail}
                     onChange={(e) => setFormEmail(e.target.value)}
                     placeholder="name@mmmut.ac.in"
@@ -525,14 +531,14 @@ export default function AdminOrganizingTeamPage() {
                 </div>
               </div>
 
-              {/* Social Links */}
+              {/* Social Links (All non-blocking text inputs) */}
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                 <div>
                   <label className="block font-mono text-[11px] font-bold text-zinc-400 uppercase mb-1">
                     LinkedIn URL
                   </label>
                   <input
-                    type="url"
+                    type="text"
                     value={formLinkedin}
                     onChange={(e) => setFormLinkedin(e.target.value)}
                     placeholder="https://linkedin.com/in/..."
@@ -544,7 +550,7 @@ export default function AdminOrganizingTeamPage() {
                     Instagram URL
                   </label>
                   <input
-                    type="url"
+                    type="text"
                     value={formInstagram}
                     onChange={(e) => setFormInstagram(e.target.value)}
                     placeholder="https://instagram.com/..."
@@ -556,7 +562,7 @@ export default function AdminOrganizingTeamPage() {
                     GitHub URL
                   </label>
                   <input
-                    type="url"
+                    type="text"
                     value={formGithub}
                     onChange={(e) => setFormGithub(e.target.value)}
                     placeholder="https://github.com/..."
