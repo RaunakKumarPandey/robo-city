@@ -118,22 +118,22 @@ export default function OrganizingTeamView() {
   const getYearBadgeStyle = (year?: string | null, category?: string) => {
     const y = (year || "").toLowerCase();
     if (y.includes("final") || y.includes("4")) {
-      return "border-[#FF7A3D]/40 bg-[#FF7A3D]/15 text-[#FF7A3D]";
+      return "border-[#FF7A3D]/50 bg-[#FF7A3D]/20 text-[#FF7A3D]";
     }
     if (y.includes("3")) {
-      return "border-[#35D9FF]/40 bg-[#35D9FF]/15 text-[#35D9FF]";
+      return "border-[#35D9FF]/50 bg-[#35D9FF]/20 text-[#35D9FF]";
     }
     if (y.includes("2")) {
-      return "border-[#FF2D8D]/40 bg-[#FF2D8D]/15 text-[#FF2D8D]";
+      return "border-[#FF2D8D]/50 bg-[#FF2D8D]/20 text-[#FF2D8D]";
     }
     if (y.includes("faculty") || y.includes("advisor") || category?.includes("Faculty")) {
-      return "border-[#A855F7]/40 bg-[#A855F7]/15 text-[#C084FC]";
+      return "border-[#A855F7]/50 bg-[#A855F7]/20 text-[#C084FC]";
     }
-    return "border-white/20 bg-white/5 text-zinc-300";
+    return "border-white/20 bg-white/10 text-zinc-300";
   };
 
   return (
-    <div className="relative min-h-screen w-full px-4 pt-28 pb-20 sm:px-6 lg:px-8">
+    <div className="relative min-h-screen w-full px-3 pt-28 pb-20 sm:px-6 lg:px-8 xl:px-12">
       {/* 1. HERO HEADER */}
       <div className="mx-auto max-w-5xl text-center">
         {/* Status Pill */}
@@ -186,7 +186,7 @@ export default function OrganizingTeamView() {
       </div>
 
       {/* 2. SEARCH & FILTER CONTROLS */}
-      <div className="mx-auto mt-12 max-w-6xl space-y-6">
+      <div className="mx-auto mt-12 max-w-[1650px] space-y-6">
         {/* Squad Tabs & Search Row */}
         <div className="flex flex-col md:flex-row items-center justify-between gap-4">
           {/* Squad Category Tabs */}
@@ -252,7 +252,7 @@ export default function OrganizingTeamView() {
           <span className="text-[#35D9FF]">IEEE STUDENT BRANCH // ROBOVERSE &apos;26</span>
         </div>
 
-        {/* 3. MEMBER CARDS GRID */}
+        {/* 3. MEMBER CARDS GRID (4 to 5 members per row on desktop/large screens) */}
         {loading ? (
           <div className="py-20 text-center font-mono text-sm text-zinc-400">
             <div className="inline-block h-8 w-8 animate-spin rounded-full border-2 border-[#FF2D8D] border-t-transparent mb-3" />
@@ -271,7 +271,7 @@ export default function OrganizingTeamView() {
         ) : (
           <motion.div
             layout
-            className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3"
+            className="grid grid-cols-1 gap-4 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5"
           >
             <AnimatePresence>
               {filteredMembers.map((member) => (
@@ -282,27 +282,27 @@ export default function OrganizingTeamView() {
                   animate={{ opacity: 1, y: 0 }}
                   exit={{ opacity: 0, scale: 0.95 }}
                   transition={{ duration: 0.3 }}
-                  className="group relative flex flex-col justify-between overflow-hidden rounded-2xl border border-white/10 bg-gradient-to-b from-[#160E2E]/90 to-[#0A0714]/95 p-6 backdrop-blur-xl transition-all duration-300 hover:border-[#FF2D8D]/60 hover:shadow-[0_0_30px_rgba(255,45,141,0.25)]"
+                  className="group relative flex flex-col justify-between overflow-hidden rounded-2xl border border-white/10 bg-gradient-to-b from-[#160E2E]/90 to-[#0A0714]/95 p-3.5 backdrop-blur-xl transition-all duration-300 hover:border-[#FF2D8D]/60 hover:shadow-[0_0_25px_rgba(255,45,141,0.25)]"
                 >
                   {/* Neon Top Edge Accent */}
                   <div className="absolute top-0 left-0 right-0 h-[2px] bg-gradient-to-r from-transparent via-[#FF2D8D] to-transparent opacity-0 transition-opacity group-hover:opacity-100" />
 
                   {/* Corner HUD ticks */}
-                  <div className="absolute top-2 left-2 h-2 w-2 border-t border-l border-white/30" />
-                  <div className="absolute top-2 right-2 h-2 w-2 border-t border-r border-white/30" />
-                  <div className="absolute bottom-2 left-2 h-2 w-2 border-b border-l border-white/30" />
-                  <div className="absolute bottom-2 right-2 h-2 w-2 border-b border-r border-white/30" />
+                  <div className="absolute top-1.5 left-1.5 h-1.5 w-1.5 border-t border-l border-white/30" />
+                  <div className="absolute top-1.5 right-1.5 h-1.5 w-1.5 border-t border-r border-white/30" />
+                  <div className="absolute bottom-1.5 left-1.5 h-1.5 w-1.5 border-b border-l border-white/30" />
+                  <div className="absolute bottom-1.5 right-1.5 h-1.5 w-1.5 border-b border-r border-white/30" />
 
                   <div>
-                    {/* Top Squad & Year Pill Strip */}
-                    <div className="mb-4 flex flex-wrap items-center justify-between gap-1.5">
-                      <div className="flex flex-wrap items-center gap-1.5">
-                        <span className="rounded-md border border-[#35D9FF]/30 bg-[#35D9FF]/10 px-2.5 py-0.5 font-mono text-[10px] font-extrabold tracking-wider text-[#35D9FF] uppercase">
+                    {/* 1. TOP HEADER (Above Photo): Squad Category + Year Badge + Order # */}
+                    <div className="mb-2.5 flex items-center justify-between gap-1">
+                      <div className="flex flex-wrap items-center gap-1 min-w-0">
+                        <span className="rounded border border-[#35D9FF]/30 bg-[#35D9FF]/10 px-1.5 py-0.5 font-mono text-[9px] font-extrabold tracking-wider text-[#35D9FF] uppercase truncate">
                           {member.category}
                         </span>
                         {member.year && (
                           <span
-                            className={`rounded-md border px-2 py-0.5 font-mono text-[10px] font-bold uppercase ${getYearBadgeStyle(
+                            className={`rounded border px-1.5 py-0.5 font-mono text-[9px] font-bold uppercase truncate ${getYearBadgeStyle(
                               member.year,
                               member.category
                             )}`}
@@ -311,90 +311,88 @@ export default function OrganizingTeamView() {
                           </span>
                         )}
                       </div>
-                      <span className="font-mono text-[10px] font-bold text-zinc-500">
+                      <span className="font-mono text-[10px] font-bold text-zinc-500 flex-shrink-0">
                         #{String(member.display_order).padStart(2, "0")}
                       </span>
                     </div>
 
-                    {/* Member Avatar & Details */}
-                    <div className="flex items-center gap-4">
-                      <div className="relative h-20 w-20 flex-shrink-0 overflow-hidden rounded-xl border-2 border-white/20 bg-[#08070D] shadow-[0_0_15px_rgba(0,0,0,0.8)] group-hover:border-[#FF2D8D] transition-colors">
-                        {member.photo_url ? (
-                          <img
-                            src={member.photo_url}
-                            alt={member.name}
-                            className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-110"
-                            onError={(e) => {
-                              // Fallback on image load error
-                              (e.target as HTMLImageElement).src =
-                                "https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=600&q=80";
-                            }}
-                          />
-                        ) : (
-                          <div className="flex h-full w-full items-center justify-center bg-gradient-to-br from-[#FF2D8D]/20 to-[#35D9FF]/20 text-[#35D9FF]">
-                            <Users className="h-8 w-8" />
-                          </div>
-                        )}
-                        <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
-                      </div>
-
-                      <div className="min-w-0 flex-1">
-                        <h3 className="truncate font-mono text-lg font-black tracking-wide text-white uppercase group-hover:text-[#FFE8C7] transition-colors">
-                          {member.name}
-                        </h3>
-                        <div className="mt-1 flex items-center gap-1.5 font-mono text-xs font-bold text-[#FF4FB3]">
-                          <Zap className="h-3 w-3 flex-shrink-0 text-[#FF7A3D]" />
-                          <span className="truncate">{member.role}</span>
+                    {/* 2. PHOTO (60% Area of the Card / Portrait Aspect) */}
+                    <div className="relative w-full aspect-[4/4.8] overflow-hidden rounded-xl border border-white/15 bg-[#08070D] shadow-[0_0_15px_rgba(0,0,0,0.8)] group-hover:border-[#FF2D8D]/70 transition-colors">
+                      {member.photo_url ? (
+                        <img
+                          src={member.photo_url}
+                          alt={member.name}
+                          className="h-full w-full object-cover object-top transition-transform duration-500 group-hover:scale-105"
+                          onError={(e) => {
+                            (e.target as HTMLImageElement).src =
+                              "https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=600&q=80";
+                          }}
+                        />
+                      ) : (
+                        <div className="flex h-full w-full items-center justify-center bg-gradient-to-br from-[#FF2D8D]/20 to-[#35D9FF]/20 text-[#35D9FF]">
+                          <Users className="h-10 w-10" />
                         </div>
-                        {member.bio && (
-                          <p className="mt-1.5 line-clamp-2 text-[11px] text-zinc-400 font-sans leading-relaxed">
-                            {member.bio}
-                          </p>
-                        )}
+                      )}
+                      <div className="absolute inset-0 bg-gradient-to-t from-[#0A0714]/80 via-transparent to-transparent opacity-60 group-hover:opacity-30 transition-opacity" />
+                    </div>
+
+                    {/* 3. DETAILS BELOW PHOTO: Name, Designation / Role, Bio */}
+                    <div className="mt-3">
+                      <h3 className="truncate font-mono text-sm sm:text-base font-black tracking-wide text-white uppercase group-hover:text-[#FFE8C7] transition-colors">
+                        {member.name}
+                      </h3>
+                      <div className="mt-0.5 flex items-center gap-1 font-mono text-[11px] font-bold text-[#FF4FB3]">
+                        <Zap className="h-3 w-3 flex-shrink-0 text-[#FF7A3D]" />
+                        <span className="truncate">{member.role}</span>
                       </div>
+                      {member.bio && (
+                        <p className="mt-1 line-clamp-2 text-[10px] text-zinc-400 font-sans leading-tight">
+                          {member.bio}
+                        </p>
+                      )}
                     </div>
                   </div>
 
-                  {/* Contact & Social Action Strip */}
-                  <div className="mt-6 border-t border-white/10 pt-4">
-                    <div className="flex items-center justify-between gap-2">
-                      <div className="flex items-center gap-2">
-                        {/* Phone call button */}
-                        {member.phone && (
-                          <a
-                            href={`tel:${member.phone}`}
-                            title={`Call ${member.name}: ${member.phone}`}
-                            className="flex h-8 items-center gap-1.5 rounded-lg border border-emerald-500/30 bg-emerald-500/10 px-2.5 font-mono text-[11px] font-bold text-emerald-400 hover:bg-emerald-500/20 hover:border-emerald-500 transition-colors"
-                          >
-                            <Phone className="h-3 w-3" />
-                            <span className="hidden sm:inline">CALL</span>
-                          </a>
-                        )}
-
-                        {/* Email button */}
+                  {/* 4. CONTACT & SOCIAL ACTIONS: Email, Call, LinkedIn, Instagram */}
+                  <div className="mt-3 border-t border-white/10 pt-2.5">
+                    <div className="flex items-center justify-between gap-1.5">
+                      <div className="flex items-center gap-1 min-w-0 flex-1">
+                        {/* Email Button */}
                         {member.email && (
                           <a
                             href={`mailto:${member.email}`}
-                            title={`Email ${member.name}: ${member.email}`}
-                            className="flex h-8 items-center gap-1.5 rounded-lg border border-[#35D9FF]/30 bg-[#35D9FF]/10 px-2.5 font-mono text-[11px] font-bold text-[#35D9FF] hover:bg-[#35D9FF]/20 hover:border-[#35D9FF] transition-colors"
+                            title={`Email: ${member.email}`}
+                            className="flex h-7 items-center gap-1 rounded-lg border border-[#35D9FF]/30 bg-[#35D9FF]/10 px-2 font-mono text-[10px] font-bold text-[#35D9FF] hover:bg-[#35D9FF]/20 transition-colors truncate"
                           >
-                            <Mail className="h-3 w-3" />
-                            <span className="hidden sm:inline">EMAIL</span>
+                            <Mail className="h-3 w-3 flex-shrink-0" />
+                            <span className="truncate">EMAIL</span>
+                          </a>
+                        )}
+
+                        {/* Call Button */}
+                        {member.phone && (
+                          <a
+                            href={`tel:${member.phone}`}
+                            title={`Call: ${member.phone}`}
+                            className="flex h-7 items-center gap-1 rounded-lg border border-emerald-500/30 bg-emerald-500/10 px-2 font-mono text-[10px] font-bold text-emerald-400 hover:bg-emerald-500/20 transition-colors flex-shrink-0"
+                          >
+                            <Phone className="h-3 w-3" />
+                            <span>CALL</span>
                           </a>
                         )}
                       </div>
 
                       {/* Social links */}
-                      <div className="flex items-center gap-1.5">
+                      <div className="flex items-center gap-1 flex-shrink-0">
                         {member.linkedin && (
                           <a
                             href={member.linkedin}
                             target="_blank"
                             rel="noopener noreferrer"
                             title="LinkedIn Profile"
-                            className="flex h-8 w-8 items-center justify-center rounded-lg border border-white/10 bg-white/5 text-zinc-400 hover:border-[#0077B5] hover:bg-[#0077B5]/20 hover:text-white transition-colors"
+                            className="flex h-7 w-7 items-center justify-center rounded-lg border border-white/10 bg-white/5 text-zinc-400 hover:border-[#0077B5] hover:bg-[#0077B5]/20 hover:text-white transition-colors"
                           >
-                            <LinkedinIcon className="h-3.5 w-3.5" />
+                            <LinkedinIcon className="h-3 w-3" />
                           </a>
                         )}
 
@@ -404,9 +402,9 @@ export default function OrganizingTeamView() {
                             target="_blank"
                             rel="noopener noreferrer"
                             title="Instagram"
-                            className="flex h-8 w-8 items-center justify-center rounded-lg border border-white/10 bg-white/5 text-zinc-400 hover:border-[#E1306C] hover:bg-[#E1306C]/20 hover:text-[#E1306C] transition-colors"
+                            className="flex h-7 w-7 items-center justify-center rounded-lg border border-white/10 bg-white/5 text-zinc-400 hover:border-[#E1306C] hover:bg-[#E1306C]/20 hover:text-[#E1306C] transition-colors"
                           >
-                            <InstagramIcon className="h-3.5 w-3.5" />
+                            <InstagramIcon className="h-3 w-3" />
                           </a>
                         )}
 
@@ -416,9 +414,9 @@ export default function OrganizingTeamView() {
                             target="_blank"
                             rel="noopener noreferrer"
                             title="GitHub"
-                            className="flex h-8 w-8 items-center justify-center rounded-lg border border-white/10 bg-white/5 text-zinc-400 hover:border-white hover:bg-white/20 hover:text-white transition-colors"
+                            className="flex h-7 w-7 items-center justify-center rounded-lg border border-white/10 bg-white/5 text-zinc-400 hover:border-white hover:bg-white/20 hover:text-white transition-colors"
                           >
-                            <GithubIcon className="h-3.5 w-3.5" />
+                            <GithubIcon className="h-3 w-3" />
                           </a>
                         )}
                       </div>
