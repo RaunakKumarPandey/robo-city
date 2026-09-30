@@ -28,27 +28,27 @@ export default function LeaderboardTable({
     const formatted = `#${String(rank).padStart(2, "0")}`;
     if (rank === 1) {
       return (
-        <span className="inline-flex items-center gap-1 rounded-md bg-[#FFE8C7]/20 border border-[#FFE8C7]/60 px-2.5 py-0.5 font-mono text-xs font-black text-[#FFE8C7] shadow-[0_0_12px_rgba(255,232,199,0.35)]">
+        <span className="inline-flex items-center gap-1 rounded-lg bg-[#FFE8C7]/20 border border-[#FFE8C7]/60 px-2.5 py-1 font-mono text-xs font-black text-[#FFE8C7] shadow-[0_0_12px_rgba(255,232,199,0.35)]">
           {formatted}
         </span>
       );
     }
     if (rank === 2) {
       return (
-        <span className="inline-flex items-center gap-1 rounded-md bg-[#FF7A3D]/20 border border-[#FF7A3D]/60 px-2.5 py-0.5 font-mono text-xs font-black text-[#FF7A3D] shadow-[0_0_10px_rgba(255,122,61,0.3)]">
+        <span className="inline-flex items-center gap-1 rounded-lg bg-[#FF7A3D]/20 border border-[#FF7A3D]/60 px-2.5 py-1 font-mono text-xs font-black text-[#FF7A3D] shadow-[0_0_10px_rgba(255,122,61,0.3)]">
           {formatted}
         </span>
       );
     }
     if (rank === 3) {
       return (
-        <span className="inline-flex items-center gap-1 rounded-md bg-[#35D9FF]/20 border border-[#35D9FF]/60 px-2.5 py-0.5 font-mono text-xs font-black text-[#35D9FF] shadow-[0_0_10px_rgba(53,217,255,0.3)]">
+        <span className="inline-flex items-center gap-1 rounded-lg bg-[#35D9FF]/20 border border-[#35D9FF]/60 px-2.5 py-1 font-mono text-xs font-black text-[#35D9FF] shadow-[0_0_10px_rgba(53,217,255,0.3)]">
           {formatted}
         </span>
       );
     }
     return (
-      <span className="font-mono text-xs font-bold text-zinc-400 px-2.5 py-0.5">
+      <span className="inline-flex items-center rounded-lg bg-white/5 border border-white/10 font-mono text-xs font-bold text-zinc-400 px-2.5 py-1">
         {formatted}
       </span>
     );
@@ -81,66 +81,81 @@ export default function LeaderboardTable({
         </div>
 
         {/* Total Teams Pill */}
-        <div className="flex items-center gap-2 rounded-xl border border-white/10 bg-[#120B20]/80 px-4 py-2 text-xs font-mono backdrop-blur-md">
+        <div className="flex items-center gap-2 rounded-xl border border-white/10 bg-[#120B20]/80 px-4 py-2 text-xs font-mono backdrop-blur-md shadow-md">
           <span className="text-zinc-400 font-bold uppercase">SYNDICATES:</span>
           <span className="text-[#35D9FF] font-black">{displayedTeams.length} / {teams.length}</span>
         </div>
       </div>
 
-      {/* Desktop Table View */}
-      <div className="hidden overflow-hidden rounded-2xl border border-white/10 bg-[#120B20]/85 backdrop-blur-xl md:block shadow-[0_15px_40px_rgba(0,0,0,0.7)]">
-        <table className="w-full text-left text-xs font-mono">
-          <thead className="border-b border-white/10 bg-white/5 text-zinc-400 uppercase tracking-widest">
+      {/* Desktop Table View with Separated Strips and Gaps */}
+      <div className="hidden md:block">
+        <table className="w-full text-left text-xs font-mono border-separate border-spacing-y-2.5">
+          <thead className="text-zinc-400 uppercase tracking-widest text-[11px]">
             <tr>
-              <th className="py-4 px-4 font-bold w-20">RANK</th>
-              <th className="py-4 px-4 font-bold">CREW / SYNDICATE</th>
-              <th className="py-4 px-4 font-bold text-center">R1 BUILD</th>
-              <th className="py-4 px-4 font-bold text-center">R2 RAMPAGE</th>
-              <th className="py-4 px-4 font-bold text-center">R3 RUN</th>
-              <th className="py-4 px-4 font-bold text-center text-[#35D9FF]">TOTAL XP</th>
-              <th className="py-4 px-4 font-bold text-center w-24">INTEL</th>
+              <th className="py-2 px-4 font-bold w-20">RANK</th>
+              <th className="py-2 px-4 font-bold">CREW / SYNDICATE</th>
+              <th className="py-2 px-4 font-bold text-center">R1 BUILD</th>
+              <th className="py-2 px-4 font-bold text-center">R2 RAMPAGE</th>
+              <th className="py-2 px-4 font-bold text-center">R3 RUN</th>
+              <th className="py-2 px-4 font-bold text-center text-[#35D9FF]">TOTAL XP</th>
+              <th className="py-2 px-4 font-bold text-center w-24">INTEL</th>
             </tr>
           </thead>
-          <tbody className="divide-y divide-white/5">
+          <tbody>
             {displayedTeams.map((team) => {
               const isUpdated = recentlyUpdatedId === team.id;
               return (
                 <tr
                   key={team.id}
-                  className={`transition-colors duration-200 hover:bg-white/5 ${
-                    isUpdated ? "bg-[#35D9FF]/15 animate-pulse" : ""
+                  className={`group transition-all duration-200 bg-gradient-to-r from-[#160E2E]/85 via-[#120B20]/90 to-[#160E2E]/85 backdrop-blur-xl hover:from-[#1E133D] hover:via-[#191033] hover:to-[#1E133D] shadow-[0_4px_20px_rgba(0,0,0,0.5)] hover:shadow-[0_0_25px_rgba(53,217,255,0.2)] ${
+                    isUpdated ? "bg-[#35D9FF]/20 ring-1 ring-[#35D9FF] animate-pulse" : ""
                   }`}
                 >
-                  <td className="py-4 px-4">{getRankBadge(team.rank)}</td>
-                  <td className="py-4 px-4">
-                    <div className="font-bold text-white text-sm">
+                  {/* Rank Cell */}
+                  <td className="py-3.5 px-4 rounded-l-2xl border-y border-l border-white/10 group-hover:border-[#35D9FF]/40">
+                    {getRankBadge(team.rank)}
+                  </td>
+
+                  {/* Crew Name & Captain Cell */}
+                  <td className="py-3.5 px-4 border-y border-white/10 group-hover:border-[#35D9FF]/40">
+                    <div className="font-bold text-white text-sm group-hover:text-[#FFE8C7] transition-colors">
                       {team.team_name}
                     </div>
                     {team.leader_name && (
-                      <div className="text-[11px] text-zinc-400">
-                        Cap: {team.leader_name}
+                      <div className="text-[11px] text-zinc-400 mt-0.5">
+                        Cap: <span className="text-zinc-300">{team.leader_name}</span>
                       </div>
                     )}
                   </td>
-                  <td className="py-4 px-4 text-center text-zinc-300">
+
+                  {/* R1 Build */}
+                  <td className="py-3.5 px-4 text-center text-zinc-300 border-y border-white/10 group-hover:border-[#35D9FF]/40">
                     {team.round1_score !== null && team.round1_score !== undefined ? team.round1_score : "—"}
                   </td>
-                  <td className="py-4 px-4 text-center text-zinc-300">
+
+                  {/* R2 Rampage */}
+                  <td className="py-3.5 px-4 text-center text-zinc-300 border-y border-white/10 group-hover:border-[#35D9FF]/40">
                     {team.round2_score !== null && team.round2_score !== undefined ? team.round2_score : "—"}
                   </td>
-                  <td className="py-4 px-4 text-center text-zinc-300">
+
+                  {/* R3 Run */}
+                  <td className="py-3.5 px-4 text-center text-zinc-300 border-y border-white/10 group-hover:border-[#35D9FF]/40">
                     {team.round3_score !== null && team.round3_score !== undefined ? team.round3_score : "—"}
                   </td>
-                  <td className="py-4 px-4 text-center">
-                    <span className="font-black text-sm text-transparent bg-clip-text bg-gradient-to-r from-[#FF2D8D] to-[#35D9FF]">
+
+                  {/* Total XP */}
+                  <td className="py-3.5 px-4 text-center border-y border-white/10 group-hover:border-[#35D9FF]/40">
+                    <span className="font-black text-sm text-transparent bg-clip-text bg-gradient-to-r from-[#FF2D8D] via-[#FF7A3D] to-[#35D9FF]">
                       {team.total_score}
                     </span>
                   </td>
-                  <td className="py-4 px-4 text-center">
+
+                  {/* Action Intel Button */}
+                  <td className="py-3.5 px-4 text-center rounded-r-2xl border-y border-r border-white/10 group-hover:border-[#35D9FF]/40">
                     <button
                       onClick={() => setInspectingTeam(team)}
                       title="Inspect Team Scores"
-                      className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-white/10 bg-white/5 text-zinc-400 hover:border-[#35D9FF] hover:bg-[#35D9FF]/10 hover:text-white transition-colors cursor-pointer"
+                      className="inline-flex h-8 w-8 items-center justify-center rounded-xl border border-white/10 bg-white/5 text-zinc-400 hover:border-[#35D9FF] hover:bg-[#35D9FF]/15 hover:text-white transition-all cursor-pointer shadow-sm hover:scale-105"
                     >
                       <Eye className="h-4 w-4" />
                     </button>
@@ -152,30 +167,30 @@ export default function LeaderboardTable({
         </table>
       </div>
 
-      {/* Mobile Cards View */}
-      <div className="grid grid-cols-1 gap-3.5 md:hidden">
+      {/* Mobile Cards View with Gaps */}
+      <div className="grid grid-cols-1 gap-3 md:hidden">
         {displayedTeams.map((team) => (
           <div
             key={team.id}
             onClick={() => setInspectingTeam(team)}
-            className="rounded-xl border border-white/10 bg-[#120B20]/90 p-4 font-mono shadow-md cursor-pointer hover:border-[#35D9FF]/40 transition-colors"
+            className="rounded-2xl border border-white/10 bg-gradient-to-r from-[#160E2E]/90 to-[#120B20]/90 p-4 font-mono shadow-lg cursor-pointer hover:border-[#35D9FF]/50 transition-all backdrop-blur-xl"
           >
             <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2.5">
+              <div className="flex items-center gap-3">
                 {getRankBadge(team.rank)}
                 <div>
                   <div className="font-bold text-white text-sm">
                     {team.team_name}
                   </div>
                   {team.leader_name && (
-                    <div className="text-[10px] text-zinc-400">
+                    <div className="text-[10px] text-zinc-400 mt-0.5">
                       Cap: {team.leader_name}
                     </div>
                   )}
                 </div>
               </div>
               <div className="text-right">
-                <div className="font-mono text-base font-black text-[#35D9FF]">
+                <div className="font-mono text-base font-black text-transparent bg-clip-text bg-gradient-to-r from-[#FF2D8D] to-[#35D9FF]">
                   XP {team.total_score}
                 </div>
               </div>
@@ -187,7 +202,7 @@ export default function LeaderboardTable({
       {/* Team Inspection Modal */}
       {inspectingTeam && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4 backdrop-blur-md">
-          <div className="relative w-full max-w-md rounded-2xl border border-white/10 bg-[#120B20] p-6 shadow-2xl space-y-6">
+          <div className="relative w-full max-w-md rounded-2xl border border-white/15 bg-gradient-to-b from-[#160E2E] to-[#0A0714] p-6 shadow-[0_0_50px_rgba(0,0,0,0.9)] space-y-6">
             <div className="flex items-center justify-between border-b border-white/10 pb-4">
               <div className="space-y-1">
                 <div className="font-mono text-[10px] font-bold tracking-widest text-[#35D9FF] uppercase">
