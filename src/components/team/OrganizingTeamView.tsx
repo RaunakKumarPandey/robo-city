@@ -2,7 +2,6 @@
 
 import { useState, useEffect, useMemo } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import Link from "next/link";
 import {
   Users,
   Shield,
@@ -58,6 +57,106 @@ const YEAR_FILTERS = [
   "FACULTY / ADVISOR",
 ] as const;
 
+interface YearTier {
+  id: string;
+  title: string;
+  subtitle: string;
+  accentColor: string;
+  dotColor: string;
+  badgeBorder: string;
+  badgeBg: string;
+  badgeText: string;
+  match: (m: OrganizingMember) => boolean;
+}
+
+const YEAR_TIERS: YearTier[] = [
+  {
+    id: "faculty",
+    title: "FACULTY & ADVISORS",
+    subtitle: "MENTORS // BRANCH COUNSELOR & PATRONS",
+    accentColor: "#C084FC",
+    dotColor: "bg-[#C084FC] shadow-[0_0_12px_#C084FC]",
+    badgeBorder: "border-[#A855F7]/40",
+    badgeBg: "bg-[#A855F7]/15",
+    badgeText: "text-[#C084FC]",
+    match: (m) => {
+      const y = (m.year || "").toLowerCase();
+      const c = (m.category || "").toLowerCase();
+      return y.includes("faculty") || y.includes("advisor") || c.includes("faculty");
+    },
+  },
+  {
+    id: "final_year",
+    title: "FINAL YEAR",
+    subtitle: "CENTRAL COMMAND // LEADERSHIP & CONVENERS",
+    accentColor: "#FF7A3D",
+    dotColor: "bg-[#FF7A3D] shadow-[0_0_12px_#FF7A3D]",
+    badgeBorder: "border-[#FF7A3D]/40",
+    badgeBg: "bg-[#FF7A3D]/15",
+    badgeText: "text-[#FF7A3D]",
+    match: (m) => {
+      const y = (m.year || "").toLowerCase();
+      const c = (m.category || "").toLowerCase();
+      if (y.includes("faculty") || y.includes("advisor") || c.includes("faculty")) return false;
+      return y.includes("final") || y.includes("4");
+    },
+  },
+  {
+    id: "3rd_year",
+    title: "3RD YEAR",
+    subtitle: "CORE EXECUTIVES // TECHNICAL & OPERATIONS DIRECTORS",
+    accentColor: "#35D9FF",
+    dotColor: "bg-[#35D9FF] shadow-[0_0_12px_#35D9FF]",
+    badgeBorder: "border-[#35D9FF]/40",
+    badgeBg: "bg-[#35D9FF]/15",
+    badgeText: "text-[#35D9FF]",
+    match: (m) => {
+      const y = (m.year || "").toLowerCase();
+      const c = (m.category || "").toLowerCase();
+      if (y.includes("faculty") || y.includes("advisor") || c.includes("faculty")) return false;
+      if (y.includes("final") || y.includes("4")) return false;
+      return y.includes("3");
+    },
+  },
+  {
+    id: "2nd_year",
+    title: "2ND YEAR",
+    subtitle: "SQUAD OPERATIVES // COORDINATORS & LOGISTICS",
+    accentColor: "#FF2D8D",
+    dotColor: "bg-[#FF2D8D] shadow-[0_0_12px_#FF2D8D]",
+    badgeBorder: "border-[#FF2D8D]/40",
+    badgeBg: "bg-[#FF2D8D]/15",
+    badgeText: "text-[#FF2D8D]",
+    match: (m) => {
+      const y = (m.year || "").toLowerCase();
+      const c = (m.category || "").toLowerCase();
+      if (y.includes("faculty") || y.includes("advisor") || c.includes("faculty")) return false;
+      if (y.includes("final") || y.includes("4")) return false;
+      if (y.includes("3")) return false;
+      return y.includes("2");
+    },
+  },
+  {
+    id: "other",
+    title: "CREW & APPRENTICES",
+    subtitle: "OPERATIONAL PERSONNEL",
+    accentColor: "#A1A1AA",
+    dotColor: "bg-zinc-400 shadow-[0_0_12px_rgba(255,255,255,0.4)]",
+    badgeBorder: "border-white/20",
+    badgeBg: "bg-white/10",
+    badgeText: "text-zinc-300",
+    match: (m) => {
+      const y = (m.year || "").toLowerCase();
+      const c = (m.category || "").toLowerCase();
+      if (y.includes("faculty") || y.includes("advisor") || c.includes("faculty")) return false;
+      if (y.includes("final") || y.includes("4")) return false;
+      if (y.includes("3")) return false;
+      if (y.includes("2")) return false;
+      return true;
+    },
+  },
+];
+
 export default function OrganizingTeamView() {
   const [members, setMembers] = useState<OrganizingMember[]>([]);
   const [loading, setLoading] = useState(true);
@@ -82,9 +181,10 @@ export default function OrganizingTeamView() {
     return () => window.removeEventListener("organizing_team_updated", handleUpdate);
   }, []);
 
+  // 1. Filtered Members (matching squad category, year filter, search query)
   const filteredMembers = useMemo(() => {
     return members.filter((m) => {
-      // 1. Squad category match
+      // Squad category match
       const matchCat =
         selectedCategory === "ALL SQUADS" ||
         m.category.toLowerCase() === selectedCategory.toLowerCase() ||
@@ -93,7 +193,7 @@ export default function OrganizingTeamView() {
         (selectedCategory === "CORE SQUAD" && m.category.includes("Core")) ||
         (selectedCategory === "FACULTY & ADVISORS" && m.category.includes("Faculty"));
 
-      // 2. Year filter match
+      // Year filter match
       const memberYear = (m.year || "").toLowerCase();
       const matchYear =
         selectedYear === "ALL YEARS" ||
@@ -102,7 +202,7 @@ export default function OrganizingTeamView() {
         (selectedYear === "2ND YEAR" && memberYear.includes("2")) ||
         (selectedYear === "FACULTY / ADVISOR" && (memberYear.includes("faculty") || memberYear.includes("advisor") || m.category.includes("Faculty")));
 
-      // 3. Search query match
+      // Search query match
       const matchSearch =
         !searchQuery ||
         m.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -113,6 +213,18 @@ export default function OrganizingTeamView() {
       return matchCat && matchYear && matchSearch;
     });
   }, [members, selectedCategory, selectedYear, searchQuery]);
+
+  // 2. Group into distinct batches/tiers (Faculty -> Final Year -> 3rd Year -> 2nd Year -> Other)
+  // Each tier starts on its OWN fresh row!
+  const groupedSections = useMemo(() => {
+    return YEAR_TIERS.map((tier) => {
+      const tierMembers = filteredMembers.filter((m) => tier.match(m));
+      return {
+        tier,
+        members: tierMembers,
+      };
+    }).filter((section) => section.members.length > 0);
+  }, [filteredMembers]);
 
   const getYearBadgeStyle = (year?: string | null, category?: string) => {
     const y = (year || "").toLowerCase();
@@ -132,94 +244,97 @@ export default function OrganizingTeamView() {
   };
 
   return (
-    <div className="relative min-h-screen w-full px-3 pt-28 pb-20 sm:px-6 lg:px-8 xl:px-12">
-      {/* 1. HERO HEADER */}
-      <div className="mx-auto max-w-5xl text-center">
-        {/* Title */}
-        <h1 className="text-4xl sm:text-6xl md:text-7xl font-black uppercase tracking-tight leading-[0.95]">
-          <span className="block text-white drop-shadow-[0_4px_20px_rgba(0,0,0,0.9)]">
-            ORGANISING
-          </span>
-          <span className="block text-transparent bg-clip-text bg-gradient-to-r from-[#FF2D8D] via-[#FF7A3D] to-[#35D9FF] filter drop-shadow-[0_0_30px_rgba(255,45,141,0.5)]">
-            COMMAND TEAM
-          </span>
-        </h1>
-      </div>
+    <div className="relative min-h-screen w-full px-4 pt-28 pb-24 sm:px-6">
+      {/* 75% Centered Content Container so the Dynamic Background Image remains clearly visible on sides */}
+      <div className="mx-auto w-[94%] sm:w-[90%] md:w-[85%] lg:w-[75%] max-w-6xl space-y-8">
+        
+        {/* 1. HERO HEADER */}
+        <div className="mx-auto max-w-4xl text-center">
+          <h1 className="text-4xl sm:text-6xl md:text-7xl font-black uppercase tracking-tight leading-[0.95]">
+            <span className="block text-white drop-shadow-[0_4px_20px_rgba(0,0,0,0.9)]">
+              ORGANISING
+            </span>
+            <span className="block text-transparent bg-clip-text bg-gradient-to-r from-[#FF2D8D] via-[#FF7A3D] to-[#35D9FF] filter drop-shadow-[0_0_30px_rgba(255,45,141,0.5)]">
+              COMMAND TEAM
+            </span>
+          </h1>
+        </div>
 
-      {/* 2. SEARCH & FILTER CONTROLS */}
-      <div className="mx-auto mt-12 max-w-[1650px] space-y-6">
-        {/* Squad Tabs & Search Row */}
-        <div className="flex flex-col md:flex-row items-center justify-between gap-4">
-          {/* Squad Category Tabs */}
-          <div className="flex flex-wrap items-center justify-center gap-1.5 rounded-2xl border border-white/10 bg-[#120B20]/80 p-1.5 backdrop-blur-xl shadow-[0_10px_30px_rgba(0,0,0,0.5)]">
-            {CATEGORIES.map((cat) => {
-              const active = selectedCategory === cat;
+        {/* 2. SEARCH & FILTER CONTROLS */}
+        <div className="space-y-4">
+          {/* Squad Category Tabs & Search Row */}
+          <div className="flex flex-col md:flex-row items-stretch md:items-center justify-between gap-3">
+            {/* Squad Category Tabs */}
+            <div className="flex flex-wrap items-center justify-center md:justify-start gap-1.5 rounded-2xl border border-white/10 bg-[#120B20]/80 p-1.5 backdrop-blur-xl shadow-[0_10px_30px_rgba(0,0,0,0.5)]">
+              {CATEGORIES.map((cat) => {
+                const active = selectedCategory === cat;
+                return (
+                  <button
+                    key={cat}
+                    onClick={() => setSelectedCategory(cat)}
+                    className={`rounded-xl px-3 py-1.5 font-mono text-[11px] sm:text-xs font-bold tracking-wider uppercase transition-all duration-200 ${
+                      active
+                        ? "bg-gradient-to-r from-[#FF2D8D] to-[#FF7A3D] text-white shadow-[0_0_15px_rgba(255,45,141,0.5)]"
+                        : "text-zinc-400 hover:text-white hover:bg-white/5"
+                    }`}
+                  >
+                    {cat}
+                  </button>
+                );
+              })}
+            </div>
+
+            {/* Search Input */}
+            <div className="relative w-full md:w-64">
+              <Search className="absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-zinc-400" />
+              <input
+                type="text"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                placeholder="Search member, role, year..."
+                className="w-full rounded-xl border border-white/10 bg-[#120B20]/80 pl-10 pr-4 py-2 font-mono text-xs text-white placeholder-zinc-500 backdrop-blur-xl transition-colors focus:border-[#35D9FF] focus:outline-none focus:ring-1 focus:ring-[#35D9FF]"
+              />
+            </div>
+          </div>
+
+          {/* Year Filter Sub-Pills */}
+          <div className="flex flex-wrap items-center gap-2 pt-1">
+            <span className="font-mono text-xs font-bold text-zinc-400 uppercase flex items-center gap-1 mr-1">
+              <GraduationCap className="h-3.5 w-3.5 text-[#35D9FF]" />
+              <span>BATCH / YEAR:</span>
+            </span>
+            {YEAR_FILTERS.map((yr) => {
+              const active = selectedYear === yr;
               return (
                 <button
-                  key={cat}
-                  onClick={() => setSelectedCategory(cat)}
-                  className={`rounded-xl px-3.5 py-1.5 font-mono text-xs font-bold tracking-wider uppercase transition-all duration-200 ${
+                  key={yr}
+                  onClick={() => setSelectedYear(yr)}
+                  className={`rounded-lg px-2.5 py-1 font-mono text-[10px] sm:text-[11px] font-bold tracking-wider uppercase transition-all ${
                     active
-                      ? "bg-gradient-to-r from-[#FF2D8D] to-[#FF7A3D] text-white shadow-[0_0_15px_rgba(255,45,141,0.5)]"
-                      : "text-zinc-400 hover:text-white hover:bg-white/5"
+                      ? "border border-[#35D9FF] bg-[#35D9FF]/20 text-[#35D9FF] shadow-[0_0_12px_rgba(53,217,255,0.4)]"
+                      : "border border-white/10 bg-white/5 text-zinc-400 hover:text-white hover:bg-white/10"
                   }`}
                 >
-                  {cat}
+                  {yr}
                 </button>
               );
             })}
           </div>
 
-          {/* Search Input */}
-          <div className="relative w-full md:w-72">
-            <Search className="absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-zinc-400" />
-            <input
-              type="text"
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder="Search member, role, year..."
-              className="w-full rounded-xl border border-white/10 bg-[#120B20]/80 pl-10 pr-4 py-2 font-mono text-xs text-white placeholder-zinc-500 backdrop-blur-xl transition-colors focus:border-[#35D9FF] focus:outline-none focus:ring-1 focus:ring-[#35D9FF]"
-            />
+          {/* Personnel Count Bar */}
+          <div className="flex items-center justify-between border-b border-white/10 pb-3 font-mono text-[11px] sm:text-xs text-zinc-400">
+            <span>OPERATIONAL PERSONNEL: {filteredMembers.length} ACTIVE</span>
+            <span className="text-[#35D9FF]">IEEE STUDENT BRANCH // ROBOVERSE &apos;26</span>
           </div>
         </div>
 
-        {/* Year Filter Sub-Pills */}
-        <div className="flex flex-wrap items-center gap-2 pt-1 pb-1">
-          <span className="font-mono text-xs font-bold text-zinc-400 uppercase flex items-center gap-1 mr-1">
-            <GraduationCap className="h-3.5 w-3.5 text-[#35D9FF]" />
-            <span>BATCH / YEAR:</span>
-          </span>
-          {YEAR_FILTERS.map((yr) => {
-            const active = selectedYear === yr;
-            return (
-              <button
-                key={yr}
-                onClick={() => setSelectedYear(yr)}
-                className={`rounded-lg px-3 py-1 font-mono text-[11px] font-bold tracking-wider uppercase transition-all ${
-                  active
-                    ? "border border-[#35D9FF] bg-[#35D9FF]/20 text-[#35D9FF] shadow-[0_0_12px_rgba(53,217,255,0.4)]"
-                    : "border border-white/10 bg-white/5 text-zinc-400 hover:text-white hover:bg-white/10"
-                }`}
-              >
-                {yr}
-              </button>
-            );
-          })}
-        </div>
-
-        {/* Member Count Watermark */}
-        <div className="flex items-center justify-between border-b border-white/10 pb-3 font-mono text-xs text-zinc-400">
-          <span>OPERATIONAL PERSONNEL: {filteredMembers.length} ACTIVE</span>
-          <span className="text-[#35D9FF]">IEEE STUDENT BRANCH // ROBOVERSE &apos;26</span>
-        </div>
-
-        {/* 3. MEMBER CARDS GRID (4 to 5 members per row on desktop/large screens) */}
+        {/* 3. GROUPED MEMBER SECTIONS (Each batch/year starts on its own row) */}
         {loading ? (
           <div className="py-20 text-center font-mono text-sm text-zinc-400">
             <div className="inline-block h-8 w-8 animate-spin rounded-full border-2 border-[#FF2D8D] border-t-transparent mb-3" />
             <div>RETRIEVING PERSONNEL DOSSIERS...</div>
           </div>
-        ) : filteredMembers.length === 0 ? (
+        ) : groupedSections.length === 0 ? (
           <div className="rounded-2xl border border-white/10 bg-[#120B20]/60 p-12 text-center backdrop-blur-xl">
             <Users className="mx-auto h-12 w-12 text-zinc-600 mb-3" />
             <div className="font-mono text-base font-bold text-white uppercase">
@@ -230,163 +345,193 @@ export default function OrganizingTeamView() {
             </p>
           </div>
         ) : (
-          <motion.div
-            layout
-            className="grid grid-cols-1 gap-4 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5"
-          >
-            <AnimatePresence>
-              {filteredMembers.map((member) => (
-                <motion.div
-                  layout
-                  key={member.id}
-                  initial={{ opacity: 0, y: 20 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  exit={{ opacity: 0, scale: 0.95 }}
-                  transition={{ duration: 0.3 }}
-                  className="group relative flex flex-col justify-between overflow-hidden rounded-2xl border border-white/10 bg-gradient-to-b from-[#160E2E]/90 to-[#0A0714]/95 p-3.5 backdrop-blur-xl transition-all duration-300 hover:border-[#FF2D8D]/60 hover:shadow-[0_0_25px_rgba(255,45,141,0.25)]"
-                >
-                  {/* Neon Top Edge Accent */}
-                  <div className="absolute top-0 left-0 right-0 h-[2px] bg-gradient-to-r from-transparent via-[#FF2D8D] to-transparent opacity-0 transition-opacity group-hover:opacity-100" />
-
-                  {/* Corner HUD ticks */}
-                  <div className="absolute top-1.5 left-1.5 h-1.5 w-1.5 border-t border-l border-white/30" />
-                  <div className="absolute top-1.5 right-1.5 h-1.5 w-1.5 border-t border-r border-white/30" />
-                  <div className="absolute bottom-1.5 left-1.5 h-1.5 w-1.5 border-b border-l border-white/30" />
-                  <div className="absolute bottom-1.5 right-1.5 h-1.5 w-1.5 border-b border-r border-white/30" />
-
-                  <div>
-                    {/* 1. TOP HEADER (Above Photo): Squad Category + Year Badge + Order # */}
-                    <div className="mb-2.5 flex items-center justify-between gap-1">
-                      <div className="flex flex-wrap items-center gap-1 min-w-0">
-                        <span className="rounded border border-[#35D9FF]/30 bg-[#35D9FF]/10 px-1.5 py-0.5 font-mono text-[9px] font-extrabold tracking-wider text-[#35D9FF] uppercase truncate">
-                          {member.category}
-                        </span>
-                        {member.year && (
-                          <span
-                            className={`rounded border px-1.5 py-0.5 font-mono text-[9px] font-bold uppercase truncate ${getYearBadgeStyle(
-                              member.year,
-                              member.category
-                            )}`}
-                          >
-                            {member.year}
-                          </span>
-                        )}
-                      </div>
-                      <span className="font-mono text-[10px] font-bold text-zinc-500 flex-shrink-0">
-                        #{String(member.display_order).padStart(2, "0")}
+          <div className="space-y-12">
+            {groupedSections.map(({ tier, members: tierMembers }) => (
+              <div key={tier.id} className="space-y-4">
+                
+                {/* Batch Section Header Bar */}
+                <div className="relative flex items-center justify-between border-b border-white/15 pb-2.5">
+                  <div className="flex items-center gap-2.5">
+                    <span className={`h-2.5 w-2.5 rounded-full ${tier.dotColor}`} />
+                    <div className="flex items-baseline gap-2">
+                      <h2 className="font-mono text-sm sm:text-base font-black tracking-wider uppercase text-white">
+                        {tier.title}
+                      </h2>
+                      <span className="text-zinc-500 font-mono text-xs hidden sm:inline">//</span>
+                      <span className="text-zinc-400 font-mono text-xs hidden sm:inline">
+                        {tier.subtitle}
                       </span>
                     </div>
+                  </div>
 
-                    {/* 2. PHOTO (60% Area of the Card / Portrait Aspect) */}
-                    <div className="relative w-full aspect-[4/4.8] overflow-hidden rounded-xl border border-white/15 bg-[#08070D] shadow-[0_0_15px_rgba(0,0,0,0.8)] group-hover:border-[#FF2D8D]/70 transition-colors">
-                      {member.photo_url ? (
-                        <img
-                          src={member.photo_url}
-                          alt={member.name}
-                          className="h-full w-full object-cover object-top transition-transform duration-500 group-hover:scale-105"
-                          onError={(e) => {
-                            (e.target as HTMLImageElement).src =
-                              "https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=600&q=80";
-                          }}
-                        />
-                      ) : (
-                        <div className="flex h-full w-full items-center justify-center bg-gradient-to-br from-[#FF2D8D]/20 to-[#35D9FF]/20 text-[#35D9FF]">
-                          <Users className="h-10 w-10" />
+                  <div className="flex items-center gap-2">
+                    <span className={`rounded-md border px-2 py-0.5 font-mono text-[10px] font-bold uppercase tracking-wider ${tier.badgeBorder} ${tier.badgeBg} ${tier.badgeText}`}>
+                      {tierMembers.length} {tierMembers.length === 1 ? "OPERATIVE" : "OPERATIVES"}
+                    </span>
+                  </div>
+                </div>
+
+                {/* Grid starting on a new row for this batch */}
+                <motion.div
+                  layout
+                  className="grid grid-cols-1 gap-4 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4"
+                >
+                  <AnimatePresence>
+                    {tierMembers.map((member) => (
+                      <motion.div
+                        layout
+                        key={member.id}
+                        initial={{ opacity: 0, y: 16 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        exit={{ opacity: 0, scale: 0.95 }}
+                        transition={{ duration: 0.25 }}
+                        className="group relative flex flex-col justify-between overflow-hidden rounded-2xl border border-white/10 bg-gradient-to-b from-[#160E2E]/85 to-[#0A0714]/90 p-3.5 backdrop-blur-xl transition-all duration-300 hover:border-[#FF2D8D]/60 hover:shadow-[0_0_25px_rgba(255,45,141,0.25)]"
+                      >
+                        {/* Neon Top Edge Accent */}
+                        <div className="absolute top-0 left-0 right-0 h-[2px] bg-gradient-to-r from-transparent via-[#FF2D8D] to-transparent opacity-0 transition-opacity group-hover:opacity-100" />
+
+                        {/* Corner HUD ticks */}
+                        <div className="absolute top-1.5 left-1.5 h-1.5 w-1.5 border-t border-l border-white/30" />
+                        <div className="absolute top-1.5 right-1.5 h-1.5 w-1.5 border-t border-r border-white/30" />
+                        <div className="absolute bottom-1.5 left-1.5 h-1.5 w-1.5 border-b border-l border-white/30" />
+                        <div className="absolute bottom-1.5 right-1.5 h-1.5 w-1.5 border-b border-r border-white/30" />
+
+                        <div>
+                          {/* 1. TOP HEADER: Squad Category + Year Badge + Order # */}
+                          <div className="mb-2.5 flex items-center justify-between gap-1">
+                            <div className="flex flex-wrap items-center gap-1 min-w-0">
+                              <span className="rounded border border-[#35D9FF]/30 bg-[#35D9FF]/10 px-1.5 py-0.5 font-mono text-[9px] font-extrabold tracking-wider text-[#35D9FF] uppercase truncate">
+                                {member.category}
+                              </span>
+                              {member.year && (
+                                <span
+                                  className={`rounded border px-1.5 py-0.5 font-mono text-[9px] font-bold uppercase truncate ${getYearBadgeStyle(
+                                    member.year,
+                                    member.category
+                                  )}`}
+                                >
+                                  {member.year}
+                                </span>
+                              )}
+                            </div>
+                            <span className="font-mono text-[10px] font-bold text-zinc-500 flex-shrink-0">
+                              #{String(member.display_order).padStart(2, "0")}
+                            </span>
+                          </div>
+
+                          {/* 2. PHOTO (Portrait Aspect) */}
+                          <div className="relative w-full aspect-[4/4.8] overflow-hidden rounded-xl border border-white/15 bg-[#08070D] shadow-[0_0_15px_rgba(0,0,0,0.8)] group-hover:border-[#FF2D8D]/70 transition-colors">
+                            {member.photo_url ? (
+                              <img
+                                src={member.photo_url}
+                                alt={member.name}
+                                className="h-full w-full object-cover object-top transition-transform duration-500 group-hover:scale-105"
+                                onError={(e) => {
+                                  (e.target as HTMLImageElement).src =
+                                    "https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=600&q=80";
+                                }}
+                              />
+                            ) : (
+                              <div className="flex h-full w-full items-center justify-center bg-gradient-to-br from-[#FF2D8D]/20 to-[#35D9FF]/20 text-[#35D9FF]">
+                                <Users className="h-10 w-10" />
+                              </div>
+                            )}
+                            <div className="absolute inset-0 bg-gradient-to-t from-[#0A0714]/80 via-transparent to-transparent opacity-60 group-hover:opacity-30 transition-opacity" />
+                          </div>
+
+                          {/* 3. DETAILS BELOW PHOTO: Name, Role, Bio */}
+                          <div className="mt-3">
+                            <h3 className="truncate font-mono text-sm sm:text-base font-black tracking-wide text-white uppercase group-hover:text-[#FFE8C7] transition-colors">
+                              {member.name}
+                            </h3>
+                            <div className="mt-0.5 flex items-center gap-1 font-mono text-[11px] font-bold text-[#FF4FB3]">
+                              <Zap className="h-3 w-3 flex-shrink-0 text-[#FF7A3D]" />
+                              <span className="truncate">{member.role}</span>
+                            </div>
+                            {member.bio && (
+                              <p className="mt-1 line-clamp-2 text-[10px] text-zinc-400 font-sans leading-tight">
+                                {member.bio}
+                              </p>
+                            )}
+                          </div>
                         </div>
-                      )}
-                      <div className="absolute inset-0 bg-gradient-to-t from-[#0A0714]/80 via-transparent to-transparent opacity-60 group-hover:opacity-30 transition-opacity" />
-                    </div>
 
-                    {/* 3. DETAILS BELOW PHOTO: Name, Designation / Role, Bio */}
-                    <div className="mt-3">
-                      <h3 className="truncate font-mono text-sm sm:text-base font-black tracking-wide text-white uppercase group-hover:text-[#FFE8C7] transition-colors">
-                        {member.name}
-                      </h3>
-                      <div className="mt-0.5 flex items-center gap-1 font-mono text-[11px] font-bold text-[#FF4FB3]">
-                        <Zap className="h-3 w-3 flex-shrink-0 text-[#FF7A3D]" />
-                        <span className="truncate">{member.role}</span>
-                      </div>
-                      {member.bio && (
-                        <p className="mt-1 line-clamp-2 text-[10px] text-zinc-400 font-sans leading-tight">
-                          {member.bio}
-                        </p>
-                      )}
-                    </div>
-                  </div>
+                        {/* 4. CONTACT & SOCIAL ACTIONS: Email, Call, LinkedIn, Instagram, GitHub */}
+                        <div className="mt-3 border-t border-white/10 pt-2.5">
+                          <div className="flex items-center justify-between gap-1.5">
+                            <div className="flex items-center gap-1 min-w-0 flex-1">
+                              {/* Email Button */}
+                              {member.email && (
+                                <a
+                                  href={`mailto:${member.email}`}
+                                  title={`Email: ${member.email}`}
+                                  className="flex h-7 items-center gap-1 rounded-lg border border-[#35D9FF]/30 bg-[#35D9FF]/10 px-2 font-mono text-[10px] font-bold text-[#35D9FF] hover:bg-[#35D9FF]/20 transition-colors truncate"
+                                >
+                                  <Mail className="h-3 w-3 flex-shrink-0" />
+                                  <span className="truncate">EMAIL</span>
+                                </a>
+                              )}
 
-                  {/* 4. CONTACT & SOCIAL ACTIONS: Email, Call, LinkedIn, Instagram */}
-                  <div className="mt-3 border-t border-white/10 pt-2.5">
-                    <div className="flex items-center justify-between gap-1.5">
-                      <div className="flex items-center gap-1 min-w-0 flex-1">
-                        {/* Email Button */}
-                        {member.email && (
-                          <a
-                            href={`mailto:${member.email}`}
-                            title={`Email: ${member.email}`}
-                            className="flex h-7 items-center gap-1 rounded-lg border border-[#35D9FF]/30 bg-[#35D9FF]/10 px-2 font-mono text-[10px] font-bold text-[#35D9FF] hover:bg-[#35D9FF]/20 transition-colors truncate"
-                          >
-                            <Mail className="h-3 w-3 flex-shrink-0" />
-                            <span className="truncate">EMAIL</span>
-                          </a>
-                        )}
+                              {/* Call Button */}
+                              {member.phone && (
+                                <a
+                                  href={`tel:${member.phone}`}
+                                  title={`Call: ${member.phone}`}
+                                  className="flex h-7 items-center gap-1 rounded-lg border border-emerald-500/30 bg-emerald-500/10 px-2 font-mono text-[10px] font-bold text-emerald-400 hover:bg-emerald-500/20 transition-colors flex-shrink-0"
+                                >
+                                  <Phone className="h-3 w-3" />
+                                  <span>CALL</span>
+                                </a>
+                              )}
+                            </div>
 
-                        {/* Call Button */}
-                        {member.phone && (
-                          <a
-                            href={`tel:${member.phone}`}
-                            title={`Call: ${member.phone}`}
-                            className="flex h-7 items-center gap-1 rounded-lg border border-emerald-500/30 bg-emerald-500/10 px-2 font-mono text-[10px] font-bold text-emerald-400 hover:bg-emerald-500/20 transition-colors flex-shrink-0"
-                          >
-                            <Phone className="h-3 w-3" />
-                            <span>CALL</span>
-                          </a>
-                        )}
-                      </div>
+                            {/* Social links */}
+                            <div className="flex items-center gap-1 flex-shrink-0">
+                              {member.linkedin && (
+                                <a
+                                  href={member.linkedin}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  title="LinkedIn Profile"
+                                  className="flex h-7 w-7 items-center justify-center rounded-lg border border-white/10 bg-white/5 text-zinc-400 hover:border-[#0077B5] hover:bg-[#0077B5]/20 hover:text-white transition-colors"
+                                >
+                                  <LinkedinIcon className="h-3 w-3" />
+                                </a>
+                              )}
 
-                      {/* Social links */}
-                      <div className="flex items-center gap-1 flex-shrink-0">
-                        {member.linkedin && (
-                          <a
-                            href={member.linkedin}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            title="LinkedIn Profile"
-                            className="flex h-7 w-7 items-center justify-center rounded-lg border border-white/10 bg-white/5 text-zinc-400 hover:border-[#0077B5] hover:bg-[#0077B5]/20 hover:text-white transition-colors"
-                          >
-                            <LinkedinIcon className="h-3 w-3" />
-                          </a>
-                        )}
+                              {member.instagram && (
+                                <a
+                                  href={member.instagram}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  title="Instagram"
+                                  className="flex h-7 w-7 items-center justify-center rounded-lg border border-white/10 bg-white/5 text-zinc-400 hover:border-[#E1306C] hover:bg-[#E1306C]/20 hover:text-[#E1306C] transition-colors"
+                                >
+                                  <InstagramIcon className="h-3 w-3" />
+                                </a>
+                              )}
 
-                        {member.instagram && (
-                          <a
-                            href={member.instagram}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            title="Instagram"
-                            className="flex h-7 w-7 items-center justify-center rounded-lg border border-white/10 bg-white/5 text-zinc-400 hover:border-[#E1306C] hover:bg-[#E1306C]/20 hover:text-[#E1306C] transition-colors"
-                          >
-                            <InstagramIcon className="h-3 w-3" />
-                          </a>
-                        )}
-
-                        {member.github && (
-                          <a
-                            href={member.github}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            title="GitHub"
-                            className="flex h-7 w-7 items-center justify-center rounded-lg border border-white/10 bg-white/5 text-zinc-400 hover:border-white hover:bg-white/20 hover:text-white transition-colors"
-                          >
-                            <GithubIcon className="h-3 w-3" />
-                          </a>
-                        )}
-                      </div>
-                    </div>
-                  </div>
+                              {member.github && (
+                                <a
+                                  href={member.github}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  title="GitHub"
+                                  className="flex h-7 w-7 items-center justify-center rounded-lg border border-white/10 bg-white/5 text-zinc-400 hover:border-white hover:bg-white/20 hover:text-white transition-colors"
+                                >
+                                  <GithubIcon className="h-3 w-3" />
+                                </a>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+                      </motion.div>
+                    ))}
+                  </AnimatePresence>
                 </motion.div>
-              ))}
-            </AnimatePresence>
-          </motion.div>
+              </div>
+            ))}
+          </div>
         )}
       </div>
     </div>
