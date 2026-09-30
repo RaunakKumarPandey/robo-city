@@ -14,6 +14,7 @@ import {
   Loader2,
   RefreshCw,
   LogOut,
+  Layers,
 } from "lucide-react";
 
 export default function AdminDashboardPage() {
@@ -234,6 +235,27 @@ export default function AdminDashboardPage() {
         </h2>
 
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
+          <Link
+            href="/admin/gallery"
+            className="group flex flex-col justify-between rounded-xl border border-white/10 bg-[#0A0718]/80 p-5 transition-all duration-200 hover:-translate-y-1 hover:border-[#35D9FF] hover:shadow-[0_0_20px_rgba(53,217,255,0.25)]"
+          >
+            <div className="space-y-3">
+              <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-[#35D9FF]/10 text-[#35D9FF]">
+                <Layers className="h-5 w-5" />
+              </div>
+              <h3 className="font-black text-sm uppercase tracking-wider text-white">
+                POSTERS &amp; GALLERY
+              </h3>
+              <p className="text-xs text-zinc-400">
+                Upload official posters and event photo moments live to the public site.
+              </p>
+            </div>
+            <div className="mt-6 flex items-center justify-between text-xs font-mono font-bold text-zinc-400 group-hover:text-[#35D9FF]">
+              <span>MANAGE MEDIA</span>
+              <ArrowRight className="h-3.5 w-3.5 transition-transform group-hover:translate-x-1" />
+            </div>
+          </Link>
+
           <Link
             href="/admin/organizing-team"
             className="group flex flex-col justify-between rounded-xl border border-white/10 bg-[#0A0718]/80 p-5 transition-all duration-200 hover:-translate-y-1 hover:border-[#FF2D8D] hover:shadow-[0_0_20px_rgba(255,45,141,0.25)]"

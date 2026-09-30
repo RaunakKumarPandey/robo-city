@@ -11,6 +11,7 @@ const navLinks: NavItem[] = [
   { name: "MISSIONS", href: "/missions" },
   { name: "GARAGE", href: "/workshops" },
   { name: "LEADERBOARD", href: "/leaderboard" },
+  { name: "GALLERY", href: "/gallery" },
   { name: "ABOUT", href: "/about" },
   { name: "CONTACT", href: "/contact" },
 ];

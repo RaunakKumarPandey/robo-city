@@ -45,6 +45,11 @@ const BG_MAP: Record<string, { image: string; tint: string; name: string }> = {
     tint: "rgba(255, 122, 61, 0.15)",
     name: "RECRUITMENT DESK // SQUAD TERMINAL",
   },
+  "/gallery": {
+    image: "/images/backgrounds/bg_about.jpg",
+    tint: "rgba(255, 45, 141, 0.15)",
+    name: "CYBER VAULT // POSTERS & GALLERY",
+  },
 };
 
 export default function DynamicBackground() {

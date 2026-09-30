@@ -192,3 +192,32 @@ export interface OrganizingMember {
   created_at?: string;
   updated_at?: string;
 }
+
+export interface EventPoster {
+  id: string;
+  title: string;
+  tagline?: string | null;
+  image_url: string;
+  download_url?: string | null;
+  category?: string | null;
+  release_date?: string | null;
+  featured?: boolean;
+  display_order: number;
+  created_at?: string;
+  updated_at?: string;
+}
+
+export interface EventGalleryImage {
+  id: string;
+  title?: string | null;
+  caption?: string | null;
+  category: "Arena Battles" | "Workshops & Garage" | "Awards & Podium" | "Crew Moments" | "VIP & Guests" | "Scrutiny & Inspection" | string;
+  image_url: string;
+  photographer?: string | null;
+  tag?: string | null;
+  featured?: boolean;
+  display_order: number;
+  created_at?: string;
+  updated_at?: string;
+}
+

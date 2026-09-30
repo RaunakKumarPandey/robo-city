@@ -15,12 +15,14 @@ import {
   X,
   ShieldCheck,
   UserCheck,
+  Image as ImageIcon,
 } from "lucide-react";
 
 const adminNavItems = [
   { name: "Dashboard", href: "/admin", icon: LayoutDashboard },
   { name: "Participant Teams", href: "/admin/teams", icon: Users },
   { name: "Organising Team", href: "/admin/organizing-team", icon: UserCheck },
+  { name: "Posters & Gallery", href: "/admin/gallery", icon: ImageIcon },
   { name: "Scores", href: "/admin/scores", icon: Trophy },
   { name: "Workshops", href: "/admin/workshops", icon: Wrench },
   { name: "Announcements", href: "/admin/announcements", icon: Radio },

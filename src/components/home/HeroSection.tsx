@@ -45,21 +45,25 @@ export default function HeroSection() {
         animate="visible"
         className="relative z-10 mx-auto flex max-w-5xl flex-1 flex-col items-center justify-center px-4 text-center sm:px-6 lg:px-8"
       >
-        {/* TOP STATUS PILL: 🔴 ROBOVERSE // GRAND PRIX 2026 */}
+        {/* TOP STATUS PILL: EVENT POSTER / IMAGES (Links to /gallery) */}
         <motion.div variants={itemVariants} className="mb-4 sm:mb-6">
-          <div className="inline-flex items-center gap-2.5 rounded-full border border-[#FF2D8D]/40 bg-[#120B20]/80 px-4 py-1.5 backdrop-blur-xl shadow-[0_0_20px_rgba(255,45,141,0.3)]">
+          <Link
+            href="/gallery"
+            className="group inline-flex items-center gap-2.5 rounded-full border border-[#FF2D8D]/40 bg-[#120B20]/85 px-4 py-1.5 backdrop-blur-xl shadow-[0_0_20px_rgba(255,45,141,0.3)] hover:border-[#35D9FF] hover:bg-[#35D9FF]/10 hover:shadow-[0_0_25px_rgba(53,217,255,0.4)] transition-all cursor-pointer"
+          >
             <span className="relative flex h-2.5 w-2.5">
               <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-[#FF2D8D] opacity-75" />
               <span className="relative inline-flex h-2.5 w-2.5 rounded-full bg-[#FF2D8D]" />
             </span>
-            <span className="font-mono text-xs font-black tracking-widest text-[#FF4FB3] uppercase">
-              LIVE SIGNAL
+            <span className="font-mono text-xs font-black tracking-widest text-[#FF4FB3] uppercase group-hover:text-white transition-colors">
+              EVENT POSTER / IMAGES
             </span>
             <span className="h-3 w-[1px] bg-white/20" />
-            <span className="font-mono text-xs font-bold tracking-wider text-[#35D9FF]">
-              ROBOVERSE &apos;26 // GRAND PRIX
+            <span className="font-mono text-xs font-bold tracking-wider text-[#35D9FF] flex items-center gap-1 group-hover:text-[#FFE8C7] transition-colors">
+              <span>VIEW POSTERS &amp; GALLERY</span>
+              <ArrowRight className="h-3 w-3 transition-transform duration-200 group-hover:translate-x-1" />
             </span>
-          </div>
+          </Link>
         </motion.div>
 
         {/* BRAND OVERLINE */}
