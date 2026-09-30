@@ -13,13 +13,8 @@ import {
   ExternalLink,
   CheckCircle2,
   AlertCircle,
-  ArrowLeft,
   Upload,
-  Image as ImageIcon,
   Sparkles,
-  Zap,
-  Eye,
-  Download,
 } from "lucide-react";
 import { EventPoster, EventGalleryImage } from "@/types/database";
 import {
@@ -105,6 +100,31 @@ export default function AdminGalleryPage() {
     setTimeout(() => setNotification(null), 4000);
   };
 
+  // File Upload Handlers (converts local file to Data URL)
+  const handlePosterFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onloadend = () => {
+      if (typeof reader.result === "string") {
+        setPosterImageUrl(reader.result);
+      }
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const handlePhotoFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onloadend = () => {
+      if (typeof reader.result === "string") {
+        setPhotoImageUrl(reader.result);
+      }
+    };
+    reader.readAsDataURL(file);
+  };
+
   // =========================================================================
   // POSTER HANDLERS
   // =========================================================================
@@ -123,10 +143,10 @@ export default function AdminGalleryPage() {
 
   const handleOpenEditPoster = (poster: EventPoster) => {
     setEditingPoster(poster);
-    setPosterTitle(poster.title);
+    setPosterTitle(poster.title || "");
     setPosterTagline(poster.tagline || "");
     setPosterCategory(poster.category || "Official Festival Poster");
-    setPosterImageUrl(poster.image_url);
+    setPosterImageUrl(poster.image_url || "");
     setPosterDownloadUrl(poster.download_url || "");
     setPosterReleaseDate(poster.release_date || "OCTOBER 2026");
     setPosterFeatured(Boolean(poster.featured));
@@ -136,19 +156,19 @@ export default function AdminGalleryPage() {
 
   const handleSavePoster = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!posterTitle.trim() || !posterImageUrl.trim()) {
-      notify("error", "Poster Title and Image URL are required.");
-      return;
-    }
 
     setSaving(true);
+    // Safe fallbacks for all optional fields — no field is mandatory!
+    const finalTitle = posterTitle.trim() || "RoboVerse '26 Official Poster";
+    const finalImage = posterImageUrl.trim() || "/images/backgrounds/bg_home.jpg";
+
     const res = await saveEventPoster({
       id: editingPoster?.id,
-      title: posterTitle.trim(),
+      title: finalTitle,
       tagline: posterTagline.trim() || null,
-      category: posterCategory,
-      image_url: posterImageUrl.trim(),
-      download_url: posterDownloadUrl.trim() || posterImageUrl.trim(),
+      category: posterCategory || "Official Festival Poster",
+      image_url: finalImage,
+      download_url: posterDownloadUrl.trim() || finalImage,
       release_date: posterReleaseDate.trim() || "OCTOBER 2026",
       featured: posterFeatured,
       display_order: Number(posterOrder) || 1,
@@ -164,8 +184,8 @@ export default function AdminGalleryPage() {
     }
   };
 
-  const handleDeletePoster = async (id: string, title: string) => {
-    if (!confirm(`Are you sure you want to delete poster "${title}"?`)) return;
+  const handleDeletePoster = async (id: string, title?: string) => {
+    if (!confirm(`Are you sure you want to delete poster "${title || "Selected Poster"}"?`)) return;
 
     const res = await deleteEventPoster(id);
     if (res.success) {
@@ -197,7 +217,7 @@ export default function AdminGalleryPage() {
     setPhotoTitle(img.title || "");
     setPhotoCaption(img.caption || "");
     setPhotoCategory(img.category || "Arena Battles");
-    setPhotoImageUrl(img.image_url);
+    setPhotoImageUrl(img.image_url || "");
     setPhotoPhotographer(img.photographer || "IEEE Media Wing");
     setPhotoTag(img.tag || "ROBOVERSE '26");
     setPhotoFeatured(Boolean(img.featured));
@@ -207,18 +227,18 @@ export default function AdminGalleryPage() {
 
   const handleSavePhoto = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!photoImageUrl.trim()) {
-      notify("error", "Image URL is required.");
-      return;
-    }
 
     setSaving(true);
+    // Safe fallbacks for all optional fields — no field is mandatory!
+    const finalTitle = photoTitle.trim() || "Event Moment";
+    const finalImage = photoImageUrl.trim() || "/images/backgrounds/bg_missions.jpg";
+
     const res = await saveGalleryImage({
       id: editingImage?.id,
-      title: photoTitle.trim() || "Event Moment",
+      title: finalTitle,
       caption: photoCaption.trim() || null,
-      category: photoCategory,
-      image_url: photoImageUrl.trim(),
+      category: photoCategory || "Arena Battles",
+      image_url: finalImage,
       photographer: photoPhotographer.trim() || "IEEE Media",
       tag: photoTag.trim() || "ROBOVERSE '26",
       featured: photoFeatured,
@@ -529,7 +549,7 @@ export default function AdminGalleryPage() {
                   {editingPoster ? "Edit Event Poster" : "Upload New Poster"}
                 </h3>
                 <p className="text-xs text-zinc-400 font-mono">
-                  Posters are displayed in high resolution on the event media page.
+                  All fields are optional. You can paste an image URL or choose a file from your device.
                 </p>
               </div>
               <button
@@ -544,11 +564,10 @@ export default function AdminGalleryPage() {
               {/* Poster Title */}
               <div>
                 <label className="block font-mono text-xs font-bold uppercase text-zinc-300 mb-1">
-                  Poster Title *
+                  Poster Title
                 </label>
                 <input
                   type="text"
-                  required
                   value={posterTitle}
                   onChange={(e) => setPosterTitle(e.target.value)}
                   placeholder="e.g. ROBOVERSE '26 // OFFICIAL FESTIVAL POSTER"
@@ -603,29 +622,55 @@ export default function AdminGalleryPage() {
                 </div>
               </div>
 
-              {/* Image URL */}
+              {/* Poster Image: URL OR File Upload */}
               <div>
                 <label className="block font-mono text-xs font-bold uppercase text-zinc-300 mb-1">
-                  Poster Image URL *
+                  Poster Image (URL or Choose File)
                 </label>
-                <input
-                  type="text"
-                  required
-                  value={posterImageUrl}
-                  onChange={(e) => setPosterImageUrl(e.target.value)}
-                  placeholder="https://... or /images/backgrounds/..."
-                  className="w-full rounded-xl border border-white/10 bg-[#07070F] px-4 py-2.5 font-mono text-xs text-white focus:border-[#FF7A3D] focus:outline-none"
-                />
-                {posterImageUrl && (
-                  <div className="mt-2 relative h-32 w-24 overflow-hidden rounded-lg border border-white/10">
-                    <img
-                      src={posterImageUrl}
-                      alt="Preview"
-                      className="h-full w-full object-cover"
-                      onError={(e) => {
-                        (e.target as HTMLImageElement).src = "/images/backgrounds/bg_home.jpg";
-                      }}
+                <div className="flex flex-col sm:flex-row gap-2">
+                  <input
+                    type="text"
+                    value={posterImageUrl.startsWith("data:") ? "(Local File Uploaded)" : posterImageUrl}
+                    onChange={(e) => setPosterImageUrl(e.target.value)}
+                    placeholder="Paste image URL here or click Upload"
+                    className="flex-1 rounded-xl border border-white/10 bg-[#07070F] px-4 py-2.5 font-mono text-xs text-white focus:border-[#FF7A3D] focus:outline-none"
+                  />
+                  <label className="inline-flex items-center justify-center gap-2 cursor-pointer rounded-xl border border-[#FF7A3D]/40 bg-[#FF7A3D]/15 px-4 py-2.5 font-mono text-xs font-bold text-[#FF7A3D] hover:bg-[#FF7A3D]/30 transition-colors shrink-0">
+                    <Upload className="h-4 w-4" />
+                    <span>Choose File</span>
+                    <input
+                      type="file"
+                      accept="image/*"
+                      onChange={handlePosterFileUpload}
+                      className="hidden"
                     />
+                  </label>
+                  {posterImageUrl && (
+                    <button
+                      type="button"
+                      onClick={() => setPosterImageUrl("")}
+                      className="rounded-xl border border-red-500/30 bg-red-500/10 px-3 py-2 font-mono text-xs text-red-400 hover:bg-red-500/20 shrink-0"
+                    >
+                      Clear
+                    </button>
+                  )}
+                </div>
+
+                {posterImageUrl && (
+                  <div className="mt-2.5 flex items-center gap-3">
+                    <div className="relative h-20 w-16 overflow-hidden rounded-lg border border-white/20 bg-black">
+                      <img
+                        src={posterImageUrl}
+                        alt="Preview"
+                        className="h-full w-full object-cover"
+                        onError={(e) => {
+                          (e.target as HTMLImageElement).src = "/images/backgrounds/bg_home.jpg";
+                        }}
+                      />
+                    </div>
+                    <span className="font-mono text-xs text-emerald-400">
+                      ✓ Image preview ready
+                    </span>
                   </div>
                 )}
               </div>
@@ -671,7 +716,7 @@ export default function AdminGalleryPage() {
                 <button
                   type="submit"
                   disabled={saving}
-                  className="inline-flex items-center gap-2 rounded-xl bg-gradient-to-r from-[#FF2D8D] to-[#FF7A3D] px-6 py-2.5 font-mono text-xs font-black uppercase text-white shadow-lg disabled:opacity-50"
+                  className="inline-flex items-center gap-2 rounded-xl bg-gradient-to-r from-[#FF2D8D] to-[#FF7A3D] px-6 py-2.5 font-mono text-xs font-black uppercase text-white shadow-lg disabled:opacity-50 cursor-pointer"
                 >
                   <Save className="h-4 w-4" />
                   <span>{saving ? "Saving..." : "Save Poster"}</span>
@@ -694,7 +739,7 @@ export default function AdminGalleryPage() {
                   {editingImage ? "Edit Gallery Photo" : "Upload Event Moment"}
                 </h3>
                 <p className="text-xs text-zinc-400 font-mono">
-                  Live moments from the arena, pit crew, and award ceremony.
+                  All fields are optional. You can paste an image URL or choose a file from your device.
                 </p>
               </div>
               <button
@@ -738,7 +783,7 @@ export default function AdminGalleryPage() {
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
                   <label className="block font-mono text-xs font-bold uppercase text-zinc-300 mb-1">
-                    Category *
+                    Category
                   </label>
                   <select
                     value={photoCategory}
@@ -767,29 +812,55 @@ export default function AdminGalleryPage() {
                 </div>
               </div>
 
-              {/* Image URL */}
+              {/* Photo Image: URL OR File Upload */}
               <div>
                 <label className="block font-mono text-xs font-bold uppercase text-zinc-300 mb-1">
-                  Image URL *
+                  Image (URL or Choose File)
                 </label>
-                <input
-                  type="text"
-                  required
-                  value={photoImageUrl}
-                  onChange={(e) => setPhotoImageUrl(e.target.value)}
-                  placeholder="https://images.unsplash.com/... or hosted URL"
-                  className="w-full rounded-xl border border-white/10 bg-[#07070F] px-4 py-2.5 font-mono text-xs text-white focus:border-[#35D9FF] focus:outline-none"
-                />
-                {photoImageUrl && (
-                  <div className="mt-2 relative h-28 w-40 overflow-hidden rounded-lg border border-white/10">
-                    <img
-                      src={photoImageUrl}
-                      alt="Preview"
-                      className="h-full w-full object-cover"
-                      onError={(e) => {
-                        (e.target as HTMLImageElement).src = "/images/backgrounds/bg_missions.jpg";
-                      }}
+                <div className="flex flex-col sm:flex-row gap-2">
+                  <input
+                    type="text"
+                    value={photoImageUrl.startsWith("data:") ? "(Local File Uploaded)" : photoImageUrl}
+                    onChange={(e) => setPhotoImageUrl(e.target.value)}
+                    placeholder="Paste image URL here or click Upload"
+                    className="flex-1 rounded-xl border border-white/10 bg-[#07070F] px-4 py-2.5 font-mono text-xs text-white focus:border-[#35D9FF] focus:outline-none"
+                  />
+                  <label className="inline-flex items-center justify-center gap-2 cursor-pointer rounded-xl border border-[#35D9FF]/40 bg-[#35D9FF]/15 px-4 py-2.5 font-mono text-xs font-bold text-[#35D9FF] hover:bg-[#35D9FF]/30 transition-colors shrink-0">
+                    <Upload className="h-4 w-4" />
+                    <span>Choose File</span>
+                    <input
+                      type="file"
+                      accept="image/*"
+                      onChange={handlePhotoFileUpload}
+                      className="hidden"
                     />
+                  </label>
+                  {photoImageUrl && (
+                    <button
+                      type="button"
+                      onClick={() => setPhotoImageUrl("")}
+                      className="rounded-xl border border-red-500/30 bg-red-500/10 px-3 py-2 font-mono text-xs text-red-400 hover:bg-red-500/20 shrink-0"
+                    >
+                      Clear
+                    </button>
+                  )}
+                </div>
+
+                {photoImageUrl && (
+                  <div className="mt-2.5 flex items-center gap-3">
+                    <div className="relative h-20 w-28 overflow-hidden rounded-lg border border-white/20 bg-black">
+                      <img
+                        src={photoImageUrl}
+                        alt="Preview"
+                        className="h-full w-full object-cover"
+                        onError={(e) => {
+                          (e.target as HTMLImageElement).src = "/images/backgrounds/bg_missions.jpg";
+                        }}
+                      />
+                    </div>
+                    <span className="font-mono text-xs text-emerald-400">
+                      ✓ Image preview ready
+                    </span>
                   </div>
                 )}
               </div>
@@ -835,7 +906,7 @@ export default function AdminGalleryPage() {
                 <button
                   type="submit"
                   disabled={saving}
-                  className="inline-flex items-center gap-2 rounded-xl bg-gradient-to-r from-[#35D9FF] to-[#3B82F6] px-6 py-2.5 font-mono text-xs font-black uppercase text-black shadow-lg disabled:opacity-50"
+                  className="inline-flex items-center gap-2 rounded-xl bg-gradient-to-r from-[#35D9FF] to-[#3B82F6] px-6 py-2.5 font-mono text-xs font-black uppercase text-black shadow-lg disabled:opacity-50 cursor-pointer"
                 >
                   <Save className="h-4 w-4" />
                   <span>{saving ? "Saving..." : "Save Photo"}</span>
