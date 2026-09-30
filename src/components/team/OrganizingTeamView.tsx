@@ -41,6 +41,44 @@ function GithubIcon({ className }: { className?: string }) {
   );
 }
 
+// Clean Member Portrait Component with Initials Fallback (NO DUMMY UNRELATED FACES)
+function MemberPortrait({ member }: { member: OrganizingMember }) {
+  const [imgError, setImgError] = useState(false);
+
+  // Compute initials (e.g. "Nilesh Kumar" -> "NK")
+  const initials = useMemo(() => {
+    if (!member.name) return "ROBO";
+    const parts = member.name.trim().split(/\s+/);
+    if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase();
+    return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
+  }, [member.name]);
+
+  return (
+    <div className="relative w-full aspect-[4/4.8] overflow-hidden rounded-xl border border-white/15 bg-[#08070D] shadow-[0_0_15px_rgba(0,0,0,0.8)] group-hover:border-[#FF2D8D]/70 transition-colors">
+      {member.photo_url && !imgError ? (
+        <img
+          src={member.photo_url}
+          alt={member.name}
+          className="h-full w-full object-cover object-top transition-transform duration-500 group-hover:scale-105"
+          onError={() => setImgError(true)}
+        />
+      ) : (
+        <div className="flex h-full w-full flex-col items-center justify-center bg-gradient-to-br from-[#160E2E] via-[#0A0714] to-[#120B20] text-center p-4">
+          <div className="flex h-16 w-16 sm:h-20 sm:w-20 items-center justify-center rounded-2xl border border-white/15 bg-white/5 shadow-inner">
+            <span className="font-mono text-xl sm:text-2xl font-black text-transparent bg-clip-text bg-gradient-to-r from-[#FF2D8D] via-[#FF7A3D] to-[#35D9FF]">
+              {initials}
+            </span>
+          </div>
+          <span className="mt-3 font-mono text-[9px] font-bold text-zinc-500 tracking-widest uppercase">
+            OPERATIVE #{String(member.display_order ?? 1).padStart(2, "0")}
+          </span>
+        </div>
+      )}
+      <div className="absolute inset-0 bg-gradient-to-t from-[#0A0714]/80 via-transparent to-transparent opacity-60 group-hover:opacity-30 transition-opacity pointer-events-none" />
+    </div>
+  );
+}
+
 const CATEGORIES = [
   "ALL SQUADS",
   "CORE SQUAD",
@@ -419,25 +457,8 @@ export default function OrganizingTeamView() {
                             </span>
                           </div>
 
-                          {/* 2. PHOTO (Portrait Aspect) */}
-                          <div className="relative w-full aspect-[4/4.8] overflow-hidden rounded-xl border border-white/15 bg-[#08070D] shadow-[0_0_15px_rgba(0,0,0,0.8)] group-hover:border-[#FF2D8D]/70 transition-colors">
-                            {member.photo_url ? (
-                              <img
-                                src={member.photo_url}
-                                alt={member.name}
-                                className="h-full w-full object-cover object-top transition-transform duration-500 group-hover:scale-105"
-                                onError={(e) => {
-                                  (e.target as HTMLImageElement).src =
-                                    "https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=600&q=80";
-                                }}
-                              />
-                            ) : (
-                              <div className="flex h-full w-full items-center justify-center bg-gradient-to-br from-[#FF2D8D]/20 to-[#35D9FF]/20 text-[#35D9FF]">
-                                <Users className="h-10 w-10" />
-                              </div>
-                            )}
-                            <div className="absolute inset-0 bg-gradient-to-t from-[#0A0714]/80 via-transparent to-transparent opacity-60 group-hover:opacity-30 transition-opacity" />
-                          </div>
+                          {/* 2. PHOTO (Portrait Aspect) with Initials Fallback (NO DUMMY FACES) */}
+                          <MemberPortrait member={member} />
 
                           {/* 3. DETAILS BELOW PHOTO: Name, Role, Bio */}
                           <div className="mt-3">
