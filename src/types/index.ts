@@ -12,6 +12,6 @@ export interface CityLocation {
   href: string;
   iconName: "building" | "flag" | "trophy" | "bot" | "wrench" | "vault" | "users";
   status?: string;
-  statusType?: "live" | "open" | "soon" | "prize";
+  statusType?: "live" | "open" | "soon" | "prize" | "closed";
   themeColor: "pink" | "orange" | "cyan" | "purple";
 }

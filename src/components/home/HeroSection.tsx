@@ -157,7 +157,7 @@ export default function HeroSection() {
           </div>
           <div className="rounded-xl border border-white/10 bg-[#120B20]/60 p-3.5 backdrop-blur-md">
             <div className="font-mono text-[10px] font-bold text-zinc-400 uppercase">EVENT STATUS</div>
-            <div className="font-mono text-lg sm:text-xl font-black text-[#FF2D8D]">REGISTRATION OPEN</div>
+            <div className="font-mono text-lg sm:text-xl font-black text-[#FF003C] drop-shadow-[0_0_10px_rgba(255,0,60,0.6)]">REGISTRATION CLOSED</div>
           </div>
         </motion.div>
       </motion.div>

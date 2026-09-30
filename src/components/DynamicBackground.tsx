@@ -42,8 +42,8 @@ const BG_MAP: Record<string, { image: string; tint: string; name: string }> = {
   },
   "/register": {
     image: "/images/backgrounds/bg_home.jpg",
-    tint: "rgba(255, 122, 61, 0.15)",
-    name: "RECRUITMENT DESK // SQUAD TERMINAL",
+    tint: "rgba(255, 0, 60, 0.2)",
+    name: "GRID LOCKDOWN // ENLISTMENT TERMINATED",
   },
   "/gallery": {
     image: "/images/backgrounds/bg_about.jpg",
