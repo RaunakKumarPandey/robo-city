@@ -60,10 +60,10 @@ export default function Navbar() {
           </div>
           <div className="flex flex-col">
             <span className="font-black text-lg tracking-[0.18em] uppercase text-transparent bg-clip-text bg-gradient-to-r from-[#FF2D8D] via-[#FF7A3D] to-[#35D9FF] filter drop-shadow-[0_0_12px_rgba(255,45,141,0.4)]">
-              ROBO CITY
+              ROBOVERSE &apos;26
             </span>
             <span className="font-mono text-[9px] font-extrabold tracking-[0.25em] text-[#FFE8C7]/80 uppercase -mt-0.5 flex items-center gap-1.5">
-              <span>ROBOVERSE &apos;26</span>
+              <span>ROBO CITY</span>
             </span>
           </div>
         </Link>
