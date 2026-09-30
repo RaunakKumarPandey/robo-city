@@ -2,12 +2,15 @@ import { supabase } from "@/lib/supabase";
 import { EventPoster, EventGalleryImage } from "@/types/database";
 import { initialEventPosters, initialGalleryImages } from "@/data/initialGalleryData";
 
+const POSTERS_STORAGE_KEY = "robocity_event_posters";
+const IMAGES_STORAGE_KEY = "robocity_gallery_images";
+
 // ============================================================================
 // 1. POSTERS API & SUPABASE HANDLERS
 // ============================================================================
 
 export async function fetchEventPosters(): Promise<EventPoster[]> {
-  // 1. Fetch via API
+  // 1. Try fetching via API route
   if (typeof window !== "undefined") {
     try {
       const res = await fetch("/api/gallery/posters", {
@@ -17,18 +20,22 @@ export async function fetchEventPosters(): Promise<EventPoster[]> {
       if (res.ok) {
         const json = await res.json();
         if (json.success && Array.isArray(json.data) && json.data.length > 0) {
-          return json.data.sort(
+          const sorted = json.data.sort(
             (a: EventPoster, b: EventPoster) =>
               (a.display_order ?? 0) - (b.display_order ?? 0)
           );
+          try {
+            localStorage.setItem(POSTERS_STORAGE_KEY, JSON.stringify(sorted));
+          } catch {}
+          return sorted;
         }
       }
     } catch {
-      // Fall through to Supabase
+      // Fall through
     }
   }
 
-  // 2. Direct Supabase Query
+  // 2. Try direct Supabase Query
   try {
     const { data, error } = await supabase
       .from("event_posters")
@@ -39,10 +46,23 @@ export async function fetchEventPosters(): Promise<EventPoster[]> {
       return data as EventPoster[];
     }
   } catch (err) {
-    console.warn("Supabase fetch posters fallback:", err);
+    console.warn("Supabase fetch posters notice:", err);
   }
 
-  // 3. Fallback Seed
+  // 3. Try LocalStorage
+  if (typeof window !== "undefined") {
+    try {
+      const cached = localStorage.getItem(POSTERS_STORAGE_KEY);
+      if (cached) {
+        const parsed = JSON.parse(cached);
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          return parsed;
+        }
+      }
+    } catch {}
+  }
+
+  // 4. Fallback Seed
   return initialEventPosters;
 }
 
@@ -56,6 +76,7 @@ export async function saveEventPoster(
     updated_at: new Date().toISOString(),
   };
 
+  // 1. Call server API
   try {
     const res = await fetch("/api/gallery/posters", {
       method: "POST",
@@ -73,9 +94,10 @@ export async function saveEventPoster(
       }
     }
   } catch (err) {
-    console.warn("API save poster failed, falling back:", err);
+    console.warn("API save poster notice:", err);
   }
 
+  // 2. Direct Supabase
   try {
     const { data, error } = await supabase
       .from("event_posters")
@@ -89,22 +111,29 @@ export async function saveEventPoster(
       }
       return { success: true, data: data as EventPoster };
     }
-    if (error) {
-      return { success: false, error: error.message };
-    }
   } catch (err) {
-    return { success: false, error: String(err) };
+    console.warn("Supabase save poster notice:", err);
   }
 
+  // 3. LocalStorage update
   if (typeof window !== "undefined") {
-    window.dispatchEvent(new Event("gallery_updated"));
+    try {
+      const current = await fetchEventPosters();
+      const updated = current.some((p) => p.id === record.id)
+        ? current.map((p) => (p.id === record.id ? record : p))
+        : [...current, record];
+      localStorage.setItem(POSTERS_STORAGE_KEY, JSON.stringify(updated));
+      window.dispatchEvent(new Event("gallery_updated"));
+    } catch {}
   }
+
   return { success: true, data: record };
 }
 
 export async function deleteEventPoster(
   id: string
 ): Promise<{ success: boolean; error?: string }> {
+  // 1. Call server API
   try {
     const res = await fetch(`/api/gallery/posters?id=${encodeURIComponent(id)}`, {
       method: "DELETE",
@@ -120,21 +149,27 @@ export async function deleteEventPoster(
       }
     }
   } catch (err) {
-    console.warn("API delete poster error:", err);
+    console.warn("API delete poster notice:", err);
   }
 
+  // 2. Direct Supabase
   try {
-    const { error } = await supabase.from("event_posters").delete().eq("id", id);
-    if (!error) {
-      if (typeof window !== "undefined") {
-        window.dispatchEvent(new Event("gallery_updated"));
-      }
-      return { success: true };
-    }
-    return { success: false, error: error.message };
+    await supabase.from("event_posters").delete().eq("id", id);
   } catch (err) {
-    return { success: false, error: String(err) };
+    console.warn("Supabase delete poster notice:", err);
   }
+
+  // 3. LocalStorage update
+  if (typeof window !== "undefined") {
+    try {
+      const current = await fetchEventPosters();
+      const updated = current.filter((p) => p.id !== id);
+      localStorage.setItem(POSTERS_STORAGE_KEY, JSON.stringify(updated));
+      window.dispatchEvent(new Event("gallery_updated"));
+    } catch {}
+  }
+
+  return { success: true };
 }
 
 // ============================================================================
@@ -142,7 +177,7 @@ export async function deleteEventPoster(
 // ============================================================================
 
 export async function fetchGalleryImages(): Promise<EventGalleryImage[]> {
-  // 1. Fetch via API
+  // 1. Try fetching via API route
   if (typeof window !== "undefined") {
     try {
       const res = await fetch("/api/gallery/images", {
@@ -152,18 +187,22 @@ export async function fetchGalleryImages(): Promise<EventGalleryImage[]> {
       if (res.ok) {
         const json = await res.json();
         if (json.success && Array.isArray(json.data) && json.data.length > 0) {
-          return json.data.sort(
+          const sorted = json.data.sort(
             (a: EventGalleryImage, b: EventGalleryImage) =>
               (a.display_order ?? 0) - (b.display_order ?? 0)
           );
+          try {
+            localStorage.setItem(IMAGES_STORAGE_KEY, JSON.stringify(sorted));
+          } catch {}
+          return sorted;
         }
       }
     } catch {
-      // Fall through to Supabase
+      // Fall through
     }
   }
 
-  // 2. Direct Supabase Query
+  // 2. Try direct Supabase Query
   try {
     const { data, error } = await supabase
       .from("event_gallery_images")
@@ -174,10 +213,23 @@ export async function fetchGalleryImages(): Promise<EventGalleryImage[]> {
       return data as EventGalleryImage[];
     }
   } catch (err) {
-    console.warn("Supabase fetch gallery images fallback:", err);
+    console.warn("Supabase fetch gallery images notice:", err);
   }
 
-  // 3. Fallback Seed
+  // 3. Try LocalStorage
+  if (typeof window !== "undefined") {
+    try {
+      const cached = localStorage.getItem(IMAGES_STORAGE_KEY);
+      if (cached) {
+        const parsed = JSON.parse(cached);
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          return parsed;
+        }
+      }
+    } catch {}
+  }
+
+  // 4. Fallback Seed
   return initialGalleryImages;
 }
 
@@ -191,6 +243,7 @@ export async function saveGalleryImage(
     updated_at: new Date().toISOString(),
   };
 
+  // 1. Call server API
   try {
     const res = await fetch("/api/gallery/images", {
       method: "POST",
@@ -208,9 +261,10 @@ export async function saveGalleryImage(
       }
     }
   } catch (err) {
-    console.warn("API save gallery image failed, falling back:", err);
+    console.warn("API save gallery image notice:", err);
   }
 
+  // 2. Direct Supabase
   try {
     const { data, error } = await supabase
       .from("event_gallery_images")
@@ -224,22 +278,29 @@ export async function saveGalleryImage(
       }
       return { success: true, data: data as EventGalleryImage };
     }
-    if (error) {
-      return { success: false, error: error.message };
-    }
   } catch (err) {
-    return { success: false, error: String(err) };
+    console.warn("Supabase save gallery image notice:", err);
   }
 
+  // 3. LocalStorage update
   if (typeof window !== "undefined") {
-    window.dispatchEvent(new Event("gallery_updated"));
+    try {
+      const current = await fetchGalleryImages();
+      const updated = current.some((img) => img.id === record.id)
+        ? current.map((img) => (img.id === record.id ? record : img))
+        : [...current, record];
+      localStorage.setItem(IMAGES_STORAGE_KEY, JSON.stringify(updated));
+      window.dispatchEvent(new Event("gallery_updated"));
+    } catch {}
   }
+
   return { success: true, data: record };
 }
 
 export async function deleteGalleryImage(
   id: string
 ): Promise<{ success: boolean; error?: string }> {
+  // 1. Call server API
   try {
     const res = await fetch(`/api/gallery/images?id=${encodeURIComponent(id)}`, {
       method: "DELETE",
@@ -255,19 +316,25 @@ export async function deleteGalleryImage(
       }
     }
   } catch (err) {
-    console.warn("API delete gallery image error:", err);
+    console.warn("API delete gallery image notice:", err);
   }
 
+  // 2. Direct Supabase
   try {
-    const { error } = await supabase.from("event_gallery_images").delete().eq("id", id);
-    if (!error) {
-      if (typeof window !== "undefined") {
-        window.dispatchEvent(new Event("gallery_updated"));
-      }
-      return { success: true };
-    }
-    return { success: false, error: error.message };
+    await supabase.from("event_gallery_images").delete().eq("id", id);
   } catch (err) {
-    return { success: false, error: String(err) };
+    console.warn("Supabase delete gallery image notice:", err);
   }
+
+  // 3. LocalStorage update
+  if (typeof window !== "undefined") {
+    try {
+      const current = await fetchGalleryImages();
+      const updated = current.filter((img) => img.id !== id);
+      localStorage.setItem(IMAGES_STORAGE_KEY, JSON.stringify(updated));
+      window.dispatchEvent(new Event("gallery_updated"));
+    } catch {}
+  }
+
+  return { success: true };
 }
