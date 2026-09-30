@@ -5,7 +5,6 @@ import { EventPoster } from "@/types/database";
 
 export const dynamic = "force-dynamic";
 
-// In-memory fallback cache so operations work smoothly even if Supabase table is not yet created
 let memoryPosters: EventPoster[] = [...initialEventPosters];
 
 export async function GET() {
@@ -17,10 +16,39 @@ export async function GET() {
       .select("*")
       .order("display_order", { ascending: true });
 
-    if (!error && data && data.length > 0) {
-      memoryPosters = data as EventPoster[];
+    if (!error && data) {
+      if (data.length > 0) {
+        memoryPosters = data as EventPoster[];
+        return NextResponse.json(
+          { success: true, data },
+          {
+            headers: {
+              "Cache-Control": "no-store, no-cache, must-revalidate, proxy-revalidate",
+            },
+          }
+        );
+      }
+      
+      // Auto-seed initial posters into Supabase if table exists and is fresh empty
+      try {
+        const { error: seedError } = await supabase
+          .from("event_posters")
+          .upsert(initialEventPosters, { onConflict: "id" });
+        if (!seedError) {
+          memoryPosters = [...initialEventPosters];
+          return NextResponse.json(
+            { success: true, data: initialEventPosters },
+            {
+              headers: {
+                "Cache-Control": "no-store, no-cache, must-revalidate, proxy-revalidate",
+              },
+            }
+          );
+        }
+      } catch {}
+
       return NextResponse.json(
-        { success: true, data },
+        { success: true, data: [] },
         {
           headers: {
             "Cache-Control": "no-store, no-cache, must-revalidate, proxy-revalidate",
@@ -29,7 +57,7 @@ export async function GET() {
       );
     }
   } catch (err) {
-    console.warn("Supabase GET event_posters fallback:", err);
+    console.warn("Supabase GET event_posters error:", err);
   }
 
   return NextResponse.json(
@@ -71,7 +99,7 @@ export async function POST(request: Request) {
     }
     memoryPosters.sort((a, b) => (a.display_order ?? 0) - (b.display_order ?? 0));
 
-    // Try persisting to Supabase if table exists
+    // Persist to Supabase
     try {
       const { data, error } = await supabase
         .from("event_posters")
@@ -112,7 +140,7 @@ export async function DELETE(request: Request) {
     // Always remove from in-memory store
     memoryPosters = memoryPosters.filter((p) => p.id !== id);
 
-    // Try deleting from Supabase if table exists
+    // Persist delete to Supabase
     try {
       await supabase.from("event_posters").delete().eq("id", id);
     } catch (err) {

@@ -5,7 +5,6 @@ import { EventGalleryImage } from "@/types/database";
 
 export const dynamic = "force-dynamic";
 
-// In-memory fallback cache so operations work smoothly even if Supabase table is not yet created
 let memoryImages: EventGalleryImage[] = [...initialGalleryImages];
 
 export async function GET() {
@@ -17,10 +16,39 @@ export async function GET() {
       .select("*")
       .order("display_order", { ascending: true });
 
-    if (!error && data && data.length > 0) {
-      memoryImages = data as EventGalleryImage[];
+    if (!error && data) {
+      if (data.length > 0) {
+        memoryImages = data as EventGalleryImage[];
+        return NextResponse.json(
+          { success: true, data },
+          {
+            headers: {
+              "Cache-Control": "no-store, no-cache, must-revalidate, proxy-revalidate",
+            },
+          }
+        );
+      }
+
+      // Auto-seed initial gallery images into Supabase if table exists and is fresh empty
+      try {
+        const { error: seedError } = await supabase
+          .from("event_gallery_images")
+          .upsert(initialGalleryImages, { onConflict: "id" });
+        if (!seedError) {
+          memoryImages = [...initialGalleryImages];
+          return NextResponse.json(
+            { success: true, data: initialGalleryImages },
+            {
+              headers: {
+                "Cache-Control": "no-store, no-cache, must-revalidate, proxy-revalidate",
+              },
+            }
+          );
+        }
+      } catch {}
+
       return NextResponse.json(
-        { success: true, data },
+        { success: true, data: [] },
         {
           headers: {
             "Cache-Control": "no-store, no-cache, must-revalidate, proxy-revalidate",
@@ -29,7 +57,7 @@ export async function GET() {
       );
     }
   } catch (err) {
-    console.warn("Supabase GET event_gallery_images fallback:", err);
+    console.warn("Supabase GET event_gallery_images error:", err);
   }
 
   return NextResponse.json(
@@ -71,7 +99,7 @@ export async function POST(request: Request) {
     }
     memoryImages.sort((a, b) => (a.display_order ?? 0) - (b.display_order ?? 0));
 
-    // Try persisting to Supabase if table exists
+    // Persist to Supabase
     try {
       const { data, error } = await supabase
         .from("event_gallery_images")
@@ -112,7 +140,7 @@ export async function DELETE(request: Request) {
     // Always remove from in-memory store
     memoryImages = memoryImages.filter((img) => img.id !== id);
 
-    // Try deleting from Supabase if table exists
+    // Persist delete to Supabase
     try {
       await supabase.from("event_gallery_images").delete().eq("id", id);
     } catch (err) {
