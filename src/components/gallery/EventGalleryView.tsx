@@ -243,95 +243,76 @@ export default function EventGalleryView() {
                   initial={{ opacity: 0, y: 15 }}
                   animate={{ opacity: 1, y: 0 }}
                   transition={{ duration: 0.2 }}
-                  className="group relative flex flex-col justify-between overflow-hidden rounded-3xl border border-white/12 bg-gradient-to-b from-[#160E2E]/90 to-[#0A0714]/95 p-4 backdrop-blur-xl transition-all duration-300 hover:border-[#FF7A3D]/70 hover:shadow-[0_0_35px_rgba(255,122,61,0.25)]"
+                  onClick={() => openPosterLightbox(poster)}
+                  className="group relative aspect-[4/5] w-full overflow-hidden rounded-3xl border border-white/15 bg-[#08070D] flex items-center justify-center shadow-[0_4px_25px_rgba(0,0,0,0.7)] cursor-pointer hover:border-[#FF7A3D]/70 hover:shadow-[0_0_35px_rgba(255,122,61,0.25)] transition-all duration-300"
                 >
                   {/* Top Laser Accent */}
-                  <div className="absolute top-0 left-0 right-0 h-[2px] bg-gradient-to-r from-transparent via-[#FF7A3D] to-transparent opacity-0 transition-opacity group-hover:opacity-100" />
+                  <div className="absolute top-0 left-0 right-0 h-[2px] bg-gradient-to-r from-transparent via-[#FF7A3D] to-transparent opacity-0 transition-opacity group-hover:opacity-100 z-30" />
 
                   {/* Corner HUD ticks */}
-                  <div className="absolute top-2 left-2 h-2 w-2 border-t-2 border-l-2 border-white/30" />
-                  <div className="absolute top-2 right-2 h-2 w-2 border-t-2 border-r-2 border-white/30" />
-                  <div className="absolute bottom-2 left-2 h-2 w-2 border-b-2 border-l-2 border-white/30" />
-                  <div className="absolute bottom-2 right-2 h-2 w-2 border-b-2 border-r-2 border-white/30" />
+                  <div className="absolute top-2 left-2 h-2 w-2 border-t-2 border-l-2 border-white/40 z-20 pointer-events-none" />
+                  <div className="absolute top-2 right-2 h-2 w-2 border-t-2 border-r-2 border-white/40 z-20 pointer-events-none" />
+                  <div className="absolute bottom-2 left-2 h-2 w-2 border-b-2 border-l-2 border-white/40 z-20 pointer-events-none" />
+                  <div className="absolute bottom-2 right-2 h-2 w-2 border-b-2 border-r-2 border-white/40 z-20 pointer-events-none" />
 
-                  <div>
-                    {/* Top Info Bar: Category + Date */}
-                    <div className="mb-3 flex items-center justify-between gap-1 font-mono text-[10px] font-bold">
-                      <span className="rounded-md border border-[#FF7A3D]/40 bg-[#FF7A3D]/15 px-2 py-0.5 text-[#FF7A3D] uppercase truncate">
-                        {poster.category || "OFFICIAL POSTER"}
+                  {/* Ambient Blurred Glow Backdrop */}
+                  <img
+                    src={poster.image_url}
+                    alt=""
+                    aria-hidden="true"
+                    className="absolute inset-0 h-full w-full object-cover blur-xl scale-125 opacity-30 pointer-events-none"
+                  />
+
+                  {/* 95%+ Poster Area - Full Uncropped Display */}
+                  <div className="relative z-10 flex h-[95%] w-[95%] items-center justify-center">
+                    <img
+                      src={poster.image_url}
+                      alt={poster.title}
+                      loading={pIdx < 2 ? "eager" : "lazy"}
+                      decoding="async"
+                      className="max-h-full max-w-full w-auto h-auto object-contain object-center drop-shadow-md transition-transform duration-500 group-hover:scale-[1.03]"
+                      onError={(e) => {
+                        (e.target as HTMLImageElement).src = "/images/backgrounds/bg_home.jpg";
+                      }}
+                    />
+                  </div>
+
+                  {/* Top Info Bar: Category + Date */}
+                  <div className="absolute top-3 left-3 right-3 z-20 flex items-center justify-between gap-1 font-mono text-[9px] font-bold pointer-events-none">
+                    <span className="rounded-md border border-[#FF7A3D]/40 bg-[#0A0714]/85 px-2 py-0.5 text-[#FF7A3D] uppercase truncate backdrop-blur-md shadow-md">
+                      {poster.category || "OFFICIAL POSTER"}
+                    </span>
+                    {poster.release_date && (
+                      <span className="rounded-md border border-white/20 bg-[#0A0714]/85 px-2 py-0.5 text-zinc-300 uppercase backdrop-blur-md shadow-md">
+                        {poster.release_date}
                       </span>
-                      {poster.release_date && (
-                        <span className="text-zinc-400 uppercase">
-                          {poster.release_date}
-                        </span>
-                      )}
-                    </div>
+                    )}
+                  </div>
 
-                    {/* Poster Image Frame */}
-                    <div
-                      onClick={() => openPosterLightbox(poster)}
-                      className="relative aspect-[4/5] w-full overflow-hidden rounded-2xl border border-white/15 bg-[#08070D] flex items-center justify-center shadow-[0_0_20px_rgba(0,0,0,0.8)] cursor-pointer group-hover:border-[#FF7A3D]/70 transition-all"
-                    >
-                      {/* Ambient Blurred Background */}
-                      <img
-                        src={poster.image_url}
-                        alt=""
-                        aria-hidden="true"
-                        className="absolute inset-0 h-full w-full object-cover blur-xl scale-125 opacity-30 pointer-events-none"
-                      />
-
-                      {/* Main Full Poster */}
-                      <img
-                        src={poster.image_url}
-                        alt={poster.title}
-                        loading={pIdx < 2 ? "eager" : "lazy"}
-                        decoding="async"
-                        className="relative z-10 max-h-full max-w-full w-auto h-auto object-contain object-center drop-shadow-md transition-transform duration-500 group-hover:scale-105"
-                        onError={(e) => {
-                          (e.target as HTMLImageElement).src = "/images/backgrounds/bg_home.jpg";
-                        }}
-                      />
-                      {/* Hover Overlay Button */}
-                      <div className="absolute inset-0 z-20 flex items-center justify-center bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity backdrop-blur-xs">
-                        <div className="flex items-center gap-2 rounded-xl bg-gradient-to-r from-[#FF2D8D] to-[#FF7A3D] px-4 py-2 font-mono text-xs font-black uppercase text-white shadow-lg">
-                          <Eye className="h-4 w-4" />
-                          <span>EXPAND POSTER</span>
-                        </div>
-                      </div>
-                    </div>
-
-                    {/* Poster Details */}
-                    <div className="mt-3.5 space-y-1">
-                      <h3 className="font-mono text-sm sm:text-base font-black tracking-wide text-white uppercase group-hover:text-[#FFE8C7] transition-colors leading-tight">
+                  {/* Bottom Info & Action Bar */}
+                  <div className="absolute bottom-0 inset-x-0 z-20 p-3 bg-gradient-to-t from-[#0A0714]/95 via-[#0A0714]/75 to-transparent transition-all duration-300 backdrop-blur-xs flex items-end justify-between gap-2">
+                    <div className="min-w-0 space-y-0.5">
+                      <h3 className="font-mono text-xs sm:text-sm font-black tracking-wide text-white uppercase group-hover:text-[#FFE8C7] transition-colors truncate drop-shadow">
                         {poster.title}
                       </h3>
                       {poster.tagline && (
-                        <p className="font-mono text-xs text-zinc-400 line-clamp-2">
+                        <p className="font-mono text-[10px] text-zinc-400 truncate">
                           {poster.tagline}
                         </p>
                       )}
                     </div>
-                  </div>
 
-                  {/* Poster Actions */}
-                  <div className="mt-4 flex items-center justify-between border-t border-white/10 pt-3">
-                    <button
-                      type="button"
-                      onClick={() => openPosterLightbox(poster)}
-                      className="inline-flex items-center gap-1.5 font-mono text-xs font-bold text-[#35D9FF] hover:text-white transition-colors cursor-pointer"
-                    >
-                      <Eye className="h-3.5 w-3.5" />
-                      <span>VIEW FULL</span>
-                    </button>
-
-                    <div className="flex items-center gap-2">
+                    <div className="flex items-center gap-1.5 shrink-0">
                       <button
                         type="button"
-                        onClick={() => handleShare(poster.image_url)}
-                        title="Copy Poster URL"
-                        className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-white/10 bg-white/5 text-zinc-400 hover:border-white hover:bg-white/10 hover:text-white transition-colors cursor-pointer"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleShare(poster.image_url);
+                        }}
+                        className="inline-flex h-7 w-7 items-center justify-center rounded-lg border border-white/20 bg-black/60 text-zinc-300 hover:text-white hover:bg-white/20 transition-colors"
+                        title="Share Poster"
                       >
-                        <Share2 className="h-3.5 w-3.5" />
+                        <Share2 className="h-3 w-3" />
                       </button>
 
                       <a
@@ -339,11 +320,11 @@ export default function EventGalleryView() {
                         target="_blank"
                         rel="noopener noreferrer"
                         download
-                        title="Download Poster"
-                        className="inline-flex items-center gap-1.5 rounded-lg border border-[#FF7A3D]/40 bg-[#FF7A3D]/15 px-3 py-1.5 font-mono text-xs font-bold text-[#FF7A3D] hover:bg-[#FF7A3D]/30 transition-colors"
+                        onClick={(e) => e.stopPropagation()}
+                        className="inline-flex items-center gap-1 rounded-lg border border-[#FF7A3D]/50 bg-[#FF7A3D]/20 px-2.5 py-1 font-mono text-[10px] font-bold text-[#FF7A3D] hover:bg-[#FF7A3D]/30 transition-colors shadow-md"
                       >
-                        <Download className="h-3.5 w-3.5" />
-                        <span>DOWNLOAD</span>
+                        <Download className="h-3 w-3" />
+                        <span>HD</span>
                       </a>
                     </div>
                   </div>
@@ -435,101 +416,86 @@ export default function EventGalleryView() {
                   initial={{ opacity: 0, scale: 0.96 }}
                   animate={{ opacity: 1, scale: 1 }}
                   transition={{ duration: 0.2 }}
-                  className="group relative flex flex-col justify-between overflow-hidden rounded-3xl border border-white/12 bg-gradient-to-b from-[#160E2E]/90 to-[#0A0714]/95 p-4 backdrop-blur-xl transition-all duration-300 hover:border-[#35D9FF]/70 hover:shadow-[0_0_35px_rgba(53,217,255,0.25)]"
+                  onClick={() => openImageLightbox(idx)}
+                  className="group relative aspect-[4/3] w-full overflow-hidden rounded-3xl border border-white/15 bg-[#08070D] flex items-center justify-center shadow-[0_4px_25px_rgba(0,0,0,0.7)] cursor-pointer hover:border-[#35D9FF]/70 hover:shadow-[0_0_35px_rgba(53,217,255,0.3)] transition-all duration-300"
                 >
                   {/* Top Laser Accent */}
-                  <div className="absolute top-0 left-0 right-0 h-[2px] bg-gradient-to-r from-transparent via-[#35D9FF] to-transparent opacity-0 transition-opacity group-hover:opacity-100" />
+                  <div className="absolute top-0 left-0 right-0 h-[2px] bg-gradient-to-r from-transparent via-[#35D9FF] to-transparent opacity-0 transition-opacity group-hover:opacity-100 z-30" />
 
                   {/* Corner HUD ticks */}
-                  <div className="absolute top-2 left-2 h-2 w-2 border-t-2 border-l-2 border-white/30" />
-                  <div className="absolute top-2 right-2 h-2 w-2 border-t-2 border-r-2 border-white/30" />
-                  <div className="absolute bottom-2 left-2 h-2 w-2 border-b-2 border-l-2 border-white/30" />
-                  <div className="absolute bottom-2 right-2 h-2 w-2 border-b-2 border-r-2 border-white/30" />
+                  <div className="absolute top-2 left-2 h-2 w-2 border-t-2 border-l-2 border-white/40 z-20 pointer-events-none" />
+                  <div className="absolute top-2 right-2 h-2 w-2 border-t-2 border-r-2 border-white/40 z-20 pointer-events-none" />
+                  <div className="absolute bottom-2 left-2 h-2 w-2 border-b-2 border-l-2 border-white/40 z-20 pointer-events-none" />
+                  <div className="absolute bottom-2 right-2 h-2 w-2 border-b-2 border-r-2 border-white/40 z-20 pointer-events-none" />
 
-                  <div>
-                    {/* Top Category Badge & Tag */}
-                    <div className="mb-3 flex items-center justify-between gap-1 font-mono text-[10px] font-bold">
-                      <span className="rounded-md border border-[#35D9FF]/40 bg-[#35D9FF]/15 px-2 py-0.5 text-[#35D9FF] uppercase tracking-wider truncate">
-                        {img.category}
+                  {/* Ambient Blurred Background (Matches photo color scheme) */}
+                  <img
+                    src={img.image_url}
+                    alt=""
+                    aria-hidden="true"
+                    className="absolute inset-0 h-full w-full object-cover blur-xl scale-125 opacity-30 pointer-events-none"
+                  />
+
+                  {/* 95%+ Photo Area - Full Uncropped Photo Display */}
+                  <div className="relative z-10 flex h-[95%] w-[95%] items-center justify-center">
+                    <img
+                      src={img.image_url}
+                      alt={img.title || "Event Photo"}
+                      loading="lazy"
+                      decoding="async"
+                      className="max-h-full max-w-full w-auto h-auto object-contain object-center drop-shadow-md transition-transform duration-500 group-hover:scale-[1.03]"
+                      onError={(e) => {
+                        (e.target as HTMLImageElement).src = "/images/backgrounds/bg_missions.jpg";
+                      }}
+                    />
+                  </div>
+
+                  {/* Floating Top Category Badge & Tag */}
+                  <div className="absolute top-3 left-3 z-20 flex items-center gap-1.5 pointer-events-none">
+                    <span className="rounded-md border border-[#35D9FF]/40 bg-[#0A0714]/85 px-2 py-0.5 font-mono text-[9px] font-bold text-[#35D9FF] uppercase backdrop-blur-md shadow-md">
+                      {img.category}
+                    </span>
+                    {img.tag && (
+                      <span className="rounded-md border border-white/20 bg-[#0A0714]/85 px-1.5 py-0.5 font-mono text-[9px] text-zinc-300 uppercase backdrop-blur-md shadow-md">
+                        {img.tag}
                       </span>
-                      {img.tag && (
-                        <span className="rounded-md border border-white/15 bg-white/5 px-2 py-0.5 text-zinc-400 uppercase truncate">
-                          {img.tag}
-                        </span>
-                      )}
-                    </div>
+                    )}
+                  </div>
 
-                    {/* Uniform Image Container with Uncropped Shape + Ambient Glow */}
-                    <div
-                      onClick={() => openImageLightbox(idx)}
-                      className="relative aspect-[4/3] w-full overflow-hidden rounded-2xl border border-white/15 bg-[#08070D] flex items-center justify-center shadow-[0_0_20px_rgba(0,0,0,0.8)] cursor-pointer group-hover:border-[#35D9FF]/70 transition-all"
-                    >
-                      {/* Ambient Blurred Background (Matches photo color scheme) */}
-                      <img
-                        src={img.image_url}
-                        alt=""
-                        aria-hidden="true"
-                        className="absolute inset-0 h-full w-full object-cover blur-xl scale-125 opacity-30 pointer-events-none"
-                      />
-
-                      {/* Main Full Photo - Complete shape preserved without any cropping */}
-                      <img
-                        src={img.image_url}
-                        alt={img.title || "Event Photo"}
-                        loading="lazy"
-                        decoding="async"
-                        className="relative z-10 max-h-full max-w-full w-auto h-auto object-contain object-center drop-shadow-md transition-transform duration-500 group-hover:scale-105"
-                        onError={(e) => {
-                          (e.target as HTMLImageElement).src = "/images/backgrounds/bg_missions.jpg";
-                        }}
-                      />
-
-                      {/* Hover View Full Button Overlay */}
-                      <div className="absolute inset-0 z-20 flex items-center justify-center bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity backdrop-blur-xs">
-                        <div className="flex items-center gap-2 rounded-xl bg-gradient-to-r from-[#00F0FF] to-[#3B82F6] px-4 py-2 font-mono text-xs font-black uppercase text-black shadow-lg">
-                          <Eye className="h-4 w-4" />
-                          <span>EXPAND PHOTO</span>
-                        </div>
+                  {/* Bottom Info Bar with Gradient Background */}
+                  <div className="absolute bottom-0 inset-x-0 z-20 p-3 bg-gradient-to-t from-[#0A0714]/95 via-[#0A0714]/75 to-transparent transition-all duration-300 backdrop-blur-xs flex items-end justify-between gap-2">
+                    <div className="min-w-0 space-y-0.5">
+                      <h4 className="font-mono text-xs sm:text-sm font-black uppercase text-white truncate group-hover:text-[#35D9FF] transition-colors drop-shadow">
+                        {img.title || "Event Moment"}
+                      </h4>
+                      <div className="flex items-center gap-2 font-mono text-[9px] text-zinc-400">
+                        <span className="truncate">📸 {img.photographer || "IEEE Media Wing"}</span>
+                        {img.caption && (
+                          <>
+                            <span>•</span>
+                            <span className="truncate max-w-[140px] text-zinc-400">{img.caption}</span>
+                          </>
+                        )}
                       </div>
                     </div>
 
-                    {/* Photo Details (Placed cleanly below image, so 100% photo is visible) */}
-                    <div className="mt-3.5 space-y-1">
-                      <h3 className="font-mono text-sm sm:text-base font-black tracking-wide text-white uppercase group-hover:text-[#35D9FF] transition-colors leading-tight">
-                        {img.title || "Event Moment"}
-                      </h3>
-                      {img.caption && (
-                        <p className="font-mono text-xs text-zinc-400 line-clamp-2">
-                          {img.caption}
-                        </p>
-                      )}
-                    </div>
-                  </div>
-
-                  {/* Photo Actions Footer */}
-                  <div className="mt-4 flex items-center justify-between border-t border-white/10 pt-3">
-                    <span className="font-mono text-[10px] text-zinc-400 truncate">
-                      📸 {img.photographer || "IEEE Media Wing"}
-                    </span>
-
-                    <div className="flex items-center gap-2">
+                    <div className="flex items-center gap-1.5 shrink-0">
                       <button
                         type="button"
-                        onClick={() => handleShare(img.image_url)}
-                        className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-white/15 bg-white/5 text-zinc-300 hover:text-white hover:bg-white/10 transition-colors cursor-pointer"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleShare(img.image_url);
+                        }}
+                        className="inline-flex h-7 w-7 items-center justify-center rounded-lg border border-white/20 bg-black/60 text-zinc-300 hover:text-white hover:bg-white/20 transition-colors"
                         title="Share Photo"
                       >
-                        <Share2 className="h-3.5 w-3.5" />
+                        <Share2 className="h-3 w-3" />
                       </button>
 
-                      <button
-                        type="button"
-                        onClick={() => openImageLightbox(idx)}
-                        className="inline-flex items-center gap-1.5 font-mono text-xs font-bold text-[#35D9FF] hover:text-white transition-colors cursor-pointer"
-                      >
-                        <Eye className="h-3.5 w-3.5" />
-                        <span>VIEW FULL</span>
-                      </button>
+                      <div className="inline-flex items-center gap-1 rounded-lg bg-[#35D9FF] px-2 py-1 font-mono text-[10px] font-black uppercase text-black shadow-md">
+                        <Eye className="h-3 w-3" />
+                        <span>VIEW</span>
+                      </div>
                     </div>
                   </div>
                 </motion.div>
