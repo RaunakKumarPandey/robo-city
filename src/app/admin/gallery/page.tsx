@@ -404,11 +404,17 @@ export default function AdminGalleryPage() {
                     </div>
 
                     {/* Poster Image Frame */}
-                    <div className="relative aspect-[4/5] w-full overflow-hidden rounded-xl border border-white/10 bg-black">
+                    <div className="relative aspect-[4/5] w-full overflow-hidden rounded-xl border border-white/10 bg-[#06040C] flex items-center justify-center">
+                      <img
+                        src={poster.image_url}
+                        alt=""
+                        aria-hidden="true"
+                        className="absolute inset-0 h-full w-full object-cover blur-xl scale-125 opacity-25 pointer-events-none"
+                      />
                       <img
                         src={poster.image_url}
                         alt={poster.title}
-                        className="h-full w-full object-cover object-center"
+                        className="relative z-10 max-h-full max-w-full w-auto h-auto object-contain object-center"
                         onError={(e) => {
                           (e.target as HTMLImageElement).src = "/images/backgrounds/bg_home.jpg";
                         }}
@@ -493,11 +499,17 @@ export default function AdminGalleryPage() {
                     </div>
 
                     {/* Image Box */}
-                    <div className="relative aspect-[4/3] w-full overflow-hidden rounded-xl border border-white/10 bg-black">
+                    <div className="relative aspect-[4/3] w-full overflow-hidden rounded-xl border border-white/10 bg-[#06040C] flex items-center justify-center">
+                      <img
+                        src={img.image_url}
+                        alt=""
+                        aria-hidden="true"
+                        className="absolute inset-0 h-full w-full object-cover blur-xl scale-125 opacity-25 pointer-events-none"
+                      />
                       <img
                         src={img.image_url}
                         alt={img.title || "Gallery photo"}
-                        className="h-full w-full object-cover object-center"
+                        className="relative z-10 max-h-full max-w-full w-auto h-auto object-contain object-center"
                         onError={(e) => {
                           (e.target as HTMLImageElement).src = "/images/backgrounds/bg_missions.jpg";
                         }}
