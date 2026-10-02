@@ -499,7 +499,7 @@ export default function AdminGalleryPage() {
                     </div>
 
                     {/* Image Box */}
-                    <div className="relative aspect-[4/3] w-full overflow-hidden rounded-xl border border-white/10 bg-[#06040C] flex items-center justify-center">
+                    <div className="relative h-64 sm:h-72 w-full overflow-hidden rounded-xl border border-white/10 bg-[#06040C] flex items-center justify-center">
                       <img
                         src={img.image_url}
                         alt=""
