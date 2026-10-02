@@ -38,9 +38,9 @@ export default function Podium({ topTeams, onSelectTeam }: PodiumProps) {
             <h3 className="mt-1 text-center font-black uppercase tracking-tight text-white text-base truncate max-w-full">
               {second.team_name}
             </h3>
-            {second.leader_name && (
+            {(second.leader_name || second.members?.[0]?.name) && (
               <span className="text-[11px] font-mono text-zinc-400 font-normal truncate max-w-full">
-                Captain: <span className="text-zinc-200">{second.leader_name}</span>
+                Captain: <span className="text-zinc-200">{second.leader_name || second.members?.[0]?.name}</span>
               </span>
             )}
             <div className="mt-4 rounded-full border border-[#FF7A3D]/40 bg-[#FF7A3D]/15 px-3.5 py-1 font-mono text-xs font-black text-[#FF7A3D] shadow-sm">
@@ -67,9 +67,9 @@ export default function Podium({ topTeams, onSelectTeam }: PodiumProps) {
             <h3 className="mt-1 text-center font-black uppercase tracking-tight text-white text-lg truncate max-w-full">
               {first.team_name}
             </h3>
-            {first.leader_name && (
+            {(first.leader_name || first.members?.[0]?.name) && (
               <span className="text-[11px] font-mono text-zinc-300 font-normal truncate max-w-full">
-                Captain: <span className="text-[#35D9FF] font-semibold">{first.leader_name}</span>
+                Captain: <span className="text-[#35D9FF] font-semibold">{first.leader_name || first.members?.[0]?.name}</span>
               </span>
             )}
             <div className="mt-4 inline-flex items-center gap-1.5 rounded-full border border-[#35D9FF]/50 bg-[#35D9FF]/20 px-4 py-1.5 font-mono text-sm font-black text-[#35D9FF] shadow-[0_0_20px_rgba(53,217,255,0.4)]">
@@ -94,9 +94,9 @@ export default function Podium({ topTeams, onSelectTeam }: PodiumProps) {
             <h3 className="mt-1 text-center font-black uppercase tracking-tight text-white text-base truncate max-w-full">
               {third.team_name}
             </h3>
-            {third.leader_name && (
+            {(third.leader_name || third.members?.[0]?.name) && (
               <span className="text-[11px] font-mono text-zinc-400 font-normal truncate max-w-full">
-                Captain: <span className="text-zinc-200">{third.leader_name}</span>
+                Captain: <span className="text-zinc-200">{third.leader_name || third.members?.[0]?.name}</span>
               </span>
             )}
             <div className="mt-4 rounded-full border border-[#35D9FF]/40 bg-[#35D9FF]/15 px-3.5 py-1 font-mono text-xs font-black text-[#35D9FF] shadow-sm">

@@ -11,20 +11,52 @@ export async function fetchTeamsWithDetails(): Promise<TeamWithDetails[]> {
       .select(`
         *,
         members:team_members(*),
-        score:scores(*)
+        score:scores(*),
+        registrations (
+          captain_name
+        )
       `)
       .order("created_at", { ascending: false });
 
     if (error) {
       console.error("Error fetching teams:", error);
-      return [];
+      const { data: fallbackData } = await supabase
+        .from("teams")
+        .select(`
+          *,
+          members:team_members(*),
+          score:scores(*)
+        `)
+        .order("created_at", { ascending: false });
+
+      return (fallbackData || []).map((t: any) => {
+        const membersList = t.members || [];
+        const leaderName = Array.isArray(membersList) && membersList[0]?.name ? membersList[0].name : null;
+        return {
+          ...t,
+          members: membersList,
+          score: Array.isArray(t.score) ? t.score[0] || null : t.score || null,
+          leader_name: leaderName,
+          captain_name: leaderName,
+        };
+      }) as TeamWithDetails[];
     }
 
-    return (data || []).map((t: any) => ({
-      ...t,
-      members: t.members || [],
-      score: Array.isArray(t.score) ? t.score[0] || null : t.score || null,
-    })) as TeamWithDetails[];
+    return (data || []).map((t: any) => {
+      const regObj = Array.isArray(t.registrations) ? t.registrations[0] : t.registrations;
+      const membersList = t.members || [];
+      const leaderName =
+        regObj?.captain_name?.trim() ||
+        (Array.isArray(membersList) && membersList[0]?.name ? membersList[0].name.trim() : null);
+
+      return {
+        ...t,
+        members: membersList,
+        score: Array.isArray(t.score) ? t.score[0] || null : t.score || null,
+        leader_name: leaderName,
+        captain_name: leaderName,
+      };
+    }) as TeamWithDetails[];
   } catch (err) {
     console.error("Fetch teams exception:", err);
     return [];
@@ -79,10 +111,7 @@ export async function createTeamWithMembers(
       .single();
 
     if (teamError || !teamData) {
-      if (teamError?.code === "23505" || teamError?.message?.includes("unique")) {
-        return { success: false, error: "TEAM NAME ALREADY EXISTS" };
-      }
-      return { success: false, error: "FAILED TO CREATE TEAM RECORD" };
+      return { success: false, error: teamError?.message || "FAILED TO CREATE TEAM RECORD" };
     }
 
     const teamId = teamData.id;
@@ -170,10 +199,7 @@ export async function updateTeamWithMembers(
       .eq("id", teamId);
 
     if (teamError) {
-      if (teamError.code === "23505" || teamError.message.includes("unique")) {
-        return { success: false, error: "TEAM NAME ALREADY EXISTS" };
-      }
-      return { success: false, error: "FAILED TO UPDATE TEAM RECORD" };
+      return { success: false, error: teamError?.message || "FAILED TO UPDATE TEAM RECORD" };
     }
 
     // Re-sync members: delete old & insert new

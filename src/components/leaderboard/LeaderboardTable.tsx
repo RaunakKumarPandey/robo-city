@@ -121,9 +121,9 @@ export default function LeaderboardTable({
                     <div className="font-bold text-white text-sm group-hover:text-[#FFE8C7] transition-colors">
                       {team.team_name}
                     </div>
-                    {team.leader_name && (
-                      <div className="text-[11px] text-zinc-400 mt-0.5">
-                        Cap: <span className="text-zinc-300">{team.leader_name}</span>
+                    {(team.leader_name || team.members?.[0]?.name) && (
+                      <div className="text-[11px] font-mono text-zinc-400 mt-0.5">
+                        Cap: <span className="text-zinc-300 font-semibold">{team.leader_name || team.members?.[0]?.name}</span>
                       </div>
                     )}
                   </td>
@@ -182,9 +182,9 @@ export default function LeaderboardTable({
                   <div className="font-bold text-white text-sm">
                     {team.team_name}
                   </div>
-                  {team.leader_name && (
+                  {(team.leader_name || team.members?.[0]?.name) && (
                     <div className="text-[10px] text-zinc-400 mt-0.5">
-                      Cap: {team.leader_name}
+                      Cap: <span className="text-zinc-300 font-semibold">{team.leader_name || team.members?.[0]?.name}</span>
                     </div>
                   )}
                 </div>

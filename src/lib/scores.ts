@@ -1,12 +1,15 @@
 import { supabase } from "@/lib/supabase";
-import { Score, TeamWithDetails } from "@/types/database";
+import { Score, TeamWithDetails, TeamMember } from "@/types/database";
 
 export interface TeamScoreItem {
   id: string;
   team_name: string;
+  leader_name?: string | null;
+  captain_name?: string | null;
   team_logo_url?: string | null;
   robot_image_url?: string | null;
   score: Score | null;
+  members?: TeamMember[];
   created_at: string;
   updated_at: string;
 }
@@ -25,24 +28,68 @@ export async function fetchTeamsWithScores(): Promise<TeamScoreItem[]> {
         robot_image_url,
         created_at,
         updated_at,
-        score:scores(*)
+        score:scores(*),
+        members:team_members(*),
+        registrations (
+          captain_name
+        )
       `)
       .order("created_at", { ascending: false });
 
     if (error) {
       console.error("Error fetching teams with scores:", error);
-      return [];
+      const { data: fallbackData } = await supabase
+        .from("teams")
+        .select(`
+          id,
+          team_name,
+          team_logo_url,
+          robot_image_url,
+          created_at,
+          updated_at,
+          score:scores(*),
+          members:team_members(*)
+        `)
+        .order("created_at", { ascending: false });
+
+      return (fallbackData || []).map((t: any) => {
+        const membersList = t.members || [];
+        const leaderName = Array.isArray(membersList) && membersList[0]?.name ? membersList[0].name : null;
+        return {
+          id: t.id,
+          team_name: t.team_name,
+          leader_name: leaderName,
+          captain_name: leaderName,
+          team_logo_url: t.team_logo_url,
+          robot_image_url: t.robot_image_url,
+          created_at: t.created_at,
+          updated_at: t.updated_at,
+          score: Array.isArray(t.score) ? t.score[0] || null : t.score || null,
+          members: membersList,
+        };
+      });
     }
 
-    return (data || []).map((t: any) => ({
-      id: t.id,
-      team_name: t.team_name,
-      team_logo_url: t.team_logo_url,
-      robot_image_url: t.robot_image_url,
-      created_at: t.created_at,
-      updated_at: t.updated_at,
-      score: Array.isArray(t.score) ? t.score[0] || null : t.score || null,
-    }));
+    return (data || []).map((t: any) => {
+      const regObj = Array.isArray(t.registrations) ? t.registrations[0] : t.registrations;
+      const membersList = t.members || [];
+      const leaderName =
+        regObj?.captain_name?.trim() ||
+        (Array.isArray(membersList) && membersList[0]?.name ? membersList[0].name.trim() : null);
+
+      return {
+        id: t.id,
+        team_name: t.team_name,
+        leader_name: leaderName,
+        captain_name: leaderName,
+        team_logo_url: t.team_logo_url,
+        robot_image_url: t.robot_image_url,
+        created_at: t.created_at,
+        updated_at: t.updated_at,
+        score: Array.isArray(t.score) ? t.score[0] || null : t.score || null,
+        members: membersList,
+      };
+    });
   } catch (err) {
     console.error("Fetch teams with scores exception:", err);
     return [];

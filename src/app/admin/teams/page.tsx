@@ -366,10 +366,17 @@ export default function AdminTeamsPage() {
                     {/* Team Name */}
                     <td className="py-4 px-4 font-bold text-white font-sans text-sm">
                       <div className="flex items-center gap-2.5">
-                        <div className="flex h-7 w-7 items-center justify-center rounded-md bg-[#FF2A85]/10 text-[#FF2A85] text-xs font-mono font-black">
+                        <div className="flex h-7 w-7 items-center justify-center rounded-md bg-[#FF2A85]/10 text-[#FF2A85] text-xs font-mono font-black shrink-0">
                           {team.team_name.charAt(0).toUpperCase()}
                         </div>
-                        <span>{team.team_name}</span>
+                        <div>
+                          <div className="font-bold text-white text-sm">{team.team_name}</div>
+                          {(team.captain_name || team.leader_name || team.members?.[0]?.name) && (
+                            <div className="text-[11px] font-mono text-zinc-400 mt-0.5 font-normal">
+                              Cap: <span className="text-zinc-300 font-semibold">{team.captain_name || team.leader_name || team.members?.[0]?.name}</span>
+                            </div>
+                          )}
+                        </div>
                       </div>
                     </td>
 
@@ -449,6 +456,11 @@ export default function AdminTeamsPage() {
                     <h3 className="font-black text-white text-base">
                       {team.team_name}
                     </h3>
+                    {(team.captain_name || team.leader_name || team.members?.[0]?.name) && (
+                      <div className="text-[11px] font-mono text-zinc-400 mt-0.5">
+                        Cap: <span className="text-zinc-300 font-semibold">{team.captain_name || team.leader_name || team.members?.[0]?.name}</span>
+                      </div>
+                    )}
                     <div className="mt-1 flex items-center gap-3 text-xs font-mono text-zinc-400">
                       <span>{team.members?.length || 0} Members</span>
                       <span>&bull;</span>

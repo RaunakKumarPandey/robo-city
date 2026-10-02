@@ -277,10 +277,17 @@ export default function AdminScoresPage() {
                       {/* Team Name */}
                       <td className="py-4 px-4 font-bold text-white font-sans text-sm">
                         <div className="flex items-center gap-2.5">
-                          <div className="flex h-7 w-7 items-center justify-center rounded-md bg-[#FF6B35]/10 text-[#FF6B35] text-xs font-mono font-black">
+                          <div className="flex h-7 w-7 items-center justify-center rounded-md bg-[#FF6B35]/10 text-[#FF6B35] text-xs font-mono font-black shrink-0">
                             {team.team_name.charAt(0).toUpperCase()}
                           </div>
-                          <span>{team.team_name}</span>
+                          <div>
+                            <div className="font-bold text-white text-sm">{team.team_name}</div>
+                            {(team.captain_name || team.leader_name || team.members?.[0]?.name) && (
+                              <div className="text-[11px] font-mono text-zinc-400 mt-0.5 font-normal">
+                                Cap: <span className="text-zinc-300 font-semibold">{team.captain_name || team.leader_name || team.members?.[0]?.name}</span>
+                              </div>
+                            )}
+                          </div>
                         </div>
                       </td>
 
@@ -361,9 +368,16 @@ export default function AdminScoresPage() {
                   className="rounded-xl border border-white/10 bg-[#0A0718]/90 p-4 backdrop-blur-md space-y-3"
                 >
                   <div className="flex items-center justify-between">
-                    <h3 className="font-black text-white text-base">
-                      {team.team_name}
-                    </h3>
+                    <div>
+                      <h3 className="font-black text-white text-base">
+                        {team.team_name}
+                      </h3>
+                      {(team.captain_name || team.leader_name || team.members?.[0]?.name) && (
+                        <div className="text-[11px] font-mono text-zinc-400 mt-0.5">
+                          Cap: <span className="text-zinc-300 font-semibold">{team.captain_name || team.leader_name || team.members?.[0]?.name}</span>
+                        </div>
+                      )}
+                    </div>
                     <span className="font-mono text-xs font-black text-[#00F0FF]">
                       {total} pts
                     </span>

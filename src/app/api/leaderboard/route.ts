@@ -13,7 +13,7 @@ export async function GET() {
     const db = getServiceSupabase();
 
     // 1. Fetch live leaderboard data
-    const list = await fetchLeaderboardData();
+    const list = await fetchLeaderboardData(db);
 
     const supabaseHost = process.env.NEXT_PUBLIC_SUPABASE_URL
       ? new URL(process.env.NEXT_PUBLIC_SUPABASE_URL).host

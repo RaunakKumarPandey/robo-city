@@ -232,14 +232,10 @@ export default function RegisterForm() {
             <AlertTriangle className="h-5 w-5 shrink-0 text-red-400" />
             <div className="flex-1">
               <span className="uppercase block font-black">
-                {errorMessage === "THIS CREW ALREADY EXISTS"
-                  ? "THIS CREW ALREADY EXISTS"
-                  : "REGISTRATION FAILED"}
+                REGISTRATION ALERT
               </span>
               <span className="text-[11px] font-normal text-red-300">
-                {errorMessage === "THIS CREW ALREADY EXISTS"
-                  ? "A team with this name is already registered in Robo City. Please choose a unique crew name."
-                  : errorMessage}
+                {errorMessage}
               </span>
             </div>
           </div>

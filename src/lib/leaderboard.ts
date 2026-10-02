@@ -1,13 +1,13 @@
-import { supabase } from "@/lib/supabase";
+import { supabase, getServiceSupabase } from "@/lib/supabase";
 import { LeaderboardEntry } from "@/types/database";
 
 /**
  * Fetches real leaderboard data from PostgreSQL (teams joined with scores).
  * Calculates authoritative rank dynamically based on total_score DESC, team_name ASC.
  */
-export async function fetchLeaderboardData(): Promise<LeaderboardEntry[]> {
-  // If running in browser, fetch through /api/leaderboard for full service-level reliability
-  if (typeof window !== "undefined") {
+export async function fetchLeaderboardData(client?: any): Promise<LeaderboardEntry[]> {
+  // If running in browser and no custom client passed, fetch through /api/leaderboard for full service-level reliability
+  if (typeof window !== "undefined" && !client) {
     try {
       const res = await fetch("/api/leaderboard", { cache: "no-store" });
       if (res.ok) {
@@ -21,8 +21,10 @@ export async function fetchLeaderboardData(): Promise<LeaderboardEntry[]> {
     }
   }
 
+  const db = client || (typeof window === "undefined" ? getServiceSupabase() : supabase);
+
   try {
-    const { data, error } = await supabase
+    const { data, error } = await db
       .from("teams")
       .select(`
         id,
@@ -49,7 +51,7 @@ export async function fetchLeaderboardData(): Promise<LeaderboardEntry[]> {
     if (error) {
       console.error("Error fetching leaderboard data:", error);
       // Fallback query simple teams if relation join has issues
-      const { data: fallbackData } = await supabase
+      const { data: fallbackData } = await db
         .from("teams")
         .select("id, team_name, team_logo_url, robot_image_url, team_members(name)");
 
@@ -58,7 +60,7 @@ export async function fetchLeaderboardData(): Promise<LeaderboardEntry[]> {
       return fallbackData.map((t: any, idx: number) => ({
         id: t.id,
         team_name: t.team_name || `Team ${idx + 1}`,
-        leader_name: Array.isArray(t.team_members) && t.team_members[0]?.name ? t.team_members[0].name : null,
+        leader_name: Array.isArray(t.team_members) && t.team_members[0]?.name ? t.team_members[0].name.trim() : null,
         team_logo_url: t.team_logo_url,
         robot_image_url: t.robot_image_url,
         round1_score: 0,
@@ -79,8 +81,8 @@ export async function fetchLeaderboardData(): Promise<LeaderboardEntry[]> {
       const rawMembers = t.team_members || t.members || [];
       const regObj = Array.isArray(t.registrations) ? t.registrations[0] : t.registrations;
       const leaderName =
-        regObj?.captain_name ||
-        (Array.isArray(rawMembers) && rawMembers[0]?.name ? rawMembers[0].name : null);
+        regObj?.captain_name?.trim() ||
+        (Array.isArray(rawMembers) && rawMembers[0]?.name ? rawMembers[0].name.trim() : null);
 
       return {
         id: t.id,
@@ -97,12 +99,14 @@ export async function fetchLeaderboardData(): Promise<LeaderboardEntry[]> {
       };
     });
 
-    // Sort by total_score DESC, tiebreak by team_name ASC
+    // Sort by total_score DESC, tiebreak by team_name ASC, then stable id tiebreak
     list.sort((a, b) => {
       if (b.total_score !== a.total_score) {
         return b.total_score - a.total_score;
       }
-      return (a.team_name || "").localeCompare(b.team_name || "");
+      const nameCompare = (a.team_name || "").localeCompare(b.team_name || "");
+      if (nameCompare !== 0) return nameCompare;
+      return (a.id || "").localeCompare(b.id || "");
     });
 
     // Assign dynamic ranks: 1, 2, 3...

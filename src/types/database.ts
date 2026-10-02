@@ -29,6 +29,8 @@ export interface Score {
 export interface TeamWithDetails extends Team {
   members: TeamMember[];
   score?: Score | null;
+  leader_name?: string | null;
+  captain_name?: string | null;
 }
 
 export interface Workshop {

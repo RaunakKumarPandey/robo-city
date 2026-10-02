@@ -13,7 +13,7 @@ CREATE SEQUENCE IF NOT EXISTS registration_number_seq START WITH 1;
 -- 3. TABLE: teams
 CREATE TABLE IF NOT EXISTS teams (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  team_name TEXT NOT NULL UNIQUE,
+  team_name TEXT NOT NULL,
   team_logo_url TEXT,
   robot_image_url TEXT,
   created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
@@ -183,6 +183,8 @@ CREATE POLICY "Allow public read access for scores" ON scores FOR SELECT USING (
 CREATE POLICY "Allow public read access for robots" ON robots FOR SELECT USING (true);
 CREATE POLICY "Allow public read access for published workshops" ON workshops FOR SELECT USING (published = true);
 CREATE POLICY "Allow public read access for published announcements" ON announcements FOR SELECT USING (published = true);
+CREATE POLICY "Allow public read access for registrations" ON registrations FOR SELECT USING (true);
+CREATE POLICY "Allow public read access for registration_members" ON registration_members FOR SELECT USING (true);
 
 -- Admin Management Policies
 CREATE POLICY "Allow admins to manage teams" ON teams FOR ALL TO authenticated USING (true) WITH CHECK (true);
@@ -329,15 +331,12 @@ BEGIN
     RAISE EXCEPTION 'TEAM NAME IS REQUIRED';
   END IF;
 
-  IF EXISTS (SELECT 1 FROM teams WHERE lower(team_name) = lower(v_trimmed_team)) THEN
-    RAISE EXCEPTION 'THIS CREW ALREADY EXISTS';
-  END IF;
-
   v_member_count := jsonb_array_length(p_members);
   IF v_member_count < 3 OR v_member_count > 5 THEN
     RAISE EXCEPTION 'CREW MUST CONTAIN 3 TO 5 MEMBERS (Found %)', v_member_count;
   END IF;
 
+  -- Create new team entry (duplicate team names allowed)
   INSERT INTO teams (team_name, team_logo_url, robot_image_url)
   VALUES (v_trimmed_team, NULL, p_robot_image_url)
   RETURNING id INTO v_team_id;
@@ -395,7 +394,6 @@ DECLARE
   v_trimmed_team TEXT;
   v_existing_id UUID;
   v_existing_num TEXT;
-  v_is_duplicate_team BOOLEAN := false;
   v_sync_status TEXT := 'synced';
   v_sync_error TEXT := NULL;
   v_actual_members_count INT := 0;
@@ -419,34 +417,29 @@ BEGIN
 
   v_trimmed_team := COALESCE(NULLIF(trim(p_team_name), ''), 'Unnamed Crew');
 
-  IF EXISTS (SELECT 1 FROM teams WHERE lower(team_name) = lower(v_trimmed_team)) THEN
-    v_is_duplicate_team := true;
-    v_sync_status := 'needs_review';
-    v_sync_error := 'Team name already exists in database. Pending admin review.';
-  END IF;
-
   v_member_count := jsonb_array_length(p_members);
   IF v_member_count < 3 OR v_member_count > 5 THEN
     v_sync_status := 'needs_review';
     v_sync_error := COALESCE(v_sync_error || '; ', '') || 'Declared/Parsed members: ' || v_member_count || ' (Rule requires 3–5 members)';
   END IF;
 
-  IF NOT v_is_duplicate_team THEN
-    INSERT INTO teams (team_name, team_logo_url, robot_image_url)
-    VALUES (v_trimmed_team, NULL, p_robot_image_url)
-    RETURNING id INTO v_team_id;
+  -- Always create a dedicated team entry for this registration (duplicate names allowed)
+  INSERT INTO teams (team_name, team_logo_url, robot_image_url)
+  VALUES (v_trimmed_team, NULL, p_robot_image_url)
+  RETURNING id INTO v_team_id;
 
-    INSERT INTO scores (team_id, round1_score, round2_score, round3_score)
-    VALUES (v_team_id, 0, 0, 0)
-    ON CONFLICT (team_id) DO NOTHING;
+  -- Initialize standard competition score record
+  INSERT INTO scores (team_id, round1_score, round2_score, round3_score)
+  VALUES (v_team_id, 0, 0, 0)
+  ON CONFLICT (team_id) DO NOTHING;
 
-    IF p_robot_name IS NOT NULL AND trim(p_robot_name) <> '' THEN
-      INSERT INTO robots (team_id, robot_name, robot_image_url)
-      VALUES (v_team_id, trim(p_robot_name), p_robot_image_url)
-      ON CONFLICT (team_id) DO UPDATE 
-        SET robot_name = EXCLUDED.robot_name,
-            robot_image_url = EXCLUDED.robot_image_url;
-    END IF;
+  -- Create robot record if provided
+  IF p_robot_name IS NOT NULL AND trim(p_robot_name) <> '' THEN
+    INSERT INTO robots (team_id, robot_name, robot_image_url)
+    VALUES (v_team_id, trim(p_robot_name), p_robot_image_url)
+    ON CONFLICT (team_id) DO UPDATE 
+      SET robot_name = EXCLUDED.robot_name,
+          robot_image_url = EXCLUDED.robot_image_url;
   END IF;
 
   INSERT INTO registrations (

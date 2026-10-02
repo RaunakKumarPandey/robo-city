@@ -22,6 +22,8 @@ Before deploying the frontend, ensure your Supabase database schema is up-to-dat
    - `004_score_management.sql` (Atomic score validation RPC)
    - `005_registration.sql` (`registrations`, `registration_members`, `robots`, sequence)
    - `006_google_form_integration.sql` (Metadata columns, unique replay index, `sync_google_form_registration` RPC)
+   - `007_event_gallery.sql` (`event_gallery` table, storage buckets, gallery RPCs)
+   - `008_allow_duplicate_team_names.sql` (Drops unique team name constraint & updates RPCs to allow duplicate team names)
 3. Under **Authentication** ➔ **Users**, create your primary admin account.
 4. Add the admin's `user_id` into the `admin_users` table:
    ```sql

@@ -111,30 +111,8 @@ export async function submitRegistration(
       };
     }
 
-    // Check for explicit duplicate crew error from RPC
-    if (rpcError?.message?.includes("ALREADY EXISTS") || rpcError?.message?.includes("unique")) {
-      return {
-        success: false,
-        error: "THIS CREW ALREADY EXISTS",
-      };
-    }
-
     // 2. Direct Fallback Execution (if RPC not migrated yet on test environment)
-    // A. Check duplicate team
-    const { data: existingTeam } = await supabase
-      .from("teams")
-      .select("id")
-      .ilike("team_name", teamName)
-      .maybeSingle();
-
-    if (existingTeam) {
-      return {
-        success: false,
-        error: "THIS CREW ALREADY EXISTS",
-      };
-    }
-
-    // B. Insert team
+    // Insert team (duplicate team names allowed)
     const { data: teamData, error: teamError } = await supabase
       .from("teams")
       .insert({
@@ -146,12 +124,9 @@ export async function submitRegistration(
       .single();
 
     if (teamError || !teamData) {
-      if (teamError?.code === "23505" || teamError?.message?.includes("unique")) {
-        return { success: false, error: "THIS CREW ALREADY EXISTS" };
-      }
       return {
         success: false,
-        error: "REGISTRATION FAILED. Please check your information and try again.",
+        error: teamError?.message || "REGISTRATION FAILED. Please check your information and try again.",
       };
     }
 
@@ -222,12 +197,9 @@ export async function submitRegistration(
     };
   } catch (err: any) {
     console.error("submitRegistration exception:", err);
-    if (err?.message?.includes("ALREADY EXISTS")) {
-      return { success: false, error: "THIS CREW ALREADY EXISTS" };
-    }
     return {
       success: false,
-      error: "REGISTRATION FAILED. Please check your information and try again.",
+      error: err?.message || "REGISTRATION FAILED. Please check your information and try again.",
     };
   }
 }

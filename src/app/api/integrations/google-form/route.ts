@@ -176,47 +176,37 @@ export async function POST(req: NextRequest) {
       });
     }
 
-    // Check for existing team
+    // Always create a new dedicated team record for this registration (duplicate names allowed)
     let teamId: string | null = null;
-    const { data: existingTeam } = await db
+    const { data: teamData, error: teamErr } = await db
       .from("teams")
+      .insert({
+        team_name: teamName,
+        team_logo_url: null,
+        robot_image_url: robotImageUrl,
+      })
       .select("id")
-      .ilike("team_name", teamName)
       .maybeSingle();
 
-    if (existingTeam) {
-      teamId = existingTeam.id;
-    } else {
-      const { data: teamData, error: teamErr } = await db
-        .from("teams")
-        .insert({
-          team_name: teamName,
-          team_logo_url: null,
-          robot_image_url: robotImageUrl,
-        })
-        .select("id")
-        .maybeSingle();
+    if (teamErr) {
+      console.error("Fallback team insert error:", teamErr);
+    }
+    teamId = teamData?.id || null;
 
-      if (teamErr) {
-        console.error("Fallback team insert error:", teamErr);
-      }
-      teamId = teamData?.id || null;
+    if (teamId) {
+      await db.from("scores").insert({
+        team_id: teamId,
+        round1_score: 0,
+        round2_score: 0,
+        round3_score: 0,
+      });
 
-      if (teamId) {
-        await db.from("scores").insert({
+      if (robotName) {
+        await db.from("robots").insert({
           team_id: teamId,
-          round1_score: 0,
-          round2_score: 0,
-          round3_score: 0,
+          robot_name: robotName,
+          robot_image_url: robotImageUrl,
         });
-
-        if (robotName) {
-          await db.from("robots").insert({
-            team_id: teamId,
-            robot_name: robotName,
-            robot_image_url: robotImageUrl,
-          });
-        }
       }
     }
 
