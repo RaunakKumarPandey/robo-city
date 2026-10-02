@@ -110,29 +110,91 @@ export default function AdminGalleryPage() {
     setTimeout(() => setNotification(null), 4000);
   };
 
-  // File Upload Handlers (converts local file to Data URL)
-  const handlePosterFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    const reader = new FileReader();
-    reader.onloadend = () => {
-      if (typeof reader.result === "string") {
-        setPosterImageUrl(reader.result);
+  const [compressing, setCompressing] = useState(false);
+
+  // High-speed client-side image compressor & optimizer to keep web lightning fast
+  const compressImageFile = (file: File, maxWidth = 1920, quality = 0.82): Promise<string> => {
+    return new Promise((resolve) => {
+      if (file.type === "image/svg+xml") {
+        const reader = new FileReader();
+        reader.onload = () => resolve(reader.result as string);
+        reader.onerror = () => resolve("");
+        reader.readAsDataURL(file);
+        return;
       }
-    };
-    reader.readAsDataURL(file);
+
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        const img = new Image();
+        img.onload = () => {
+          let width = img.width;
+          let height = img.height;
+
+          // Downscale large camera photos while preserving crystal clarity and exact aspect ratio
+          if (width > maxWidth || height > maxWidth) {
+            if (width > height) {
+              height = Math.round((height * maxWidth) / width);
+              width = maxWidth;
+            } else {
+              width = Math.round((width * maxWidth) / height);
+              height = maxWidth;
+            }
+          }
+
+          const canvas = document.createElement("canvas");
+          canvas.width = width;
+          canvas.height = height;
+          const ctx = canvas.getContext("2d");
+          if (!ctx) {
+            resolve(img.src);
+            return;
+          }
+
+          ctx.drawImage(img, 0, 0, width, height);
+          const optimizedData = canvas.toDataURL("image/jpeg", quality);
+          resolve(optimizedData);
+        };
+        img.onerror = () => resolve(e.target?.result as string);
+        img.src = e.target?.result as string;
+      };
+      reader.onerror = () => resolve("");
+      reader.readAsDataURL(file);
+    });
   };
 
-  const handlePhotoFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+  // File Upload Handlers (optimizes and converts local file)
+  const handlePosterFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
-    const reader = new FileReader();
-    reader.onloadend = () => {
-      if (typeof reader.result === "string") {
-        setPhotoImageUrl(reader.result);
+    setCompressing(true);
+    try {
+      const optimized = await compressImageFile(file, 2048, 0.85);
+      if (optimized) {
+        setPosterImageUrl(optimized);
+        notify("success", "Poster optimized and loaded!");
       }
-    };
-    reader.readAsDataURL(file);
+    } catch {
+      notify("error", "Failed to process poster file.");
+    } finally {
+      setCompressing(false);
+    }
+  };
+
+  const handlePhotoFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setCompressing(true);
+    try {
+      const optimized = await compressImageFile(file, 1920, 0.82);
+      if (optimized) {
+        setPhotoImageUrl(optimized);
+        notify("success", "Photo optimized and loaded!");
+      }
+    } catch {
+      notify("error", "Failed to process photo file.");
+    } finally {
+      setCompressing(false);
+    }
   };
 
   // =========================================================================
@@ -658,11 +720,12 @@ export default function AdminGalleryPage() {
                     className="flex-1 rounded-xl border border-white/10 bg-[#07070F] px-4 py-2.5 font-mono text-xs text-white focus:border-[#FF7A3D] focus:outline-none"
                   />
                   <label className="inline-flex items-center justify-center gap-2 cursor-pointer rounded-xl border border-[#FF7A3D]/40 bg-[#FF7A3D]/15 px-4 py-2.5 font-mono text-xs font-bold text-[#FF7A3D] hover:bg-[#FF7A3D]/30 transition-colors shrink-0">
-                    <Upload className="h-4 w-4" />
-                    <span>Choose File</span>
+                    <Upload className={`h-4 w-4 ${compressing ? "animate-spin" : ""}`} />
+                    <span>{compressing ? "Optimizing..." : "Choose File"}</span>
                     <input
                       type="file"
                       accept="image/*"
+                      disabled={compressing}
                       onChange={handlePosterFileUpload}
                       className="hidden"
                     />
@@ -848,11 +911,12 @@ export default function AdminGalleryPage() {
                     className="flex-1 rounded-xl border border-white/10 bg-[#07070F] px-4 py-2.5 font-mono text-xs text-white focus:border-[#35D9FF] focus:outline-none"
                   />
                   <label className="inline-flex items-center justify-center gap-2 cursor-pointer rounded-xl border border-[#35D9FF]/40 bg-[#35D9FF]/15 px-4 py-2.5 font-mono text-xs font-bold text-[#35D9FF] hover:bg-[#35D9FF]/30 transition-colors shrink-0">
-                    <Upload className="h-4 w-4" />
-                    <span>Choose File</span>
+                    <Upload className={`h-4 w-4 ${compressing ? "animate-spin" : ""}`} />
+                    <span>{compressing ? "Optimizing..." : "Choose File"}</span>
                     <input
                       type="file"
                       accept="image/*"
+                      disabled={compressing}
                       onChange={handlePhotoFileUpload}
                       className="hidden"
                     />
