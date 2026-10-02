@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { getServiceSupabase } from "@/lib/supabase";
+import { getServiceSupabase, isSupabaseConfigured } from "@/lib/supabase";
 import { initialEventPosters } from "@/data/initialGalleryData";
 import { EventPoster } from "@/types/database";
 
@@ -8,60 +8,43 @@ export const dynamic = "force-dynamic";
 let memoryPosters: EventPoster[] = [...initialEventPosters];
 
 export async function GET() {
-  const supabase = getServiceSupabase();
+  if (isSupabaseConfigured) {
+    try {
+      const supabase = getServiceSupabase();
+      const { data, error } = await supabase
+        .from("event_posters")
+        .select("*")
+        .order("display_order", { ascending: true });
 
-  try {
-    const { data, error } = await supabase
-      .from("event_posters")
-      .select("*")
-      .order("display_order", { ascending: true });
-
-    if (!error && data) {
-      if (data.length > 0) {
+      if (!error && Array.isArray(data) && data.length > 0) {
         memoryPosters = data as EventPoster[];
         return NextResponse.json(
-          { success: true, data },
+          { success: true, data: memoryPosters },
           {
             headers: {
-              "Cache-Control": "no-store, no-cache, must-revalidate, proxy-revalidate",
+              "Cache-Control": "public, s-maxage=15, stale-while-revalidate=60",
             },
           }
         );
       }
-      
-      // Auto-seed initial posters into Supabase if table exists and is fresh empty
-      try {
-        const { error: seedError } = await supabase
-          .from("event_posters")
-          .upsert(initialEventPosters, { onConflict: "id" });
-        if (!seedError) {
-          memoryPosters = [...initialEventPosters];
-          return NextResponse.json(
-            { success: true, data: initialEventPosters },
-            {
-              headers: {
-                "Cache-Control": "no-store, no-cache, must-revalidate, proxy-revalidate",
-              },
-            }
-          );
-        }
-      } catch {}
 
-      return NextResponse.json(
-        { success: true, data: [] },
-        {
-          headers: {
-            "Cache-Control": "no-store, no-cache, must-revalidate, proxy-revalidate",
-          },
-        }
-      );
+      // If table is empty, auto-seed initial posters into Supabase
+      if (!error && Array.isArray(data) && data.length === 0) {
+        try {
+          await supabase
+            .from("event_posters")
+            .upsert(initialEventPosters, { onConflict: "id" });
+        } catch {}
+      }
+    } catch (err) {
+      console.warn("Supabase GET event_posters notice:", err);
     }
-  } catch (err) {
-    console.warn("Supabase GET event_posters error:", err);
   }
 
+  // Fast fallback to memoryPosters or initialEventPosters
+  const finalData = memoryPosters.length > 0 ? memoryPosters : initialEventPosters;
   return NextResponse.json(
-    { success: true, data: memoryPosters },
+    { success: true, data: finalData },
     {
       headers: {
         "Cache-Control": "no-store, no-cache, must-revalidate, proxy-revalidate",

@@ -24,6 +24,8 @@ import {
   fetchGalleryImages,
   saveGalleryImage,
   deleteGalleryImage,
+  getCachedPosters,
+  getCachedGalleryImages,
 } from "@/lib/gallery";
 
 const POSTER_CATEGORIES = [
@@ -46,9 +48,9 @@ const PHOTO_CATEGORIES = [
 
 export default function AdminGalleryPage() {
   const [activeTab, setActiveTab] = useState<"posters" | "photos">("posters");
-  const [posters, setPosters] = useState<EventPoster[]>([]);
-  const [images, setImages] = useState<EventGalleryImage[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [posters, setPosters] = useState<EventPoster[]>(() => getCachedPosters());
+  const [images, setImages] = useState<EventGalleryImage[]>(() => getCachedGalleryImages());
+  const [loading, setLoading] = useState(false);
   const [notification, setNotification] = useState<{
     type: "success" | "error";
     message: string;
@@ -81,14 +83,22 @@ export default function AdminGalleryPage() {
   const [saving, setSaving] = useState(false);
 
   const loadData = async () => {
-    setLoading(true);
-    const [postersData, imagesData] = await Promise.all([
-      fetchEventPosters(),
-      fetchGalleryImages(),
-    ]);
-    setPosters(postersData);
-    setImages(imagesData);
-    setLoading(false);
+    try {
+      const [postersData, imagesData] = await Promise.all([
+        fetchEventPosters(),
+        fetchGalleryImages(),
+      ]);
+      if (postersData && postersData.length > 0) {
+        setPosters(postersData);
+      }
+      if (imagesData && imagesData.length > 0) {
+        setImages(imagesData);
+      }
+    } catch {
+      // Keep cached
+    } finally {
+      setLoading(false);
+    }
   };
 
   useEffect(() => {

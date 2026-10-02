@@ -15,7 +15,7 @@ import {
   GraduationCap,
 } from "lucide-react";
 import { OrganizingMember } from "@/types/database";
-import { fetchOrganizingTeam } from "@/lib/team";
+import { fetchOrganizingTeam, getCachedOrganizingTeam } from "@/lib/team";
 
 function LinkedinIcon({ className }: { className?: string }) {
   return (
@@ -59,6 +59,8 @@ function MemberPortrait({ member }: { member: OrganizingMember }) {
         <img
           src={member.photo_url}
           alt={member.name}
+          loading="lazy"
+          decoding="async"
           className="h-full w-full object-cover object-top transition-transform duration-500 group-hover:scale-105"
           onError={() => setImgError(true)}
         />
@@ -196,17 +198,21 @@ const YEAR_TIERS: YearTier[] = [
 ];
 
 export default function OrganizingTeamView() {
-  const [members, setMembers] = useState<OrganizingMember[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [members, setMembers] = useState<OrganizingMember[]>(() => getCachedOrganizingTeam());
+  const [loading, setLoading] = useState<boolean>(() => getCachedOrganizingTeam().length === 0);
   const [selectedCategory, setSelectedCategory] = useState<string>("ALL SQUADS");
   const [selectedYear, setSelectedYear] = useState<string>("ALL YEARS");
   const [searchQuery, setSearchQuery] = useState("");
 
   const loadMembers = async () => {
-    setLoading(true);
-    const data = await fetchOrganizingTeam();
-    setMembers(data);
-    setLoading(false);
+    try {
+      const data = await fetchOrganizingTeam();
+      if (data && data.length > 0) {
+        setMembers(data);
+      }
+    } finally {
+      setLoading(false);
+    }
   };
 
   useEffect(() => {
@@ -410,19 +416,15 @@ export default function OrganizingTeamView() {
                 </div>
 
                 {/* Grid starting on a new row for this batch */}
-                <motion.div
-                  layout
-                  className="grid grid-cols-1 gap-4 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4"
-                >
+                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4">
                   <AnimatePresence>
                     {tierMembers.map((member) => (
                       <motion.div
-                        layout
                         key={member.id}
-                        initial={{ opacity: 0, y: 16 }}
+                        initial={{ opacity: 0, y: 12 }}
                         animate={{ opacity: 1, y: 0 }}
                         exit={{ opacity: 0, scale: 0.95 }}
-                        transition={{ duration: 0.25 }}
+                        transition={{ duration: 0.2 }}
                         className="group relative flex flex-col justify-between overflow-hidden rounded-2xl border border-white/10 bg-gradient-to-b from-[#160E2E]/85 to-[#0A0714]/90 p-3.5 backdrop-blur-xl transition-all duration-300 hover:border-[#FF2D8D]/60 hover:shadow-[0_0_25px_rgba(255,45,141,0.25)]"
                       >
                         {/* Neon Top Edge Accent */}
@@ -549,7 +551,7 @@ export default function OrganizingTeamView() {
                       </motion.div>
                     ))}
                   </AnimatePresence>
-                </motion.div>
+                </div>
               </div>
             ))}
           </div>

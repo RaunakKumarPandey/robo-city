@@ -22,7 +22,12 @@ import {
   Flame,
 } from "lucide-react";
 import { EventPoster, EventGalleryImage } from "@/types/database";
-import { fetchEventPosters, fetchGalleryImages } from "@/lib/gallery";
+import {
+  fetchEventPosters,
+  fetchGalleryImages,
+  getCachedPosters,
+  getCachedGalleryImages,
+} from "@/lib/gallery";
 
 const GALLERY_CATEGORIES = [
   "ALL PHOTOS",
@@ -35,9 +40,9 @@ const GALLERY_CATEGORIES = [
 ] as const;
 
 export default function EventGalleryView() {
-  const [posters, setPosters] = useState<EventPoster[]>([]);
-  const [images, setImages] = useState<EventGalleryImage[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [posters, setPosters] = useState<EventPoster[]>(() => getCachedPosters());
+  const [images, setImages] = useState<EventGalleryImage[]>(() => getCachedGalleryImages());
+  const [loading, setLoading] = useState<boolean>(false);
   const [selectedCategory, setSelectedCategory] = useState<string>("ALL PHOTOS");
   const [searchQuery, setSearchQuery] = useState("");
 
@@ -49,14 +54,18 @@ export default function EventGalleryView() {
   const [copiedLink, setCopiedLink] = useState(false);
 
   const loadData = async () => {
-    setLoading(true);
-    const [postersData, imagesData] = await Promise.all([
-      fetchEventPosters(),
-      fetchGalleryImages(),
-    ]);
-    setPosters(postersData);
-    setImages(imagesData);
-    setLoading(false);
+    try {
+      const [postersData, imagesData] = await Promise.all([
+        fetchEventPosters(),
+        fetchGalleryImages(),
+      ]);
+      if (postersData && postersData.length > 0) setPosters(postersData);
+      if (imagesData && imagesData.length > 0) setImages(imagesData);
+    } catch {
+      // Keep cached data
+    } finally {
+      setLoading(false);
+    }
   };
 
   useEffect(() => {
@@ -228,12 +237,12 @@ export default function EventGalleryView() {
             </div>
           ) : (
             <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">
-              {posters.map((poster) => (
+              {posters.map((poster, pIdx) => (
                 <motion.div
                   key={poster.id}
-                  layout
-                  initial={{ opacity: 0, y: 20 }}
+                  initial={{ opacity: 0, y: 15 }}
                   animate={{ opacity: 1, y: 0 }}
+                  transition={{ duration: 0.2 }}
                   className="group relative flex flex-col justify-between overflow-hidden rounded-3xl border border-white/12 bg-gradient-to-b from-[#160E2E]/90 to-[#0A0714]/95 p-4 backdrop-blur-xl transition-all duration-300 hover:border-[#FF7A3D]/70 hover:shadow-[0_0_35px_rgba(255,122,61,0.25)]"
                 >
                   {/* Top Laser Accent */}
@@ -266,6 +275,8 @@ export default function EventGalleryView() {
                       <img
                         src={poster.image_url}
                         alt={poster.title}
+                        loading={pIdx < 2 ? "eager" : "lazy"}
+                        decoding="async"
                         className="h-full w-full object-cover object-center transition-transform duration-500 group-hover:scale-105"
                         onError={(e) => {
                           (e.target as HTMLImageElement).src = "/images/backgrounds/bg_home.jpg";
@@ -412,16 +423,17 @@ export default function EventGalleryView() {
               {filteredImages.map((img, idx) => (
                 <motion.div
                   key={img.id}
-                  layout
-                  initial={{ opacity: 0, scale: 0.95 }}
+                  initial={{ opacity: 0, scale: 0.96 }}
                   animate={{ opacity: 1, scale: 1 }}
-                  transition={{ duration: 0.25 }}
+                  transition={{ duration: 0.2 }}
                   onClick={() => openImageLightbox(idx)}
                   className="group relative aspect-[4/3] w-full overflow-hidden rounded-2xl border border-white/12 bg-[#0A0714] shadow-[0_4px_20px_rgba(0,0,0,0.6)] cursor-pointer hover:border-[#35D9FF]/70 hover:shadow-[0_0_25px_rgba(53,217,255,0.3)] transition-all"
                 >
                   <img
                     src={img.image_url}
                     alt={img.title || "Event Photo"}
+                    loading="lazy"
+                    decoding="async"
                     className="h-full w-full object-cover object-center transition-transform duration-500 group-hover:scale-110"
                     onError={(e) => {
                       (e.target as HTMLImageElement).src = "/images/backgrounds/bg_missions.jpg";

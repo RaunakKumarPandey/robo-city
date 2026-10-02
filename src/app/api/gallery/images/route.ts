@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { getServiceSupabase } from "@/lib/supabase";
+import { getServiceSupabase, isSupabaseConfigured } from "@/lib/supabase";
 import { initialGalleryImages } from "@/data/initialGalleryData";
 import { EventGalleryImage } from "@/types/database";
 
@@ -8,60 +8,43 @@ export const dynamic = "force-dynamic";
 let memoryImages: EventGalleryImage[] = [...initialGalleryImages];
 
 export async function GET() {
-  const supabase = getServiceSupabase();
+  if (isSupabaseConfigured) {
+    try {
+      const supabase = getServiceSupabase();
+      const { data, error } = await supabase
+        .from("event_gallery_images")
+        .select("*")
+        .order("display_order", { ascending: true });
 
-  try {
-    const { data, error } = await supabase
-      .from("event_gallery_images")
-      .select("*")
-      .order("display_order", { ascending: true });
-
-    if (!error && data) {
-      if (data.length > 0) {
+      if (!error && Array.isArray(data) && data.length > 0) {
         memoryImages = data as EventGalleryImage[];
         return NextResponse.json(
-          { success: true, data },
+          { success: true, data: memoryImages },
           {
             headers: {
-              "Cache-Control": "no-store, no-cache, must-revalidate, proxy-revalidate",
+              "Cache-Control": "public, s-maxage=15, stale-while-revalidate=60",
             },
           }
         );
       }
 
-      // Auto-seed initial gallery images into Supabase if table exists and is fresh empty
-      try {
-        const { error: seedError } = await supabase
-          .from("event_gallery_images")
-          .upsert(initialGalleryImages, { onConflict: "id" });
-        if (!seedError) {
-          memoryImages = [...initialGalleryImages];
-          return NextResponse.json(
-            { success: true, data: initialGalleryImages },
-            {
-              headers: {
-                "Cache-Control": "no-store, no-cache, must-revalidate, proxy-revalidate",
-              },
-            }
-          );
-        }
-      } catch {}
-
-      return NextResponse.json(
-        { success: true, data: [] },
-        {
-          headers: {
-            "Cache-Control": "no-store, no-cache, must-revalidate, proxy-revalidate",
-          },
-        }
-      );
+      // If table is empty, auto-seed initial gallery images into Supabase
+      if (!error && Array.isArray(data) && data.length === 0) {
+        try {
+          await supabase
+            .from("event_gallery_images")
+            .upsert(initialGalleryImages, { onConflict: "id" });
+        } catch {}
+      }
+    } catch (err) {
+      console.warn("Supabase GET event_gallery_images notice:", err);
     }
-  } catch (err) {
-    console.warn("Supabase GET event_gallery_images error:", err);
   }
 
+  // Fast fallback to memoryImages or initialGalleryImages
+  const finalData = memoryImages.length > 0 ? memoryImages : initialGalleryImages;
   return NextResponse.json(
-    { success: true, data: memoryImages },
+    { success: true, data: finalData },
     {
       headers: {
         "Cache-Control": "no-store, no-cache, must-revalidate, proxy-revalidate",

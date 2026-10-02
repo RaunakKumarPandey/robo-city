@@ -86,8 +86,6 @@ export default function AdminTeamsPage() {
     setFormRobotUrl("");
     setFormMembers([
       { name: "", branch: "", year: "" },
-      { name: "", branch: "", year: "" },
-      { name: "", branch: "", year: "" },
     ]);
     setFormError(null);
     setIsFormModalOpen(true);
@@ -106,8 +104,7 @@ export default function AdminTeamsPage() {
       year: m.year || "",
     }));
 
-    // Ensure at least 3 member inputs are present
-    while (existingMembers.length < 3) {
+    if (existingMembers.length === 0) {
       existingMembers.push({ name: "", branch: "", year: "" });
     }
 
@@ -118,16 +115,14 @@ export default function AdminTeamsPage() {
 
   // Form Member Operations
   const handleAddMemberInput = () => {
-    if (formMembers.length < 5) {
+    if (formMembers.length < 10) {
       setFormMembers([...formMembers, { name: "", branch: "", year: "" }]);
     }
   };
 
   const handleRemoveMemberInput = (index: number) => {
-    if (formMembers.length > 3) {
-      const updated = formMembers.filter((_, i) => i !== index);
-      setFormMembers(updated);
-    }
+    const updated = formMembers.filter((_, i) => i !== index);
+    setFormMembers(updated);
   };
 
   const handleMemberChange = (
@@ -150,13 +145,14 @@ export default function AdminTeamsPage() {
       return;
     }
 
-    const filledMembers = formMembers.filter((m) => m.name.trim().length > 0);
-    if (filledMembers.length < 3 || filledMembers.length > 5) {
-      setFormError(
-        `PLEASE ADD 3–5 MEMBERS WITH NAMES (Currently: ${filledMembers.length})`
-      );
-      return;
-    }
+    // Only include members that have at least some data filled
+    const filledMembers = formMembers
+      .filter((m) => m.name.trim().length > 0 || m.branch.trim().length > 0 || m.year.trim().length > 0)
+      .map((m) => ({
+        name: m.name.trim() || "Member",
+        branch: m.branch.trim(),
+        year: m.year.trim(),
+      }));
 
     setSubmitting(true);
 
@@ -252,7 +248,7 @@ export default function AdminTeamsPage() {
               TEAM GARAGE
             </h1>
             <p className="mt-1 text-xs text-zinc-400 font-mono">
-              MANAGE ROBO CITY CREWS &middot; OFFICIAL 3–5 MEMBERS PER TEAM
+              MANAGE ROBO CITY CREWS &middot; SPECIFICATIONS & ROSTERS
             </p>
           </div>
 
@@ -567,23 +563,23 @@ export default function AdminTeamsPage() {
                 </div>
               </div>
 
-              {/* Team Members Section (3–5 Members) */}
+              {/* Team Members Section */}
               <div className="border-t border-white/10 pt-5 space-y-3">
                 <div className="flex items-center justify-between">
                   <div>
                     <label className="block font-mono text-xs font-bold tracking-wider text-zinc-200 uppercase">
-                      TEAM MEMBERS (OFFICIAL 3–5 MEMBERS)
+                      TEAM MEMBERS (OPTIONAL)
                     </label>
                     <p className="text-[11px] font-mono text-zinc-400">
-                      Members: {formMembers.filter((m) => m.name.trim()).length} / 5
+                      Members: {formMembers.filter((m) => m.name.trim()).length}
                     </p>
                   </div>
 
                   <button
                     type="button"
                     onClick={handleAddMemberInput}
-                    disabled={formMembers.length >= 5}
-                    className="inline-flex items-center gap-1 rounded-md border border-[#00F0FF]/40 bg-[#00F0FF]/10 px-2.5 py-1 text-xs font-mono font-bold text-[#00F0FF] uppercase disabled:opacity-30 cursor-pointer"
+                    disabled={formMembers.length >= 10}
+                    className="inline-flex items-center gap-1 rounded-md border border-[#00F0FF]/40 bg-[#00F0FF]/10 px-2.5 py-1 text-xs font-mono font-bold text-[#00F0FF] uppercase disabled:opacity-30 cursor-pointer hover:bg-[#00F0FF]/20 transition-colors"
                   >
                     <Plus className="h-3 w-3" />
                     <span>+ ADD MEMBER</span>
@@ -591,55 +587,59 @@ export default function AdminTeamsPage() {
                 </div>
 
                 {/* Member Input Rows */}
-                <div className="space-y-2.5">
-                  {formMembers.map((member, idx) => (
-                    <div
-                      key={idx}
-                      className="flex items-center gap-2 rounded-lg border border-white/5 bg-white/[0.02] p-2.5"
-                    >
-                      <span className="font-mono text-xs font-bold text-[#FF6B35] w-5">
-                        #{idx + 1}
-                      </span>
-                      <input
-                        type="text"
-                        value={member.name}
-                        onChange={(e) =>
-                          handleMemberChange(idx, "name", e.target.value)
-                        }
-                        placeholder={`Member Name ${idx < 3 ? "*" : ""}`}
-                        required={idx < 3}
-                        className="flex-1 rounded border border-white/10 bg-black/40 py-1.5 px-2.5 text-xs text-white placeholder-zinc-500 focus:border-[#FF2A85] focus:outline-none"
-                      />
-                      <input
-                        type="text"
-                        value={member.branch}
-                        onChange={(e) =>
-                          handleMemberChange(idx, "branch", e.target.value)
-                        }
-                        placeholder="Branch (e.g. EE)"
-                        className="w-24 rounded border border-white/10 bg-black/40 py-1.5 px-2.5 text-xs text-white placeholder-zinc-500 focus:border-[#FF2A85] focus:outline-none"
-                      />
-                      <input
-                        type="text"
-                        value={member.year}
-                        onChange={(e) =>
-                          handleMemberChange(idx, "year", e.target.value)
-                        }
-                        placeholder="Year"
-                        className="w-16 rounded border border-white/10 bg-black/40 py-1.5 px-2.5 text-xs text-white placeholder-zinc-500 focus:border-[#FF2A85] focus:outline-none"
-                      />
-                      {formMembers.length > 3 && (
+                {formMembers.length === 0 ? (
+                  <div className="rounded-lg border border-dashed border-white/10 p-3 text-center text-xs font-mono text-zinc-500">
+                    No members added yet. Click &ldquo;+ ADD MEMBER&rdquo; to add crew members.
+                  </div>
+                ) : (
+                  <div className="space-y-2.5">
+                    {formMembers.map((member, idx) => (
+                      <div
+                        key={idx}
+                        className="flex items-center gap-2 rounded-lg border border-white/5 bg-white/[0.02] p-2.5"
+                      >
+                        <span className="font-mono text-xs font-bold text-[#FF6B35] w-5">
+                          #{idx + 1}
+                        </span>
+                        <input
+                          type="text"
+                          value={member.name}
+                          onChange={(e) =>
+                            handleMemberChange(idx, "name", e.target.value)
+                          }
+                          placeholder="Member Name"
+                          className="flex-1 rounded border border-white/10 bg-black/40 py-1.5 px-2.5 text-xs text-white placeholder-zinc-500 focus:border-[#FF2A85] focus:outline-none"
+                        />
+                        <input
+                          type="text"
+                          value={member.branch}
+                          onChange={(e) =>
+                            handleMemberChange(idx, "branch", e.target.value)
+                          }
+                          placeholder="Branch"
+                          className="w-24 rounded border border-white/10 bg-black/40 py-1.5 px-2.5 text-xs text-white placeholder-zinc-500 focus:border-[#FF2A85] focus:outline-none"
+                        />
+                        <input
+                          type="text"
+                          value={member.year}
+                          onChange={(e) =>
+                            handleMemberChange(idx, "year", e.target.value)
+                          }
+                          placeholder="Year"
+                          className="w-16 rounded border border-white/10 bg-black/40 py-1.5 px-2.5 text-xs text-white placeholder-zinc-500 focus:border-[#FF2A85] focus:outline-none"
+                        />
                         <button
                           type="button"
                           onClick={() => handleRemoveMemberInput(idx)}
-                          className="rounded p-1 text-zinc-500 hover:text-red-400 cursor-pointer"
+                          title="Remove member"
+                          className="rounded p-1 text-zinc-500 hover:text-red-400 hover:bg-white/5 cursor-pointer transition-colors"
                         >
                           <X className="h-4 w-4" />
                         </button>
-                      )}
-                    </div>
-                  ))}
-                </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
               </div>
 
               {/* Actions */}

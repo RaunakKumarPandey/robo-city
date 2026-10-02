@@ -45,13 +45,7 @@ export async function createTeamWithMembers(
     return { success: false, error: "TEAM NAME IS REQUIRED" };
   }
 
-  const validMembers = members.filter((m) => m.name && m.name.trim().length > 0);
-  if (validMembers.length < 3 || validMembers.length > 5) {
-    return {
-      success: false,
-      error: `PLEASE ADD 3–5 MEMBERS (Currently: ${validMembers.length})`,
-    };
-  }
+  const validMembers = (members || []).filter((m) => m.name && m.name.trim().length > 0);
 
   try {
     // 1. First attempt via atomic RPC if available
@@ -93,20 +87,22 @@ export async function createTeamWithMembers(
 
     const teamId = teamData.id;
 
-    // Insert members
-    const membersToInsert = validMembers.map((m) => ({
-      team_id: teamId,
-      name: m.name.trim(),
-      branch: m.branch?.trim() || null,
-      year: m.year?.trim() || null,
-    }));
+    // Insert members if any
+    if (validMembers.length > 0) {
+      const membersToInsert = validMembers.map((m) => ({
+        team_id: teamId,
+        name: m.name.trim(),
+        branch: m.branch?.trim() || null,
+        year: m.year?.trim() || null,
+      }));
 
-    const { error: membersError } = await supabase
-      .from("team_members")
-      .insert(membersToInsert);
+      const { error: membersError } = await supabase
+        .from("team_members")
+        .insert(membersToInsert);
 
-    if (membersError) {
-      console.error("Members creation error:", membersError);
+      if (membersError) {
+        console.error("Members creation error:", membersError);
+      }
     }
 
     // Insert initial score
@@ -139,13 +135,7 @@ export async function updateTeamWithMembers(
     return { success: false, error: "TEAM NAME IS REQUIRED" };
   }
 
-  const validMembers = members.filter((m) => m.name && m.name.trim().length > 0);
-  if (validMembers.length < 3 || validMembers.length > 5) {
-    return {
-      success: false,
-      error: `PLEASE ADD 3–5 MEMBERS (Currently: ${validMembers.length})`,
-    };
-  }
+  const validMembers = (members || []).filter((m) => m.name && m.name.trim().length > 0);
 
   try {
     // 1. Try via RPC
@@ -189,14 +179,22 @@ export async function updateTeamWithMembers(
     // Re-sync members: delete old & insert new
     await supabase.from("team_members").delete().eq("team_id", teamId);
 
-    const membersToInsert = validMembers.map((m) => ({
-      team_id: teamId,
-      name: m.name.trim(),
-      branch: m.branch?.trim() || null,
-      year: m.year?.trim() || null,
-    }));
+    if (validMembers.length > 0) {
+      const membersToInsert = validMembers.map((m) => ({
+        team_id: teamId,
+        name: m.name.trim(),
+        branch: m.branch?.trim() || null,
+        year: m.year?.trim() || null,
+      }));
 
-    await supabase.from("team_members").insert(membersToInsert);
+      const { error: membersError } = await supabase
+        .from("team_members")
+        .insert(membersToInsert);
+
+      if (membersError) {
+        console.error("Members update error:", membersError);
+      }
+    }
 
     return { success: true };
   } catch (err) {
