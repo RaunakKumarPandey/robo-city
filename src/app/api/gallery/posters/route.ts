@@ -1,59 +1,57 @@
 import { NextResponse } from "next/server";
 import { getServiceSupabase, isSupabaseConfigured } from "@/lib/supabase";
+import { initialEventPosters } from "@/data/initialGalleryData";
 import { EventPoster } from "@/types/database";
 
 export const dynamic = "force-dynamic";
 
-const DUMMY_POSTER_IDS = ["poster-1", "poster-2", "poster-3", "poster-4"];
-
-let memoryPosters: EventPoster[] = [];
+let memoryPosters: EventPoster[] = [...initialEventPosters];
 
 export async function GET() {
   if (isSupabaseConfigured) {
     try {
       const supabase = getServiceSupabase();
-
-      // Clean up legacy dummy mock posters from database if present
-      try {
-        await supabase.from("event_posters").delete().in("id", DUMMY_POSTER_IDS);
-      } catch {}
-
       const { data, error } = await supabase
         .from("event_posters")
         .select("*")
         .order("display_order", { ascending: true });
 
-      if (!error && Array.isArray(data)) {
-        // Exclude any legacy dummy items
-        const filtered = (data as EventPoster[]).filter(
-          (p) => !DUMMY_POSTER_IDS.includes(p.id)
-        );
-        memoryPosters = filtered;
+      if (!error && Array.isArray(data) && data.length > 0) {
+        memoryPosters = data as EventPoster[];
         return NextResponse.json(
           { success: true, data: memoryPosters },
           {
             headers: {
               "Cache-Control": "no-store, no-cache, must-revalidate, proxy-revalidate, max-age=0",
-              Pragma: "no-cache",
-              Expires: "0",
+              "Pragma": "no-cache",
+              "Expires": "0",
             },
           }
         );
+      }
+
+      // If table is empty, auto-seed initial posters into Supabase
+      if (!error && Array.isArray(data) && data.length === 0) {
+        try {
+          await supabase
+            .from("event_posters")
+            .upsert(initialEventPosters, { onConflict: "id" });
+        } catch {}
       }
     } catch (err) {
       console.warn("Supabase GET event_posters notice:", err);
     }
   }
 
-  // Fast fallback to memoryPosters (filtered)
-  const cleanMemory = memoryPosters.filter((p) => !DUMMY_POSTER_IDS.includes(p.id));
+  // Fast fallback to memoryPosters or initialEventPosters
+  const finalData = memoryPosters.length > 0 ? memoryPosters : initialEventPosters;
   return NextResponse.json(
-    { success: true, data: cleanMemory },
+    { success: true, data: finalData },
     {
       headers: {
         "Cache-Control": "no-store, no-cache, must-revalidate, proxy-revalidate, max-age=0",
-        Pragma: "no-cache",
-        Expires: "0",
+        "Pragma": "no-cache",
+        "Expires": "0",
       },
     }
   );
@@ -86,7 +84,6 @@ export async function POST(request: Request) {
     } else {
       memoryPosters.push(record);
     }
-    memoryPosters = memoryPosters.filter((p) => !DUMMY_POSTER_IDS.includes(p.id));
     memoryPosters.sort((a, b) => (a.display_order ?? 0) - (b.display_order ?? 0));
 
     // Persist to Supabase

@@ -1,23 +1,19 @@
 import { supabase } from "@/lib/supabase";
 import { OrganizingMember } from "@/types/database";
+import { initialOrganizingTeam } from "@/data/initialOrganizingTeam";
 
 const TEAM_STORAGE_KEY = "robocity_organizing_team";
-const DUMMY_ORG_IDS = ["org-1", "org-2", "org-3", "org-4", "org-5"];
 
 // Fast in-memory cache for 0ms immediate client loads
 let memoryTeamCache: OrganizingMember[] | null = null;
 
-function filterMembers(list: OrganizingMember[]): OrganizingMember[] {
-  return list.filter((m) => m && !DUMMY_ORG_IDS.includes(m.id));
-}
-
 /**
  * Synchronous getter for immediate render on page load without blank screen or spinner wait.
- * Returns in-memory cache, or localStorage cached list, or empty list.
+ * Returns in-memory cache, or localStorage cached list, or initial seed team.
  */
 export function getCachedOrganizingTeam(): OrganizingMember[] {
-  if (memoryTeamCache) {
-    return filterMembers(memoryTeamCache);
+  if (memoryTeamCache && memoryTeamCache.length > 0) {
+    return memoryTeamCache;
   }
 
   if (typeof window !== "undefined") {
@@ -25,35 +21,25 @@ export function getCachedOrganizingTeam(): OrganizingMember[] {
       const cached = localStorage.getItem(TEAM_STORAGE_KEY);
       if (cached) {
         const parsed = JSON.parse(cached);
-        if (Array.isArray(parsed)) {
-          const filtered = filterMembers(parsed);
-          memoryTeamCache = filtered;
-          return filtered;
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          memoryTeamCache = parsed;
+          return parsed;
         }
       }
     } catch {}
   }
 
-  return [];
+  return initialOrganizingTeam;
 }
 
 /**
  * Helper to fetch with timeout so slow network/database responses never freeze or block the UI.
  */
-async function fetchWithTimeout(url: string, options: RequestInit = {}, timeoutMs = 12000): Promise<Response> {
+async function fetchWithTimeout(url: string, options: RequestInit = {}, timeoutMs = 3000): Promise<Response> {
   const controller = new AbortController();
   const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
   try {
-    const res = await fetch(url, {
-      cache: "no-store",
-      ...options,
-      headers: {
-        "Cache-Control": "no-cache",
-        Pragma: "no-cache",
-        ...(options.headers || {}),
-      },
-      signal: controller.signal,
-    });
+    const res = await fetch(url, { ...options, signal: controller.signal });
     clearTimeout(timeoutId);
     return res;
   } catch (err) {
@@ -70,15 +56,13 @@ export async function fetchOrganizingTeam(): Promise<OrganizingMember[]> {
   // 1. Try fetching via API route with fast timeout
   if (typeof window !== "undefined") {
     try {
-      const res = await fetchWithTimeout(`/api/organizing-team?_t=${Date.now()}`, {
-        headers: { Accept: "application/json" },
-        cache: "no-store",
-      }, 12000);
+      const res = await fetchWithTimeout("/api/organizing-team", {
+        headers: { "Accept": "application/json" },
+      }, 3000);
       if (res.ok) {
         const json = await res.json();
-        if (json.success && Array.isArray(json.data)) {
-          const filtered = filterMembers(json.data);
-          const sorted = filtered.sort(
+        if (json.success && Array.isArray(json.data) && json.data.length > 0) {
+          const sorted = json.data.sort(
             (a: OrganizingMember, b: OrganizingMember) =>
               (a.display_order ?? 0) - (b.display_order ?? 0)
           );
@@ -102,29 +86,25 @@ export async function fetchOrganizingTeam(): Promise<OrganizingMember[]> {
       .order("display_order", { ascending: true });
 
     const timeoutPromise = new Promise<{ data: null; error: Error }>((_, reject) =>
-      setTimeout(() => reject(new Error("Supabase query timeout")), 8000)
+      setTimeout(() => reject(new Error("Supabase query timeout")), 3000)
     );
 
     const { data, error } = (await Promise.race([supabasePromise, timeoutPromise])) as any;
 
-    if (!error && Array.isArray(data)) {
-      const filtered = filterMembers(data);
-      const sorted = filtered.sort(
-        (a, b) => (a.display_order ?? 0) - (b.display_order ?? 0)
-      );
-      memoryTeamCache = sorted;
+    if (!error && Array.isArray(data) && data.length > 0) {
+      memoryTeamCache = data as OrganizingMember[];
       if (typeof window !== "undefined") {
         try {
-          localStorage.setItem(TEAM_STORAGE_KEY, JSON.stringify(sorted));
+          localStorage.setItem(TEAM_STORAGE_KEY, JSON.stringify(data));
         } catch {}
       }
-      return sorted;
+      return data as OrganizingMember[];
     }
   } catch (err) {
-    // Fall back to cached
+    // Fall back to cached or initial seed
   }
 
-  // 3. Fallback to cached
+  // 3. Fallback to cached or default initial seed list
   return getCachedOrganizingTeam();
 }
 
@@ -149,9 +129,8 @@ export async function saveOrganizingMember(
       const updated = current.some((m) => m.id === record.id)
         ? current.map((m) => (m.id === record.id ? record : m))
         : [...current, record].sort((a, b) => (a.display_order ?? 0) - (b.display_order ?? 0));
-      const filtered = filterMembers(updated);
-      memoryTeamCache = filtered;
-      localStorage.setItem(TEAM_STORAGE_KEY, JSON.stringify(filtered));
+      memoryTeamCache = updated;
+      localStorage.setItem(TEAM_STORAGE_KEY, JSON.stringify(updated));
       window.dispatchEvent(new Event("organizing_team_updated"));
     } catch {}
   }
@@ -212,9 +191,8 @@ export async function deleteOrganizingMember(
     try {
       const current = getCachedOrganizingTeam();
       const updated = current.filter((m) => m.id !== id);
-      const filtered = filterMembers(updated);
-      memoryTeamCache = filtered;
-      localStorage.setItem(TEAM_STORAGE_KEY, JSON.stringify(filtered));
+      memoryTeamCache = updated;
+      localStorage.setItem(TEAM_STORAGE_KEY, JSON.stringify(updated));
       window.dispatchEvent(new Event("organizing_team_updated"));
     } catch {}
   }

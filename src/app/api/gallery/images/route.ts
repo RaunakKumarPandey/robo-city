@@ -4,18 +4,37 @@ import { EventGalleryImage } from "@/types/database";
 
 export const dynamic = "force-dynamic";
 
-const DUMMY_IMAGE_IDS = ["img-1", "img-2", "img-3", "img-4", "img-5", "img-6"];
-
 let memoryImages: EventGalleryImage[] = [];
+
+/**
+ * Filter out any mock Unsplash photos so only real uploaded photos are served.
+ */
+function sanitizeGalleryImages(images: EventGalleryImage[]): EventGalleryImage[] {
+  return images.filter(
+    (img) =>
+      img &&
+      img.image_url &&
+      !img.image_url.includes("images.unsplash.com") &&
+      !img.image_url.includes("photo-1485827404703") &&
+      !img.image_url.includes("photo-1518770660439") &&
+      !img.image_url.includes("photo-1581092160607") &&
+      !img.image_url.includes("photo-1567427017947") &&
+      !img.image_url.includes("photo-1531482615713") &&
+      !img.image_url.includes("photo-1475721027785")
+  );
+}
 
 export async function GET() {
   if (isSupabaseConfigured) {
     try {
       const supabase = getServiceSupabase();
 
-      // Clean up legacy dummy mock images from database if present
+      // Clean up any legacy Unsplash mock entries in background
       try {
-        await supabase.from("event_gallery_images").delete().in("id", DUMMY_IMAGE_IDS);
+        await supabase
+          .from("event_gallery_images")
+          .delete()
+          .ilike("image_url", "%unsplash.com%");
       } catch {}
 
       const { data, error } = await supabase
@@ -24,18 +43,17 @@ export async function GET() {
         .order("display_order", { ascending: true });
 
       if (!error && Array.isArray(data)) {
-        // Exclude any legacy dummy items
-        const filtered = (data as EventGalleryImage[]).filter(
-          (img) => !DUMMY_IMAGE_IDS.includes(img.id)
-        );
-        memoryImages = filtered;
+        const clean = sanitizeGalleryImages(data as EventGalleryImage[]);
+        if (clean.length > 0 || memoryImages.length === 0) {
+          memoryImages = clean;
+        }
         return NextResponse.json(
           { success: true, data: memoryImages },
           {
             headers: {
               "Cache-Control": "no-store, no-cache, must-revalidate, proxy-revalidate, max-age=0",
-              Pragma: "no-cache",
-              Expires: "0",
+              "Pragma": "no-cache",
+              "Expires": "0",
             },
           }
         );
@@ -45,15 +63,15 @@ export async function GET() {
     }
   }
 
-  // Fast fallback to memoryImages (filtered)
-  const cleanMemory = memoryImages.filter((img) => !DUMMY_IMAGE_IDS.includes(img.id));
+  // Fast fallback to memoryImages (sanitized)
+  const finalData = sanitizeGalleryImages(memoryImages);
   return NextResponse.json(
-    { success: true, data: cleanMemory },
+    { success: true, data: finalData },
     {
       headers: {
         "Cache-Control": "no-store, no-cache, must-revalidate, proxy-revalidate, max-age=0",
-        Pragma: "no-cache",
-        Expires: "0",
+        "Pragma": "no-cache",
+        "Expires": "0",
       },
     }
   );
@@ -63,7 +81,52 @@ export async function POST(request: Request) {
   const supabase = getServiceSupabase();
 
   try {
-    const body = (await request.json()) as Partial<EventGalleryImage>;
+    const rawBody = await request.json();
+
+    // Support batch sync from admin client (e.g. { batch: EventGalleryImage[] })
+    if (rawBody && Array.isArray(rawBody.batch)) {
+      const batchRecords: EventGalleryImage[] = rawBody.batch.map((body: Partial<EventGalleryImage>) => ({
+        id: body.id || `img-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+        title: body.title || "Event Moment",
+        caption: body.caption || null,
+        category: body.category || "Arena Battles",
+        image_url: body.image_url || "/images/backgrounds/bg_missions.jpg",
+        photographer: body.photographer || "IEEE Media",
+        tag: body.tag || "ROBOVERSE '26",
+        featured: Boolean(body.featured),
+        display_order: Number(body.display_order) || 1,
+        updated_at: new Date().toISOString(),
+      }));
+
+      const cleanBatch = sanitizeGalleryImages(batchRecords);
+
+      // Merge into in-memory store
+      for (const rec of cleanBatch) {
+        const idx = memoryImages.findIndex((img) => img.id === rec.id);
+        if (idx >= 0) {
+          memoryImages[idx] = rec;
+        } else {
+          memoryImages.push(rec);
+        }
+      }
+      memoryImages.sort((a, b) => (a.display_order ?? 0) - (b.display_order ?? 0));
+
+      // Persist batch to Supabase
+      if (isSupabaseConfigured && cleanBatch.length > 0) {
+        try {
+          await supabase
+            .from("event_gallery_images")
+            .upsert(cleanBatch, { onConflict: "id" });
+        } catch (err) {
+          console.warn("Supabase batch upsert notice:", err);
+        }
+      }
+
+      return NextResponse.json({ success: true, count: cleanBatch.length, data: memoryImages });
+    }
+
+    // Single Record Save
+    const body = rawBody as Partial<EventGalleryImage>;
     const imageId = body.id || `img-${Date.now()}`;
 
     const record: EventGalleryImage = {
@@ -86,22 +149,24 @@ export async function POST(request: Request) {
     } else {
       memoryImages.push(record);
     }
-    memoryImages = memoryImages.filter((img) => !DUMMY_IMAGE_IDS.includes(img.id));
+    memoryImages = sanitizeGalleryImages(memoryImages);
     memoryImages.sort((a, b) => (a.display_order ?? 0) - (b.display_order ?? 0));
 
     // Persist to Supabase
-    try {
-      const { data, error } = await supabase
-        .from("event_gallery_images")
-        .upsert([record], { onConflict: "id" })
-        .select()
-        .maybeSingle();
+    if (isSupabaseConfigured) {
+      try {
+        const { data, error } = await supabase
+          .from("event_gallery_images")
+          .upsert([record], { onConflict: "id" })
+          .select()
+          .maybeSingle();
 
-      if (!error && data) {
-        return NextResponse.json({ success: true, data: data || record });
+        if (!error && data) {
+          return NextResponse.json({ success: true, data: data || record });
+        }
+      } catch (err) {
+        console.warn("Supabase upsert gallery image notice:", err);
       }
-    } catch (err) {
-      console.warn("Supabase upsert gallery image notice:", err);
     }
 
     return NextResponse.json({ success: true, data: record });
@@ -127,14 +192,16 @@ export async function DELETE(request: Request) {
       );
     }
 
-    // Always remove from in-memory store
+    // Remove from in-memory store
     memoryImages = memoryImages.filter((img) => img.id !== id);
 
     // Persist delete to Supabase
-    try {
-      await supabase.from("event_gallery_images").delete().eq("id", id);
-    } catch (err) {
-      console.warn("Supabase delete gallery image notice:", err);
+    if (isSupabaseConfigured) {
+      try {
+        await supabase.from("event_gallery_images").delete().eq("id", id);
+      } catch (err) {
+        console.warn("Supabase delete gallery image notice:", err);
+      }
     }
 
     return NextResponse.json({ success: true });

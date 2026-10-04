@@ -207,7 +207,7 @@ export default function OrganizingTeamView() {
   const loadMembers = async () => {
     try {
       const data = await fetchOrganizingTeam();
-      if (Array.isArray(data)) {
+      if (data && data.length > 0) {
         setMembers(data);
       }
     } finally {

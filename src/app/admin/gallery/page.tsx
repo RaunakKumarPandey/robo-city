@@ -26,6 +26,7 @@ import {
   deleteGalleryImage,
   getCachedPosters,
   getCachedGalleryImages,
+  syncLocalGalleryToCloud,
 } from "@/lib/gallery";
 
 const POSTER_CATEGORIES = [
@@ -88,10 +89,10 @@ export default function AdminGalleryPage() {
         fetchEventPosters(),
         fetchGalleryImages(),
       ]);
-      if (Array.isArray(postersData)) {
+      if (postersData && Array.isArray(postersData)) {
         setPosters(postersData);
       }
-      if (Array.isArray(imagesData)) {
+      if (imagesData && Array.isArray(imagesData)) {
         setImages(imagesData);
       }
     } catch {
@@ -103,6 +104,7 @@ export default function AdminGalleryPage() {
 
   useEffect(() => {
     loadData();
+    syncLocalGalleryToCloud().then(() => loadData()).catch(() => {});
 
     const handleUpdate = () => {
       loadData();
