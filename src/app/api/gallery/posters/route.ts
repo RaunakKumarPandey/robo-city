@@ -22,7 +22,9 @@ export async function GET() {
           { success: true, data: memoryPosters },
           {
             headers: {
-              "Cache-Control": "public, s-maxage=15, stale-while-revalidate=60",
+              "Cache-Control": "no-store, no-cache, must-revalidate, proxy-revalidate, max-age=0",
+              "Pragma": "no-cache",
+              "Expires": "0",
             },
           }
         );
@@ -47,7 +49,9 @@ export async function GET() {
     { success: true, data: finalData },
     {
       headers: {
-        "Cache-Control": "no-store, no-cache, must-revalidate, proxy-revalidate",
+        "Cache-Control": "no-store, no-cache, must-revalidate, proxy-revalidate, max-age=0",
+        "Pragma": "no-cache",
+        "Expires": "0",
       },
     }
   );

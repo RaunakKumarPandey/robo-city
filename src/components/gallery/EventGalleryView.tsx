@@ -79,11 +79,11 @@ export default function EventGalleryView() {
     return () => window.removeEventListener("gallery_updated", handleUpdate);
   }, []);
 
-  const [visibleCount, setVisibleCount] = useState(12);
+  const [visibleCount, setVisibleCount] = useState(24);
 
   // Reset pagination on filter / search change
   useEffect(() => {
-    setVisibleCount(12);
+    setVisibleCount(24);
   }, [selectedCategory, searchQuery]);
 
   // Filtered gallery photos

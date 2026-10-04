@@ -10,6 +10,22 @@ let memoryPostersCache: EventPoster[] | null = null;
 let memoryImagesCache: EventGalleryImage[] | null = null;
 
 /**
+ * Safely persist data to localStorage without crashing or keeping stale data on quota exceeded.
+ */
+function safeSetStorage(key: string, data: any[]): void {
+  if (typeof window === "undefined") return;
+  try {
+    localStorage.setItem(key, JSON.stringify(data));
+  } catch {
+    // If quota exceeded due to large base64 strings or storage limit,
+    // clear the outdated localStorage entry to prevent it from overriding full database queries.
+    try {
+      localStorage.removeItem(key);
+    } catch {}
+  }
+}
+
+/**
  * Synchronous getter for posters (reads memory -> localStorage -> initialEventPosters)
  */
 export function getCachedPosters(): EventPoster[] {
@@ -60,11 +76,20 @@ export function getCachedGalleryImages(): EventGalleryImage[] {
 /**
  * Helper to fetch with timeout so slow network/database responses never freeze or block the UI.
  */
-async function fetchWithTimeout(url: string, options: RequestInit = {}, timeoutMs = 2500): Promise<Response> {
+async function fetchWithTimeout(url: string, options: RequestInit = {}, timeoutMs = 12000): Promise<Response> {
   const controller = new AbortController();
   const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
   try {
-    const res = await fetch(url, { ...options, signal: controller.signal });
+    const res = await fetch(url, {
+      cache: "no-store",
+      ...options,
+      headers: {
+        "Cache-Control": "no-cache",
+        Pragma: "no-cache",
+        ...(options.headers || {}),
+      },
+      signal: controller.signal,
+    });
     clearTimeout(timeoutId);
     return res;
   } catch (err) {
@@ -78,12 +103,13 @@ async function fetchWithTimeout(url: string, options: RequestInit = {}, timeoutM
 // ============================================================================
 
 export async function fetchEventPosters(): Promise<EventPoster[]> {
-  // 1. Try fetching via API route with fast timeout
+  // 1. Try fetching via API route with no-cache and fresh timestamp
   if (typeof window !== "undefined") {
     try {
-      const res = await fetchWithTimeout("/api/gallery/posters", {
+      const res = await fetchWithTimeout(`/api/gallery/posters?_t=${Date.now()}`, {
         headers: { Accept: "application/json" },
-      }, 2500);
+        cache: "no-store",
+      }, 12000);
       if (res.ok) {
         const json = await res.json();
         if (json.success && Array.isArray(json.data) && json.data.length > 0) {
@@ -92,9 +118,7 @@ export async function fetchEventPosters(): Promise<EventPoster[]> {
               (a.display_order ?? 0) - (b.display_order ?? 0)
           );
           memoryPostersCache = sorted;
-          try {
-            localStorage.setItem(POSTERS_STORAGE_KEY, JSON.stringify(sorted));
-          } catch {}
+          safeSetStorage(POSTERS_STORAGE_KEY, sorted);
           return sorted;
         }
       }
@@ -112,19 +136,18 @@ export async function fetchEventPosters(): Promise<EventPoster[]> {
         .order("display_order", { ascending: true });
 
       const timeoutPromise = new Promise<{ data: null; error: Error }>((_, reject) =>
-        setTimeout(() => reject(new Error("Supabase posters query timeout")), 2000)
+        setTimeout(() => reject(new Error("Supabase posters query timeout")), 8000)
       );
 
       const { data, error } = (await Promise.race([supabasePromise, timeoutPromise])) as any;
 
       if (!error && Array.isArray(data) && data.length > 0) {
-        memoryPostersCache = data as EventPoster[];
-        if (typeof window !== "undefined") {
-          try {
-            localStorage.setItem(POSTERS_STORAGE_KEY, JSON.stringify(data));
-          } catch {}
-        }
-        return data as EventPoster[];
+        const sorted = (data as EventPoster[]).sort(
+          (a, b) => (a.display_order ?? 0) - (b.display_order ?? 0)
+        );
+        memoryPostersCache = sorted;
+        safeSetStorage(POSTERS_STORAGE_KEY, sorted);
+        return sorted;
       }
     } catch {
       // Fall through
@@ -153,7 +176,7 @@ export async function saveEventPoster(
         ? current.map((p) => (p.id === record.id ? record : p))
         : [...current, record].sort((a, b) => (a.display_order ?? 0) - (b.display_order ?? 0));
       memoryPostersCache = updated;
-      localStorage.setItem(POSTERS_STORAGE_KEY, JSON.stringify(updated));
+      safeSetStorage(POSTERS_STORAGE_KEY, updated);
       window.dispatchEvent(new Event("gallery_updated"));
     } catch {}
   }
@@ -180,21 +203,23 @@ export async function saveEventPoster(
   }
 
   // 2. Direct Supabase Upsert
-  try {
-    const { data, error } = await supabase
-      .from("event_posters")
-      .upsert([record], { onConflict: "id" })
-      .select()
-      .maybeSingle();
+  if (isSupabaseConfigured) {
+    try {
+      const { data, error } = await supabase
+        .from("event_posters")
+        .upsert([record], { onConflict: "id" })
+        .select()
+        .maybeSingle();
 
-    if (!error && data) {
-      if (typeof window !== "undefined") {
-        window.dispatchEvent(new Event("gallery_updated"));
+      if (!error && data) {
+        if (typeof window !== "undefined") {
+          window.dispatchEvent(new Event("gallery_updated"));
+        }
+        return { success: true, data: data as EventPoster };
       }
-      return { success: true, data: data as EventPoster };
+    } catch (err) {
+      console.warn("Direct Supabase save poster notice:", err);
     }
-  } catch (err) {
-    console.warn("Direct Supabase save poster notice:", err);
   }
 
   return { success: true, data: record };
@@ -209,7 +234,7 @@ export async function deleteEventPoster(
       const current = getCachedPosters();
       const updated = current.filter((p) => p.id !== id);
       memoryPostersCache = updated;
-      localStorage.setItem(POSTERS_STORAGE_KEY, JSON.stringify(updated));
+      safeSetStorage(POSTERS_STORAGE_KEY, updated);
       window.dispatchEvent(new Event("gallery_updated"));
     } catch {}
   }
@@ -224,10 +249,12 @@ export async function deleteEventPoster(
   }
 
   // 2. Direct Supabase delete
-  try {
-    await supabase.from("event_posters").delete().eq("id", id);
-  } catch (err) {
-    console.warn("Supabase delete poster notice:", err);
+  if (isSupabaseConfigured) {
+    try {
+      await supabase.from("event_posters").delete().eq("id", id);
+    } catch (err) {
+      console.warn("Supabase delete poster notice:", err);
+    }
   }
 
   return { success: true };
@@ -238,12 +265,13 @@ export async function deleteEventPoster(
 // ============================================================================
 
 export async function fetchGalleryImages(): Promise<EventGalleryImage[]> {
-  // 1. Try fetching via API route with fast timeout
+  // 1. Try fetching via API route with fresh timestamp and no-cache
   if (typeof window !== "undefined") {
     try {
-      const res = await fetchWithTimeout("/api/gallery/images", {
+      const res = await fetchWithTimeout(`/api/gallery/images?_t=${Date.now()}`, {
         headers: { Accept: "application/json" },
-      }, 2500);
+        cache: "no-store",
+      }, 12000);
       if (res.ok) {
         const json = await res.json();
         if (json.success && Array.isArray(json.data) && json.data.length > 0) {
@@ -252,9 +280,7 @@ export async function fetchGalleryImages(): Promise<EventGalleryImage[]> {
               (a.display_order ?? 0) - (b.display_order ?? 0)
           );
           memoryImagesCache = sorted;
-          try {
-            localStorage.setItem(IMAGES_STORAGE_KEY, JSON.stringify(sorted));
-          } catch {}
+          safeSetStorage(IMAGES_STORAGE_KEY, sorted);
           return sorted;
         }
       }
@@ -272,19 +298,18 @@ export async function fetchGalleryImages(): Promise<EventGalleryImage[]> {
         .order("display_order", { ascending: true });
 
       const timeoutPromise = new Promise<{ data: null; error: Error }>((_, reject) =>
-        setTimeout(() => reject(new Error("Supabase images query timeout")), 2000)
+        setTimeout(() => reject(new Error("Supabase images query timeout")), 8000)
       );
 
       const { data, error } = (await Promise.race([supabasePromise, timeoutPromise])) as any;
 
       if (!error && Array.isArray(data) && data.length > 0) {
-        memoryImagesCache = data as EventGalleryImage[];
-        if (typeof window !== "undefined") {
-          try {
-            localStorage.setItem(IMAGES_STORAGE_KEY, JSON.stringify(data));
-          } catch {}
-        }
-        return data as EventGalleryImage[];
+        const sorted = (data as EventGalleryImage[]).sort(
+          (a, b) => (a.display_order ?? 0) - (b.display_order ?? 0)
+        );
+        memoryImagesCache = sorted;
+        safeSetStorage(IMAGES_STORAGE_KEY, sorted);
+        return sorted;
       }
     } catch {
       // Fall through
@@ -313,7 +338,7 @@ export async function saveGalleryImage(
         ? current.map((img) => (img.id === record.id ? record : img))
         : [...current, record].sort((a, b) => (a.display_order ?? 0) - (b.display_order ?? 0));
       memoryImagesCache = updated;
-      localStorage.setItem(IMAGES_STORAGE_KEY, JSON.stringify(updated));
+      safeSetStorage(IMAGES_STORAGE_KEY, updated);
       window.dispatchEvent(new Event("gallery_updated"));
     } catch {}
   }
@@ -340,21 +365,23 @@ export async function saveGalleryImage(
   }
 
   // 2. Direct Supabase Upsert
-  try {
-    const { data, error } = await supabase
-      .from("event_gallery_images")
-      .upsert([record], { onConflict: "id" })
-      .select()
-      .maybeSingle();
+  if (isSupabaseConfigured) {
+    try {
+      const { data, error } = await supabase
+        .from("event_gallery_images")
+        .upsert([record], { onConflict: "id" })
+        .select()
+        .maybeSingle();
 
-    if (!error && data) {
-      if (typeof window !== "undefined") {
-        window.dispatchEvent(new Event("gallery_updated"));
+      if (!error && data) {
+        if (typeof window !== "undefined") {
+          window.dispatchEvent(new Event("gallery_updated"));
+        }
+        return { success: true, data: data as EventGalleryImage };
       }
-      return { success: true, data: data as EventGalleryImage };
+    } catch (err) {
+      console.warn("Direct Supabase save gallery image notice:", err);
     }
-  } catch (err) {
-    console.warn("Direct Supabase save gallery image notice:", err);
   }
 
   return { success: true, data: record };
@@ -369,7 +396,7 @@ export async function deleteGalleryImage(
       const current = getCachedGalleryImages();
       const updated = current.filter((img) => img.id !== id);
       memoryImagesCache = updated;
-      localStorage.setItem(IMAGES_STORAGE_KEY, JSON.stringify(updated));
+      safeSetStorage(IMAGES_STORAGE_KEY, updated);
       window.dispatchEvent(new Event("gallery_updated"));
     } catch {}
   }
@@ -384,10 +411,12 @@ export async function deleteGalleryImage(
   }
 
   // 2. Direct Supabase delete
-  try {
-    await supabase.from("event_gallery_images").delete().eq("id", id);
-  } catch (err) {
-    console.warn("Supabase delete gallery image notice:", err);
+  if (isSupabaseConfigured) {
+    try {
+      await supabase.from("event_gallery_images").delete().eq("id", id);
+    } catch (err) {
+      console.warn("Supabase delete gallery image notice:", err);
+    }
   }
 
   return { success: true };

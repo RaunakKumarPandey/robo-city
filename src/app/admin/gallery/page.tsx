@@ -103,6 +103,12 @@ export default function AdminGalleryPage() {
 
   useEffect(() => {
     loadData();
+
+    const handleUpdate = () => {
+      loadData();
+    };
+    window.addEventListener("gallery_updated", handleUpdate);
+    return () => window.removeEventListener("gallery_updated", handleUpdate);
   }, []);
 
   const notify = (type: "success" | "error", message: string) => {
@@ -113,7 +119,7 @@ export default function AdminGalleryPage() {
   const [compressing, setCompressing] = useState(false);
 
   // High-speed client-side image compressor & optimizer to keep web lightning fast
-  const compressImageFile = (file: File, maxWidth = 1920, quality = 0.82): Promise<string> => {
+  const compressImageFile = (file: File, maxWidth = 1280, quality = 0.78): Promise<string> => {
     return new Promise((resolve) => {
       if (file.type === "image/svg+xml") {
         const reader = new FileReader();
@@ -168,7 +174,7 @@ export default function AdminGalleryPage() {
     if (!file) return;
     setCompressing(true);
     try {
-      const optimized = await compressImageFile(file, 2048, 0.85);
+      const optimized = await compressImageFile(file, 1400, 0.82);
       if (optimized) {
         setPosterImageUrl(optimized);
         notify("success", "Poster optimized and loaded!");
@@ -185,7 +191,7 @@ export default function AdminGalleryPage() {
     if (!file) return;
     setCompressing(true);
     try {
-      const optimized = await compressImageFile(file, 1920, 0.82);
+      const optimized = await compressImageFile(file, 1280, 0.78);
       if (optimized) {
         setPhotoImageUrl(optimized);
         notify("success", "Photo optimized and loaded!");
