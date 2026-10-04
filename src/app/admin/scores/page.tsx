@@ -2,7 +2,27 @@
 
 import { useEffect, useState, useMemo } from "react";
 import Link from "next/link";
-import { TeamScoreItem, fetchTeamsWithScores, updateTeamScores } from "@/lib/scores";
+import {
+  TeamScoreItem,
+  fetchTeamsWithScores,
+  updateDetailedTeamScores,
+} from "@/lib/scores";
+import {
+  Round2Details,
+  StageDetails,
+  Round3Details,
+  ScoreDetails,
+} from "@/types/database";
+import {
+  calculateRound2,
+  calculateStage,
+  calculateRound3,
+  calculateOverallCompletionTime,
+  DEFAULT_ROUND2_MAX_MARKS,
+  DEFAULT_ROUND2_PENALTY_RATE,
+  DEFAULT_STAGE_MAX_MARKS,
+  DEFAULT_STAGE_PENALTY_RATE,
+} from "@/lib/scoringUtils";
 import {
   Trophy,
   Search,
@@ -15,12 +35,24 @@ import {
   Users,
   RefreshCw,
   Sparkles,
+  ShieldCheck,
+  ShieldAlert,
+  Clock,
+  Timer,
+  Zap,
+  Target,
+  ChevronRight,
+  Layers,
+  HelpCircle,
+  Unlock,
+  Lock,
 } from "lucide-react";
 
 export default function AdminScoresPage() {
   const [teams, setTeams] = useState<TeamScoreItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
+  const [filterCategory, setFilterCategory] = useState<"all" | "qualified" | "not_qualified">("all");
   const [sortBy, setSortBy] = useState<"highest" | "lowest" | "name" | "updated">("highest");
 
   // Notifications
@@ -31,9 +63,35 @@ export default function AdminScoresPage() {
 
   // Edit Modal State
   const [selectedTeam, setSelectedTeam] = useState<TeamScoreItem | null>(null);
-  const [round1, setRound1] = useState<string>("0");
-  const [round2, setRound2] = useState<string>("0");
-  const [round3, setRound3] = useState<string>("0");
+  const [activeTab, setActiveTab] = useState<"screening" | "round1" | "round2" | "round3">("screening");
+
+  // Form State for Selected Team
+  const [screeningStatus, setScreeningStatus] = useState<"qualified" | "not_qualified">("qualified");
+  const [round1Status, setRound1Status] = useState<"qualified" | "not_qualified" | "pending">("pending");
+  
+  // Round 2 Form State
+  const [round2Time, setRound2Time] = useState<string>("00:00");
+  const [round2MaxMarks, setRound2MaxMarks] = useState<string>("100");
+  const [round2GainMarks, setRound2GainMarks] = useState<string>("0");
+  const [round2PenaltyRate, setRound2PenaltyRate] = useState<string>("5");
+  const [round2PenaltyCount, setRound2PenaltyCount] = useState<string>("0");
+
+  // Round 3 Form State (3 Stages)
+  const [activeStageIndex, setActiveStageIndex] = useState<number>(0);
+  const [stagesState, setStagesState] = useState<
+    {
+      time: string;
+      maxMarks: string;
+      gainMarks: string;
+      penaltyRate: string;
+      penaltyCount: string;
+    }[]
+  >([
+    { time: "00:00", maxMarks: "50", gainMarks: "0", penaltyRate: "5", penaltyCount: "0" },
+    { time: "00:00", maxMarks: "50", gainMarks: "0", penaltyRate: "5", penaltyCount: "0" },
+    { time: "00:00", maxMarks: "50", gainMarks: "0", penaltyRate: "5", penaltyCount: "0" },
+  ]);
+
   const [submitting, setSubmitting] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
 
@@ -55,38 +113,146 @@ export default function AdminScoresPage() {
     }, 4500);
   };
 
+  // Open Edit Modal with team's current scores
   const handleOpenEditModal = (team: TeamScoreItem) => {
     setSelectedTeam(team);
-    setRound1(String(team.score?.round1_score ?? 0));
-    setRound2(String(team.score?.round2_score ?? 0));
-    setRound3(String(team.score?.round3_score ?? 0));
+    setScreeningStatus(team.screening_status || "qualified");
+    setRound1Status(team.round1_status || "pending");
+
+    // Initialize Round 2
+    const r2 = team.round2_details || team.details?.round2;
+    setRound2Time(r2?.completion_time || "00:00");
+    setRound2MaxMarks(String(r2?.max_marks ?? DEFAULT_ROUND2_MAX_MARKS));
+    setRound2GainMarks(String(r2?.gain_marks ?? (team.score?.round2_score ?? 0)));
+    setRound2PenaltyRate(String(r2?.penalty_rate ?? DEFAULT_ROUND2_PENALTY_RATE));
+    setRound2PenaltyCount(String(r2?.penalty_count ?? 0));
+
+    // Initialize Round 3 (3 Stages)
+    const r3 = team.round3_details || team.details?.round3;
+    const stages = r3?.stages || [];
+    const initialStages = [1, 2, 3].map((num, i) => {
+      const st = stages.find((s) => s.stage_number === num) || stages[i];
+      return {
+        time: st?.completion_time || "00:00",
+        maxMarks: String(st?.max_marks ?? DEFAULT_STAGE_MAX_MARKS),
+        gainMarks: String(st?.gain_marks ?? (i === 0 ? (team.score?.round3_score ?? 0) : 0)),
+        penaltyRate: String(st?.penalty_rate ?? DEFAULT_STAGE_PENALTY_RATE),
+        penaltyCount: String(st?.penalty_count ?? 0),
+      };
+    });
+    setStagesState(initialStages);
+    setActiveStageIndex(0);
+    setActiveTab(team.screening_status === "not_qualified" ? "screening" : "round2");
     setFormError(null);
   };
 
+  // Quick 1-click Qualify/Disqualify toggle directly from table
+  const handleQuickScreeningToggle = async (team: TeamScoreItem, newStatus: "qualified" | "not_qualified") => {
+    const res = await updateDetailedTeamScores({
+      teamId: team.id,
+      screening_status: newStatus,
+      round1_status: team.round1_status || "pending",
+      round2: team.round2_details || { max_marks: 100, gain_marks: team.score?.round2_score || 0 },
+      round3: team.round3_details?.stages || [
+        { stage_number: 1, max_marks: 50, gain_marks: team.score?.round3_score || 0 },
+        { stage_number: 2, max_marks: 50, gain_marks: 0 },
+        { stage_number: 3, max_marks: 50, gain_marks: 0 },
+      ],
+    });
+
+    if (res.success) {
+      showFeedback(
+        "success",
+        `${team.team_name.toUpperCase()} IS NOW ${newStatus === "qualified" ? "QUALIFIED" : "NOT QUALIFIED"}`
+      );
+      await loadScores();
+    } else {
+      showFeedback("error", res.error || "FAILED TO UPDATE SCREENING STATUS");
+    }
+  };
+
+  // Live Calculations for Modal Preview
+  const computedRound2 = useMemo(() => {
+    const maxMarks = Math.max(0, parseFloat(round2MaxMarks) || 0);
+    const gainMarks = Math.max(0, parseFloat(round2GainMarks) || 0);
+    const penaltyRate = Math.max(0, parseFloat(round2PenaltyRate) || 0);
+    const penaltyCount = Math.max(0, parseFloat(round2PenaltyCount) || 0);
+
+    return calculateRound2({
+      completion_time: round2Time || "00:00",
+      max_marks: maxMarks,
+      gain_marks: gainMarks,
+      penalty_rate: penaltyRate,
+      penalty_count: penaltyCount,
+    });
+  }, [round2Time, round2MaxMarks, round2GainMarks, round2PenaltyRate, round2PenaltyCount]);
+
+  const computedStages = useMemo(() => {
+    return stagesState.map((st, idx) => {
+      const maxMarks = Math.max(0, parseFloat(st.maxMarks) || 0);
+      const gainMarks = Math.max(0, parseFloat(st.gainMarks) || 0);
+      const penaltyRate = Math.max(0, parseFloat(st.penaltyRate) || 0);
+      const penaltyCount = Math.max(0, parseFloat(st.penaltyCount) || 0);
+
+      return calculateStage(
+        {
+          completion_time: st.time || "00:00",
+          max_marks: maxMarks,
+          gain_marks: gainMarks,
+          penalty_rate: penaltyRate,
+          penalty_count: penaltyCount,
+        },
+        idx + 1
+      );
+    });
+  }, [stagesState]);
+
+  const computedRound3Total = useMemo(() => {
+    return computedStages.reduce((sum, s) => sum + s.total_marks, 0);
+  }, [computedStages]);
+
+  const computedOverallTime = useMemo(() => {
+    return calculateOverallCompletionTime(round2Time, computedStages);
+  }, [round2Time, computedStages]);
+
+  const computedGrandTotal = useMemo(() => {
+    if (screeningStatus === "not_qualified") return 0;
+    return computedRound2.total_marks + computedRound3Total;
+  }, [screeningStatus, computedRound2, computedRound3Total]);
+
+  const handleStageFieldChange = (
+    index: number,
+    field: "time" | "maxMarks" | "gainMarks" | "penaltyRate" | "penaltyCount",
+    value: string
+  ) => {
+    setStagesState((prev) => {
+      const copy = [...prev];
+      copy[index] = { ...copy[index], [field]: value };
+      return copy;
+    });
+  };
+
+  // Submit Modal Update
   const handleSaveScore = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!selectedTeam) return;
     setFormError(null);
 
-    // 1. Validation
-    const r1 = parseInt(round1, 10);
-    const r2 = parseInt(round2, 10);
-    const r3 = parseInt(round3, 10);
-
-    if (isNaN(r1) || isNaN(r2) || isNaN(r3)) {
-      setFormError("ALL ROUND SCORES MUST BE VALID NUMBERS");
-      return;
-    }
-
-    if (r1 < 0 || r2 < 0 || r3 < 0) {
-      setFormError("ROUND SCORES CANNOT BE NEGATIVE");
-      return;
-    }
-
     setSubmitting(true);
 
-    // 2. Execute secure update
-    const res = await updateTeamScores(selectedTeam.id, r1, r2, r3);
+    const payload = {
+      teamId: selectedTeam.id,
+      screening_status: screeningStatus,
+      round1_status: round1Status,
+      round1_score: round1Status === "qualified" ? 1 : 0,
+      round2: computedRound2,
+      round3: {
+        stages: computedStages,
+        total_marks: computedRound3Total,
+      },
+    };
+
+    const res = await updateDetailedTeamScores(payload);
 
     if (!res.success) {
       setFormError(res.error || "FAILED TO UPDATE SCORE");
@@ -94,10 +260,9 @@ export default function AdminScoresPage() {
       return;
     }
 
-    const updatedTotal = res.score?.total_score ?? r1 + r2 + r3;
     showFeedback(
       "success",
-      `SCORE UPDATED FOR ${selectedTeam.team_name} (TOTAL: ${updatedTotal} PTS)`
+      `SCORES UPDATED FOR ${selectedTeam.team_name} (TOTAL: ${computedGrandTotal} PTS)`
     );
 
     setSubmitting(false);
@@ -105,22 +270,32 @@ export default function AdminScoresPage() {
     await loadScores();
   };
 
-  // Preview total in modal (Read only calculation preview)
-  const previewTotal = useMemo(() => {
-    const r1 = parseInt(round1, 10) || 0;
-    const r2 = parseInt(round2, 10) || 0;
-    const r3 = parseInt(round3, 10) || 0;
-    return r1 >= 0 && r2 >= 0 && r3 >= 0 ? r1 + r2 + r3 : 0;
-  }, [round1, round2, round3]);
-
   // Filtered & Sorted Teams
   const filteredTeams = useMemo(() => {
-    let result = teams.filter((t) =>
-      t.team_name.toLowerCase().includes(searchQuery.toLowerCase().trim())
-    );
+    let result = teams.filter((t) => {
+      const matchesSearch =
+        t.team_name.toLowerCase().includes(searchQuery.toLowerCase().trim()) ||
+        (t.captain_name || "").toLowerCase().includes(searchQuery.toLowerCase().trim()) ||
+        (t.leader_name || "").toLowerCase().includes(searchQuery.toLowerCase().trim());
+
+      if (!matchesSearch) return false;
+
+      if (filterCategory === "qualified") {
+        return t.screening_status === "qualified";
+      }
+      if (filterCategory === "not_qualified") {
+        return t.screening_status === "not_qualified";
+      }
+      return true;
+    });
 
     if (sortBy === "highest") {
-      result.sort((a, b) => (b.score?.total_score ?? 0) - (a.score?.total_score ?? 0));
+      result.sort((a, b) => {
+        if (a.screening_status !== b.screening_status) {
+          return a.screening_status === "qualified" ? -1 : 1;
+        }
+        return (b.score?.total_score ?? 0) - (a.score?.total_score ?? 0);
+      });
     } else if (sortBy === "lowest") {
       result.sort((a, b) => (a.score?.total_score ?? 0) - (b.score?.total_score ?? 0));
     } else if (sortBy === "name") {
@@ -134,7 +309,16 @@ export default function AdminScoresPage() {
     }
 
     return result;
-  }, [teams, searchQuery, sortBy]);
+  }, [teams, searchQuery, filterCategory, sortBy]);
+
+  const qualifiedCount = useMemo(
+    () => teams.filter((t) => t.screening_status === "qualified").length,
+    [teams]
+  );
+  const notQualifiedCount = useMemo(
+    () => teams.filter((t) => t.screening_status === "not_qualified").length,
+    [teams]
+  );
 
   return (
     <div className="space-y-8">
@@ -143,13 +327,13 @@ export default function AdminScoresPage() {
         <div className="flex flex-col justify-between gap-4 border-b border-white/10 pb-6 sm:flex-row sm:items-center">
           <div>
             <span className="font-mono text-xs font-bold tracking-widest text-[#FF6B35] uppercase">
-              ADMIN // SCORE CONTROL
+              ADMIN // TOURNAMENT EVALUATION CONSOLE
             </span>
             <h1 className="text-2xl sm:text-3xl font-black uppercase tracking-tight text-white mt-1">
-              SCORE CONTROL
+              SCORE &amp; ROUND CONTROL
             </h1>
             <p className="mt-1 text-xs text-zinc-400 font-mono">
-              UPDATE THE CITY&apos;S COMPETITION SCORES &middot; TOTAL IS GENERATED AUTOMATICALLY BY POSTGRESQL
+              MANAGE QUIZ/KIT SCREENING, VIVA &amp; BOT ASSEMBLY, FIRST ARENA &amp; SECOND ARENA (3 STAGES)
             </p>
           </div>
 
@@ -168,7 +352,7 @@ export default function AdminScoresPage() {
           <div
             className={`mt-4 flex items-center gap-2.5 rounded-lg border p-3.5 text-xs font-mono font-bold tracking-wider uppercase transition-all ${
               feedback.type === "success"
-                ? "border-emerald-500/40 bg-emerald-500/10 text-emerald-400"
+                ? "border-emerald-500/40 bg-emerald-500/10 text-emerald-400 shadow-[0_0_15px_rgba(16,185,129,0.2)]"
                 : "border-red-500/40 bg-red-500/10 text-red-400"
             }`}
           >
@@ -182,166 +366,332 @@ export default function AdminScoresPage() {
         )}
       </div>
 
-      {/* 2. SEARCH & SORT TOOLBAR */}
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        {/* Search */}
-        <div className="relative flex-1 max-w-md">
-          <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3.5 text-zinc-500">
-            <Search className="h-4 w-4" />
+      {/* 2. STATS PILLS & QUICK FILTERS */}
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+        {/* Total Registered */}
+        <div className="rounded-xl border border-white/10 bg-[#0A0718]/80 p-4 backdrop-blur-md">
+          <div className="flex items-center justify-between text-zinc-400 text-xs font-mono">
+            <span>TOTAL CREWS</span>
+            <Users className="h-4 w-4 text-[#00F0FF]" />
           </div>
-          <input
-            type="text"
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            placeholder="Search teams by name..."
-            className="w-full rounded-lg border border-white/10 bg-white/5 py-2 pl-10 pr-3.5 text-xs text-white placeholder-zinc-500 backdrop-blur-sm transition-colors focus:border-[#FF6B35] focus:outline-none"
-          />
+          <div className="mt-1 text-2xl font-black font-mono text-white">{teams.length}</div>
         </div>
 
-        {/* Sort Dropdown */}
-        <div className="flex items-center gap-2">
-          <ArrowUpDown className="h-3.5 w-3.5 text-zinc-500" />
-          <span className="text-[11px] font-mono text-zinc-400 uppercase">Sort:</span>
-          <select
-            value={sortBy}
-            onChange={(e) => setSortBy(e.target.value as any)}
-            className="rounded-lg border border-white/10 bg-[#0A0718] py-1.5 px-3 text-xs text-zinc-300 focus:border-[#FF6B35] focus:outline-none"
-          >
-            <option value="highest">Highest Total Score</option>
-            <option value="lowest">Lowest Total Score</option>
-            <option value="name">Team Name (A-Z)</option>
-            <option value="updated">Recently Updated</option>
-          </select>
+        {/* Qualified */}
+        <div className="rounded-xl border border-emerald-500/30 bg-emerald-500/5 p-4 backdrop-blur-md">
+          <div className="flex items-center justify-between text-emerald-400 text-xs font-mono">
+            <span>QUALIFIED (TOP)</span>
+            <ShieldCheck className="h-4 w-4 text-emerald-400" />
+          </div>
+          <div className="mt-1 text-2xl font-black font-mono text-emerald-400">{qualifiedCount}</div>
+        </div>
+
+        {/* Not Qualified */}
+        <div className="rounded-xl border border-red-500/30 bg-red-500/5 p-4 backdrop-blur-md">
+          <div className="flex items-center justify-between text-red-400 text-xs font-mono">
+            <span>NOT QUALIFIED</span>
+            <ShieldAlert className="h-4 w-4 text-red-400" />
+          </div>
+          <div className="mt-1 text-2xl font-black font-mono text-red-400">{notQualifiedCount}</div>
+        </div>
+
+        {/* Grand XP */}
+        <div className="rounded-xl border border-[#FF6B35]/30 bg-[#FF6B35]/5 p-4 backdrop-blur-md">
+          <div className="flex items-center justify-between text-[#FF6B35] text-xs font-mono">
+            <span>ACTIVE ARENAS</span>
+            <Trophy className="h-4 w-4 text-[#FF6B35]" />
+          </div>
+          <div className="mt-1 text-2xl font-black font-mono text-white">R1, R2, R3</div>
         </div>
       </div>
 
-      {/* 3. SCORES LIST TABLE / CARDS */}
+      {/* 3. SEARCH & FILTER TOOLBAR */}
+      <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+        {/* Filter Category Tabs */}
+        <div className="flex flex-wrap items-center gap-2">
+          <button
+            onClick={() => setFilterCategory("all")}
+            className={`rounded-lg px-3.5 py-1.5 font-mono text-xs font-bold uppercase transition-all cursor-pointer ${
+              filterCategory === "all"
+                ? "bg-white text-black shadow-md"
+                : "border border-white/10 bg-white/5 text-zinc-400 hover:text-white"
+            }`}
+          >
+            ALL CREWS ({teams.length})
+          </button>
+          <button
+            onClick={() => setFilterCategory("qualified")}
+            className={`inline-flex items-center gap-1.5 rounded-lg px-3.5 py-1.5 font-mono text-xs font-bold uppercase transition-all cursor-pointer ${
+              filterCategory === "qualified"
+                ? "bg-emerald-500 text-black shadow-[0_0_15px_rgba(16,185,129,0.4)]"
+                : "border border-emerald-500/30 bg-emerald-500/10 text-emerald-400 hover:bg-emerald-500/20"
+            }`}
+          >
+            <ShieldCheck className="h-3.5 w-3.5" />
+            <span>QUALIFIED ({qualifiedCount})</span>
+          </button>
+          <button
+            onClick={() => setFilterCategory("not_qualified")}
+            className={`inline-flex items-center gap-1.5 rounded-lg px-3.5 py-1.5 font-mono text-xs font-bold uppercase transition-all cursor-pointer ${
+              filterCategory === "not_qualified"
+                ? "bg-red-500 text-white shadow-[0_0_15px_rgba(239,68,68,0.4)]"
+                : "border border-red-500/30 bg-red-500/10 text-red-400 hover:bg-red-500/20"
+            }`}
+          >
+            <ShieldAlert className="h-3.5 w-3.5" />
+            <span>NOT QUALIFIED ({notQualifiedCount})</span>
+          </button>
+        </div>
+
+        {/* Search and Sort */}
+        <div className="flex flex-col sm:flex-row items-center gap-3">
+          <div className="relative w-full sm:w-64">
+            <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3 text-zinc-500">
+              <Search className="h-3.5 w-3.5" />
+            </div>
+            <input
+              type="text"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              placeholder="Search crew or captain..."
+              className="w-full rounded-lg border border-white/10 bg-white/5 py-1.5 pl-9 pr-3 text-xs text-white placeholder-zinc-500 transition-colors focus:border-[#FF6B35] focus:outline-none"
+            />
+          </div>
+
+          <div className="flex items-center gap-2 self-start sm:self-auto">
+            <ArrowUpDown className="h-3.5 w-3.5 text-zinc-500" />
+            <select
+              value={sortBy}
+              onChange={(e) => setSortBy(e.target.value as any)}
+              className="rounded-lg border border-white/10 bg-[#0A0718] py-1.5 px-3 text-xs text-zinc-300 focus:border-[#FF6B35] focus:outline-none"
+            >
+              <option value="highest">Highest Score (Ranked)</option>
+              <option value="lowest">Lowest Score</option>
+              <option value="name">Team Name (A-Z)</option>
+              <option value="updated">Recently Updated</option>
+            </select>
+          </div>
+        </div>
+      </div>
+
+      {/* 4. MAIN TOURNAMENT SCORES TABLE */}
       {loading ? (
         <div className="flex h-60 flex-col items-center justify-center space-y-3">
           <Loader2 className="h-7 w-7 animate-spin text-[#FF6B35]" />
           <span className="font-mono text-xs font-bold uppercase tracking-widest text-zinc-400">
-            LOADING SCORES...
+            LOADING COMPETITION SCORES...
           </span>
         </div>
       ) : filteredTeams.length === 0 ? (
-        /* Empty State */
         <div className="rounded-2xl border border-white/10 bg-[#0A0718]/80 p-12 text-center backdrop-blur-md">
-          <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-[#FF6B35]/10 text-[#FF6B35] mb-4 shadow-[0_0_20px_rgba(255,107,53,0.2)]">
+          <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-[#FF6B35]/10 text-[#FF6B35] mb-4">
             <Trophy className="h-7 w-7" />
           </div>
           <h2 className="text-lg font-black uppercase tracking-wider text-white font-mono">
-            NO TEAMS FOUND
+            NO CREWS FOUND
           </h2>
-          <p className="mt-2 text-xs text-zinc-400 max-w-sm mx-auto leading-relaxed">
-            Go to the Team Garage to register teams before entering tournament scores.
+          <p className="mt-2 text-xs text-zinc-400 max-w-sm mx-auto">
+            {searchQuery
+              ? "No teams match the search criteria."
+              : "Register teams in Team Garage to begin entering tournament round scores."}
           </p>
-          <div className="mt-6">
-            <Link
-              href="/admin/teams"
-              className="inline-flex items-center gap-2 rounded-lg bg-gradient-to-r from-[#FF2A85] to-[#FF6B35] px-6 py-2.5 text-xs font-black tracking-widest text-white uppercase shadow-[0_0_15px_rgba(255,42,133,0.3)] transition-all hover:scale-105 font-mono"
-            >
-              <Users className="h-4 w-4" />
-              <span>OPEN TEAM GARAGE</span>
-            </Link>
-          </div>
         </div>
       ) : (
         <>
-          {/* Desktop Scoreboard Table */}
+          {/* Desktop Table View */}
           <div className="hidden overflow-hidden rounded-xl border border-white/10 bg-[#0A0718]/80 backdrop-blur-md md:block">
             <table className="w-full text-left text-xs font-mono">
-              <thead className="border-b border-white/10 bg-white/5 text-zinc-400 uppercase tracking-widest">
+              <thead className="border-b border-white/10 bg-white/5 text-zinc-400 uppercase tracking-widest text-[11px]">
                 <tr>
-                  <th className="py-3.5 px-4 font-bold">TEAM</th>
-                  <th className="py-3.5 px-4 font-bold text-center">ROUND 1</th>
-                  <th className="py-3.5 px-4 font-bold text-center">ROUND 2</th>
-                  <th className="py-3.5 px-4 font-bold text-center">ROUND 3</th>
-                  <th className="py-3.5 px-4 font-bold text-center text-[#00F0FF]">TOTAL</th>
-                  <th className="py-3.5 px-4 font-bold text-center">LAST UPDATED</th>
-                  <th className="py-3.5 px-4 text-right font-bold">ACTION</th>
+                  <th className="py-3.5 px-3 font-bold">CREW &amp; CAPTAIN</th>
+                  <th className="py-3.5 px-3 font-bold text-center">SCREENING</th>
+                  <th className="py-3.5 px-3 font-bold text-center">R1 VIVA</th>
+                  <th className="py-3.5 px-3 font-bold text-center">R2 ARENA 1</th>
+                  <th className="py-3.5 px-3 font-bold text-center">R3 ARENA 2</th>
+                  <th className="py-3.5 px-3 font-bold text-center text-[#FF6B35]">OVERALL C.T</th>
+                  <th className="py-3.5 px-3 font-bold text-center text-[#00F0FF]">TOTAL XP</th>
+                  <th className="py-3.5 px-3 text-right font-bold">ACTION</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-white/5 text-zinc-300">
                 {filteredTeams.map((team) => {
-                  const r1 = team.score?.round1_score ?? 0;
-                  const r2 = team.score?.round2_score ?? 0;
-                  const r3 = team.score?.round3_score ?? 0;
+                  const isQualified = team.screening_status === "qualified";
+                  const r1Status = team.round1_status || "pending";
+                  const r2 = team.round2_details;
+                  const r3 = team.round3_details;
                   const total = team.score?.total_score ?? 0;
-                  const updatedAt = team.score?.updated_at || team.updated_at;
+                  const overallTime = team.overall_time || "00:00";
 
                   return (
                     <tr
                       key={team.id}
-                      className="transition-colors hover:bg-white/[0.02]"
+                      className={`transition-colors hover:bg-white/[0.02] ${
+                        !isQualified ? "opacity-75 bg-red-950/10" : ""
+                      }`}
                     >
-                      {/* Team Name */}
-                      <td className="py-4 px-4 font-bold text-white font-sans text-sm">
+                      {/* Crew Name */}
+                      <td className="py-4 px-3 font-bold text-white font-sans text-sm">
                         <div className="flex items-center gap-2.5">
-                          <div className="flex h-7 w-7 items-center justify-center rounded-md bg-[#FF6B35]/10 text-[#FF6B35] text-xs font-mono font-black shrink-0">
+                          <div
+                            className={`flex h-8 w-8 items-center justify-center rounded-lg text-xs font-mono font-black shrink-0 ${
+                              isQualified
+                                ? "bg-gradient-to-br from-[#FF2A85] to-[#FF6B35] text-white shadow-sm"
+                                : "bg-zinc-800 text-zinc-400 border border-white/10"
+                            }`}
+                          >
                             {team.team_name.charAt(0).toUpperCase()}
                           </div>
                           <div>
-                            <div className="font-bold text-white text-sm">{team.team_name}</div>
+                            <div className="font-bold text-white text-sm flex items-center gap-2">
+                              <span>{team.team_name}</span>
+                              {!isQualified && (
+                                <span className="rounded bg-red-500/20 border border-red-500/40 px-1.5 py-0.2 text-[10px] font-mono font-bold text-red-400 uppercase">
+                                  NOT QUALIFIED
+                                </span>
+                              )}
+                            </div>
                             {(team.captain_name || team.leader_name || team.members?.[0]?.name) && (
                               <div className="text-[11px] font-mono text-zinc-400 mt-0.5 font-normal">
-                                Cap: <span className="text-zinc-300 font-semibold">{team.captain_name || team.leader_name || team.members?.[0]?.name}</span>
+                                Cap:{" "}
+                                <span className="text-zinc-300 font-semibold">
+                                  {team.captain_name || team.leader_name || team.members?.[0]?.name}
+                                </span>
                               </div>
                             )}
                           </div>
                         </div>
                       </td>
 
-                      {/* R1 */}
-                      <td className="py-4 px-4 text-center">
-                        <span
-                          className={`rounded px-2 py-0.5 font-mono ${
-                            r1 > 0 ? "bg-white/10 text-white font-bold" : "text-zinc-500"
-                          }`}
-                        >
-                          {r1}
-                        </span>
+                      {/* Screening Status (Quiz & Kit) + Quick Toggle */}
+                      <td className="py-4 px-3 text-center">
+                        {isQualified ? (
+                          <div className="inline-flex flex-col items-center gap-1">
+                            <span className="inline-flex items-center gap-1 rounded-full border border-emerald-500/40 bg-emerald-500/10 px-2.5 py-0.5 text-[11px] font-bold text-emerald-400 font-mono shadow-[0_0_10px_rgba(16,185,129,0.2)]">
+                              <ShieldCheck className="h-3 w-3" />
+                              <span>QUALIFIED</span>
+                            </span>
+                            <button
+                              onClick={() => handleQuickScreeningToggle(team, "not_qualified")}
+                              className="text-[10px] text-zinc-500 hover:text-red-400 underline cursor-pointer"
+                            >
+                              Set Not Qualified
+                            </button>
+                          </div>
+                        ) : (
+                          <div className="inline-flex flex-col items-center gap-1.5">
+                            <span className="inline-flex items-center gap-1 rounded-full border border-red-500/40 bg-red-500/10 px-2.5 py-0.5 text-[11px] font-bold text-red-400 font-mono">
+                              <ShieldAlert className="h-3 w-3" />
+                              <span>NOT QUALIFIED</span>
+                            </span>
+                            <button
+                              onClick={() => handleQuickScreeningToggle(team, "qualified")}
+                              className="inline-flex items-center gap-1 rounded border border-emerald-500/40 bg-emerald-500/20 px-2 py-0.5 text-[10px] font-bold text-emerald-300 hover:bg-emerald-500 hover:text-black transition-all cursor-pointer uppercase shadow-sm"
+                            >
+                              <Unlock className="h-2.5 w-2.5" />
+                              <span>QUALIFY TEAM</span>
+                            </button>
+                          </div>
+                        )}
                       </td>
 
-                      {/* R2 */}
-                      <td className="py-4 px-4 text-center">
-                        <span
-                          className={`rounded px-2 py-0.5 font-mono ${
-                            r2 > 0 ? "bg-white/10 text-white font-bold" : "text-zinc-500"
-                          }`}
-                        >
-                          {r2}
-                        </span>
+                      {/* R1 Viva & Bot Assembly */}
+                      <td className="py-4 px-3 text-center">
+                        {!isQualified ? (
+                          <span className="text-zinc-600 text-[11px] font-mono flex items-center justify-center gap-1">
+                            <Lock className="h-3 w-3" /> LOCKED
+                          </span>
+                        ) : r1Status === "qualified" ? (
+                          <span className="inline-flex items-center gap-1 rounded bg-emerald-500/20 border border-emerald-500/40 px-2 py-0.5 text-[11px] font-bold text-emerald-400">
+                            QUALIFIED
+                          </span>
+                        ) : r1Status === "not_qualified" ? (
+                          <span className="inline-flex items-center gap-1 rounded bg-red-500/20 border border-red-500/40 px-2 py-0.5 text-[11px] font-bold text-red-400">
+                            NOT QUALIFIED
+                          </span>
+                        ) : (
+                          <span className="rounded bg-white/5 px-2 py-0.5 text-[11px] text-zinc-400">
+                            PENDING
+                          </span>
+                        )}
                       </td>
 
-                      {/* R3 */}
-                      <td className="py-4 px-4 text-center">
-                        <span
-                          className={`rounded px-2 py-0.5 font-mono ${
-                            r3 > 0 ? "bg-white/10 text-white font-bold" : "text-zinc-500"
-                          }`}
-                        >
-                          {r3}
-                        </span>
+                      {/* R2 Arena 1 */}
+                      <td className="py-4 px-3 text-center">
+                        {!isQualified ? (
+                          <span className="text-zinc-600 text-[11px] font-mono flex items-center justify-center gap-1">
+                            <Lock className="h-3 w-3" /> LOCKED
+                          </span>
+                        ) : (
+                          <div className="inline-flex flex-col items-center">
+                            <span className="font-bold text-white text-sm">
+                              {r2?.total_marks ?? team.score?.round2_score ?? 0} pts
+                            </span>
+                            {r2 && (
+                              <span className="text-[10px] text-zinc-400 font-mono">
+                                {r2.gain_marks}/{r2.max_marks} &bull; -{r2.penalty_total}p ({r2.completion_time})
+                              </span>
+                            )}
+                          </div>
+                        )}
                       </td>
 
-                      {/* Total */}
-                      <td className="py-4 px-4 text-center font-bold">
-                        <span className="inline-flex items-center gap-1 rounded-full border border-[#00F0FF]/30 bg-[#00F0FF]/10 px-3 py-1 font-mono text-sm text-[#00F0FF] shadow-[0_0_10px_rgba(0,240,255,0.2)]">
-                          <Trophy className="h-3 w-3" />
-                          <span>{total} pts</span>
-                        </span>
+                      {/* R3 Arena 2 (3 Stages) */}
+                      <td className="py-4 px-3 text-center">
+                        {!isQualified ? (
+                          <span className="text-zinc-600 text-[11px] font-mono flex items-center justify-center gap-1">
+                            <Lock className="h-3 w-3" /> LOCKED
+                          </span>
+                        ) : (
+                          <div className="inline-flex flex-col items-center">
+                            <span className="font-bold text-white text-sm">
+                              {r3?.total_marks ?? team.score?.round3_score ?? 0} pts
+                            </span>
+                            {r3?.stages && (
+                              <div className="flex items-center gap-1 mt-0.5">
+                                {r3.stages.map((st, i) => (
+                                  <span
+                                    key={i}
+                                    title={`Stage ${st.stage_number}: ${st.total_marks} pts (${st.completion_time})`}
+                                    className="rounded bg-white/10 px-1 py-0.2 text-[9px] text-zinc-300 font-mono"
+                                  >
+                                    S{st.stage_number}:{st.total_marks}
+                                  </span>
+                                ))}
+                              </div>
+                            )}
+                          </div>
+                        )}
                       </td>
 
-                      {/* Last Updated */}
-                      <td className="py-4 px-4 text-center text-zinc-500 text-[11px]">
-                        {updatedAt ? new Date(updatedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : "—"}
+                      {/* Overall C.T */}
+                      <td className="py-4 px-3 text-center">
+                        {isQualified ? (
+                          <span className="inline-flex items-center gap-1 rounded bg-black/40 border border-white/10 px-2 py-0.5 text-xs text-zinc-300 font-mono font-bold">
+                            <Timer className="h-3 w-3 text-[#FF6B35]" />
+                            <span>{overallTime}</span>
+                          </span>
+                        ) : (
+                          <span className="text-zinc-600 font-mono">—</span>
+                        )}
+                      </td>
+
+                      {/* Total Score */}
+                      <td className="py-4 px-3 text-center font-bold">
+                        {isQualified ? (
+                          <span className="inline-flex items-center gap-1 rounded-full border border-[#00F0FF]/40 bg-[#00F0FF]/10 px-3 py-1 font-mono text-sm text-[#00F0FF] shadow-[0_0_12px_rgba(0,240,255,0.25)]">
+                            <Trophy className="h-3 w-3" />
+                            <span>{total} pts</span>
+                          </span>
+                        ) : (
+                          <span className="text-zinc-500 font-mono text-xs">0 pts (NQ)</span>
+                        )}
                       </td>
 
                       {/* Action */}
-                      <td className="py-4 px-4 text-right">
+                      <td className="py-4 px-3 text-right">
                         <button
                           onClick={() => handleOpenEditModal(team)}
-                          className="inline-flex items-center gap-1.5 rounded-lg border border-[#FF6B35]/40 bg-[#FF6B35]/10 px-3 py-1.5 text-xs font-mono font-bold text-[#FF6B35] transition-all hover:bg-[#FF6B35] hover:text-white cursor-pointer uppercase"
+                          className="inline-flex items-center gap-1.5 rounded-lg border border-[#FF6B35]/40 bg-[#FF6B35]/10 px-3 py-1.5 text-xs font-mono font-bold text-[#FF6B35] transition-all hover:bg-[#FF6B35] hover:text-white cursor-pointer uppercase shadow-sm"
                         >
                           <Edit3 className="h-3.5 w-3.5" />
                           <span>UPDATE</span>
@@ -354,56 +704,104 @@ export default function AdminScoresPage() {
             </table>
           </div>
 
-          {/* Mobile Stacked Score Cards */}
-          <div className="grid grid-cols-1 gap-3.5 md:hidden">
+          {/* Mobile Cards View */}
+          <div className="grid grid-cols-1 gap-3 md:hidden">
             {filteredTeams.map((team) => {
-              const r1 = team.score?.round1_score ?? 0;
-              const r2 = team.score?.round2_score ?? 0;
-              const r3 = team.score?.round3_score ?? 0;
+              const isQualified = team.screening_status === "qualified";
               const total = team.score?.total_score ?? 0;
 
               return (
                 <div
                   key={team.id}
-                  className="rounded-xl border border-white/10 bg-[#0A0718]/90 p-4 backdrop-blur-md space-y-3"
+                  className={`rounded-xl border border-white/10 bg-[#0A0718]/90 p-4 backdrop-blur-md space-y-3 ${
+                    !isQualified ? "border-red-500/20 bg-red-950/10" : ""
+                  }`}
                 >
-                  <div className="flex items-center justify-between">
+                  <div className="flex items-start justify-between">
                     <div>
-                      <h3 className="font-black text-white text-base">
-                        {team.team_name}
+                      <h3 className="font-black text-white text-base flex items-center gap-2">
+                        <span>{team.team_name}</span>
+                        {!isQualified && (
+                          <span className="rounded bg-red-500/20 px-1.5 py-0.5 text-[9px] font-bold text-red-400">
+                            NOT QUALIFIED
+                          </span>
+                        )}
                       </h3>
                       {(team.captain_name || team.leader_name || team.members?.[0]?.name) && (
                         <div className="text-[11px] font-mono text-zinc-400 mt-0.5">
-                          Cap: <span className="text-zinc-300 font-semibold">{team.captain_name || team.leader_name || team.members?.[0]?.name}</span>
+                          Cap:{" "}
+                          <span className="text-zinc-300 font-semibold">
+                            {team.captain_name || team.leader_name || team.members?.[0]?.name}
+                          </span>
                         </div>
                       )}
                     </div>
-                    <span className="font-mono text-xs font-black text-[#00F0FF]">
-                      {total} pts
-                    </span>
+                    <div className="text-right">
+                      <span className="font-mono text-xs font-black text-[#00F0FF]">
+                        {isQualified ? `${total} pts` : "NQ"}
+                      </span>
+                      {isQualified && (
+                        <div className="text-[10px] text-zinc-400 font-mono flex items-center justify-end gap-1 mt-0.5">
+                          <Timer className="h-2.5 w-2.5 text-[#FF6B35]" />
+                          <span>C.T: {team.overall_time || "00:00"}</span>
+                        </div>
+                      )}
+                    </div>
                   </div>
 
-                  <div className="grid grid-cols-3 gap-2 text-center font-mono text-xs">
-                    <div className="rounded border border-white/5 bg-black/40 p-2">
-                      <span className="text-[10px] text-zinc-400 block">R1</span>
-                      <span className="font-bold text-white">{r1}</span>
-                    </div>
-                    <div className="rounded border border-white/5 bg-black/40 p-2">
-                      <span className="text-[10px] text-zinc-400 block">R2</span>
-                      <span className="font-bold text-white">{r2}</span>
-                    </div>
-                    <div className="rounded border border-white/5 bg-black/40 p-2">
-                      <span className="text-[10px] text-zinc-400 block">R3</span>
-                      <span className="font-bold text-white">{r3}</span>
-                    </div>
+                  {/* Screening pill */}
+                  <div className="flex items-center justify-between border-y border-white/5 py-2 font-mono text-xs">
+                    <span className="text-zinc-400">Screening:</span>
+                    {isQualified ? (
+                      <span className="text-emerald-400 font-bold flex items-center gap-1">
+                        <ShieldCheck className="h-3.5 w-3.5" /> QUALIFIED
+                      </span>
+                    ) : (
+                      <div className="flex items-center gap-2">
+                        <span className="text-red-400 font-bold">NOT QUALIFIED</span>
+                        <button
+                          onClick={() => handleQuickScreeningToggle(team, "qualified")}
+                          className="rounded bg-emerald-500/20 border border-emerald-500/40 px-2 py-0.5 text-[10px] text-emerald-300 font-bold"
+                        >
+                          QUALIFY
+                        </button>
+                      </div>
+                    )}
                   </div>
+
+                  {isQualified ? (
+                    <div className="grid grid-cols-3 gap-2 text-center font-mono text-xs">
+                      <div className="rounded border border-white/5 bg-black/40 p-2">
+                        <span className="text-[10px] text-zinc-400 block">R1 VIVA</span>
+                        <span className="font-bold text-white text-[11px] uppercase">
+                          {team.round1_status || "PENDING"}
+                        </span>
+                      </div>
+                      <div className="rounded border border-white/5 bg-black/40 p-2">
+                        <span className="text-[10px] text-zinc-400 block">R2 ARENA 1</span>
+                        <span className="font-bold text-white">
+                          {team.round2_details?.total_marks ?? team.score?.round2_score ?? 0}
+                        </span>
+                      </div>
+                      <div className="rounded border border-white/5 bg-black/40 p-2">
+                        <span className="text-[10px] text-zinc-400 block">R3 ARENA 2</span>
+                        <span className="font-bold text-white">
+                          {team.round3_details?.total_marks ?? team.score?.round3_score ?? 0}
+                        </span>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="rounded border border-dashed border-red-500/20 p-2 text-center font-mono text-[11px] text-zinc-400">
+                      Tournament rounds 1-3 are locked until crew is marked Qualified.
+                    </div>
+                  )}
 
                   <button
                     onClick={() => handleOpenEditModal(team)}
                     className="flex w-full items-center justify-center gap-1.5 rounded-lg border border-[#FF6B35]/40 bg-[#FF6B35]/10 py-2 text-xs font-mono font-bold text-[#FF6B35] uppercase hover:bg-[#FF6B35] hover:text-white"
                   >
                     <Edit3 className="h-3.5 w-3.5" />
-                    <span>UPDATE SCORE</span>
+                    <span>EVALUATE &amp; UPDATE SCORE</span>
                   </button>
                 </div>
               );
@@ -413,22 +811,22 @@ export default function AdminScoresPage() {
       )}
 
       {/* ========================================================================= */}
-      {/* 4. UPDATE SCORE MODAL (READ ONLY TOTAL) */}
+      {/* 5. COMPREHENSIVE SCORE EVALUATION MODAL */}
       {/* ========================================================================= */}
       {selectedTeam && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4 backdrop-blur-sm">
-          <div className="relative w-full max-w-md rounded-2xl border border-white/10 bg-[#0A0718] p-6 sm:p-8 shadow-[0_0_50px_rgba(0,0,0,0.9)]">
-            {/* Modal Header */}
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/85 p-4 backdrop-blur-md overflow-y-auto">
+          <div className="relative w-full max-w-2xl rounded-2xl border border-white/15 bg-[#0A0718] p-6 sm:p-8 shadow-[0_0_60px_rgba(0,0,0,0.95)] max-h-[90vh] overflow-y-auto my-6">
+            {/* Header */}
             <div className="flex items-center justify-between border-b border-white/10 pb-4 mb-6">
               <div>
                 <span className="font-mono text-xs font-bold text-[#FF6B35] uppercase">
-                  SCORE CONTROL // ROUND ENTRY
+                  SCORE CONTROL // TOURNAMENT EVALUATION
                 </span>
-                <h2 className="text-xl font-black uppercase text-white tracking-tight">
-                  UPDATE SCORE
+                <h2 className="text-xl sm:text-2xl font-black uppercase text-white tracking-tight">
+                  EVALUATE CREW
                 </h2>
                 <p className="mt-1 text-xs font-mono text-[#00F0FF]">
-                  TEAM: {selectedTeam.team_name}
+                  CREW: <span className="text-white font-bold">{selectedTeam.team_name}</span>
                 </p>
               </div>
               <button
@@ -439,7 +837,7 @@ export default function AdminScoresPage() {
               </button>
             </div>
 
-            {/* Error Message inside modal */}
+            {/* Error Alert inside modal */}
             {formError && (
               <div className="mb-6 flex items-start gap-2.5 rounded-lg border border-red-500/40 bg-red-500/10 p-3 text-xs text-red-400 font-mono">
                 <AlertCircle className="h-4 w-4 shrink-0 mt-0.5" />
@@ -447,71 +845,489 @@ export default function AdminScoresPage() {
               </div>
             )}
 
-            {/* Form */}
-            <form onSubmit={handleSaveScore} className="space-y-4 font-mono">
-              {/* Round 1 */}
-              <div>
-                <label className="block text-xs font-bold tracking-wider text-zinc-300 uppercase mb-1.5">
-                  ROUND 1 SCORE (THE BUILD & ENDURANCE)
-                </label>
-                <input
-                  type="number"
-                  min="0"
-                  step="1"
-                  value={round1}
-                  onChange={(e) => setRound1(e.target.value)}
-                  placeholder="0"
-                  required
-                  className="w-full rounded-lg border border-white/10 bg-white/5 py-2.5 px-3.5 text-sm font-bold text-white focus:border-[#FF6B35] focus:outline-none"
-                />
-              </div>
+            {/* Form Tabs */}
+            <div className="flex flex-wrap items-center gap-2 border-b border-white/10 pb-4 mb-6 font-mono text-xs">
+              <button
+                type="button"
+                onClick={() => setActiveTab("screening")}
+                className={`rounded-lg px-3 py-1.5 font-bold uppercase transition-all cursor-pointer ${
+                  activeTab === "screening"
+                    ? "bg-[#FF2A85] text-white shadow-[0_0_15px_rgba(255,42,133,0.3)]"
+                    : "bg-white/5 text-zinc-400 hover:text-white"
+                }`}
+              >
+                1. SCREENING (QUIZ &amp; KIT)
+              </button>
 
-              {/* Round 2 */}
-              <div>
-                <label className="block text-xs font-bold tracking-wider text-zinc-300 uppercase mb-1.5">
-                  ROUND 2 SCORE (RAMPAGE & OBSTACLES)
-                </label>
-                <input
-                  type="number"
-                  min="0"
-                  step="1"
-                  value={round2}
-                  onChange={(e) => setRound2(e.target.value)}
-                  placeholder="0"
-                  required
-                  className="w-full rounded-lg border border-white/10 bg-white/5 py-2.5 px-3.5 text-sm font-bold text-white focus:border-[#FF6B35] focus:outline-none"
-                />
-              </div>
+              <button
+                type="button"
+                onClick={() => setActiveTab("round1")}
+                disabled={screeningStatus === "not_qualified"}
+                className={`rounded-lg px-3 py-1.5 font-bold uppercase transition-all cursor-pointer ${
+                  activeTab === "round1"
+                    ? "bg-[#FF6B35] text-white shadow-[0_0_15px_rgba(255,107,53,0.3)]"
+                    : screeningStatus === "not_qualified"
+                    ? "bg-white/5 text-zinc-600 cursor-not-allowed opacity-50"
+                    : "bg-white/5 text-zinc-400 hover:text-white"
+                }`}
+              >
+                2. R1 VIVA &amp; BOT
+              </button>
 
-              {/* Round 3 */}
-              <div>
-                <label className="block text-xs font-bold tracking-wider text-zinc-300 uppercase mb-1.5">
-                  ROUND 3 SCORE (OBSTACLE RUN RACE)
-                </label>
-                <input
-                  type="number"
-                  min="0"
-                  step="1"
-                  value={round3}
-                  onChange={(e) => setRound3(e.target.value)}
-                  placeholder="0"
-                  required
-                  className="w-full rounded-lg border border-white/10 bg-white/5 py-2.5 px-3.5 text-sm font-bold text-white focus:border-[#FF6B35] focus:outline-none"
-                />
-              </div>
+              <button
+                type="button"
+                onClick={() => setActiveTab("round2")}
+                disabled={screeningStatus === "not_qualified"}
+                className={`rounded-lg px-3 py-1.5 font-bold uppercase transition-all cursor-pointer ${
+                  activeTab === "round2"
+                    ? "bg-[#00F0FF] text-black shadow-[0_0_15px_rgba(0,240,255,0.3)]"
+                    : screeningStatus === "not_qualified"
+                    ? "bg-white/5 text-zinc-600 cursor-not-allowed opacity-50"
+                    : "bg-white/5 text-zinc-400 hover:text-white"
+                }`}
+              >
+                3. R2 ARENA 1 ({computedRound2.total_marks} PTS)
+              </button>
 
-              {/* Total Score Readout (Read Only) */}
-              <div className="rounded-xl border border-[#00F0FF]/30 bg-[#00F0FF]/5 p-4 mt-4">
-                <div className="flex items-center justify-between">
+              <button
+                type="button"
+                onClick={() => setActiveTab("round3")}
+                disabled={screeningStatus === "not_qualified"}
+                className={`rounded-lg px-3 py-1.5 font-bold uppercase transition-all cursor-pointer ${
+                  activeTab === "round3"
+                    ? "bg-[#8A2BE2] text-white shadow-[0_0_15px_rgba(138,43,226,0.3)]"
+                    : screeningStatus === "not_qualified"
+                    ? "bg-white/5 text-zinc-600 cursor-not-allowed opacity-50"
+                    : "bg-white/5 text-zinc-400 hover:text-white"
+                }`}
+              >
+                4. R3 ARENA 2 ({computedRound3Total} PTS)
+              </button>
+            </div>
+
+            {/* Evaluation Form */}
+            <form onSubmit={handleSaveScore} className="space-y-6 font-mono">
+              {/* TAB 1: SCREENING */}
+              {activeTab === "screening" && (
+                <div className="space-y-4">
+                  <div className="rounded-xl border border-white/10 bg-white/[0.02] p-4">
+                    <label className="block text-xs font-bold tracking-wider text-zinc-300 uppercase mb-2">
+                      EVENT SELECTION // QUIZ &amp; KIT BUYER SCREENING
+                    </label>
+                    <p className="text-[11px] text-zinc-400 mb-4 leading-relaxed">
+                      Choose whether this crew is Qualified or Not Qualified. Qualified crews appear at the top of the leaderboard and participate in Rounds 1, 2, and 3.
+                    </p>
+
+                    <div className="grid grid-cols-2 gap-3">
+                      <button
+                        type="button"
+                        onClick={() => setScreeningStatus("qualified")}
+                        className={`flex flex-col items-center justify-center p-4 rounded-xl border transition-all cursor-pointer ${
+                          screeningStatus === "qualified"
+                            ? "border-emerald-500 bg-emerald-500/20 text-emerald-300 shadow-[0_0_20px_rgba(16,185,129,0.3)] ring-1 ring-emerald-400"
+                            : "border-white/10 bg-white/5 text-zinc-400 hover:bg-white/10"
+                        }`}
+                      >
+                        <ShieldCheck className="h-6 w-6 mb-2 text-emerald-400" />
+                        <span className="font-black text-sm uppercase">QUALIFIED</span>
+                        <span className="text-[10px] text-zinc-400 mt-1">Unlocks R1, R2, R3</span>
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() => setScreeningStatus("not_qualified")}
+                        className={`flex flex-col items-center justify-center p-4 rounded-xl border transition-all cursor-pointer ${
+                          screeningStatus === "not_qualified"
+                            ? "border-red-500 bg-red-500/20 text-red-300 shadow-[0_0_20px_rgba(239,68,68,0.3)] ring-1 ring-red-400"
+                            : "border-white/10 bg-white/5 text-zinc-400 hover:bg-white/10"
+                        }`}
+                      >
+                        <ShieldAlert className="h-6 w-6 mb-2 text-red-400" />
+                        <span className="font-black text-sm uppercase">NOT QUALIFIED</span>
+                        <span className="text-[10px] text-zinc-400 mt-1">Locks tournament rounds</span>
+                      </button>
+                    </div>
+                  </div>
+
+                  {screeningStatus === "not_qualified" && (
+                    <div className="rounded-xl border border-red-500/30 bg-red-500/10 p-4 text-xs text-red-300 space-y-1">
+                      <p className="font-bold flex items-center gap-1.5">
+                        <Lock className="h-4 w-4 shrink-0" />
+                        <span>CREW IS CURRENTLY MARKED NOT QUALIFIED</span>
+                      </p>
+                      <p className="text-[11px] text-red-400 leading-relaxed">
+                        This team will be shown at the bottom of the leaderboard. To enter marks for Arena 1 or Arena 2, switch this status back to Qualified above.
+                      </p>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* TAB 2: ROUND 1 (VIVA & BOT ASSEMBLING) */}
+              {activeTab === "round1" && (
+                <div className="space-y-4">
+                  <div className="rounded-xl border border-white/10 bg-white/[0.02] p-4">
+                    <label className="block text-xs font-bold tracking-wider text-zinc-300 uppercase mb-2">
+                      ROUND 1 // VIVA &amp; BOT ASSEMBLING RESULT
+                    </label>
+                    <p className="text-[11px] text-zinc-400 mb-4">
+                      Evaluate bot structural scrutiny, technical viva, and build readiness. Result is evaluated as Qualified or Not Qualified.
+                    </p>
+
+                    <div className="grid grid-cols-3 gap-3">
+                      <button
+                        type="button"
+                        onClick={() => setRound1Status("qualified")}
+                        className={`flex flex-col items-center justify-center p-3.5 rounded-xl border transition-all cursor-pointer ${
+                          round1Status === "qualified"
+                            ? "border-emerald-500 bg-emerald-500/20 text-emerald-300 ring-1 ring-emerald-400"
+                            : "border-white/10 bg-white/5 text-zinc-400 hover:bg-white/10"
+                        }`}
+                      >
+                        <CheckCircle2 className="h-5 w-5 mb-1.5 text-emerald-400" />
+                        <span className="font-bold text-xs">QUALIFIED</span>
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() => setRound1Status("not_qualified")}
+                        className={`flex flex-col items-center justify-center p-3.5 rounded-xl border transition-all cursor-pointer ${
+                          round1Status === "not_qualified"
+                            ? "border-red-500 bg-red-500/20 text-red-300 ring-1 ring-red-400"
+                            : "border-white/10 bg-white/5 text-zinc-400 hover:bg-white/10"
+                        }`}
+                      >
+                        <ShieldAlert className="h-5 w-5 mb-1.5 text-red-400" />
+                        <span className="font-bold text-xs">NOT QUALIFIED</span>
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() => setRound1Status("pending")}
+                        className={`flex flex-col items-center justify-center p-3.5 rounded-xl border transition-all cursor-pointer ${
+                          round1Status === "pending"
+                            ? "border-[#00F0FF] bg-[#00F0FF]/20 text-[#00F0FF] ring-1 ring-[#00F0FF]"
+                            : "border-white/10 bg-white/5 text-zinc-400 hover:bg-white/10"
+                        }`}
+                      >
+                        <Clock className="h-5 w-5 mb-1.5 text-[#00F0FF]" />
+                        <span className="font-bold text-xs">PENDING</span>
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* TAB 3: ROUND 2 (FIRST ARENA MARKS) */}
+              {activeTab === "round2" && (
+                <div className="space-y-4">
+                  <div className="rounded-xl border border-white/10 bg-white/[0.02] p-4 space-y-4">
+                    <div className="flex items-center justify-between border-b border-white/10 pb-2">
+                      <span className="text-xs font-bold text-[#00F0FF] uppercase">
+                        ROUND 2: FIRST ARENA SCORING
+                      </span>
+                      <span className="text-[11px] text-zinc-400">
+                        Formula: Gain Marks &minus; (Penalties &times; Rate)
+                      </span>
+                    </div>
+
+                    {/* Completion Time */}
+                    <div>
+                      <label className="block text-xs font-bold tracking-wider text-zinc-300 uppercase mb-1">
+                        1. COMPLETION TIME (MM:SS)
+                      </label>
+                      <input
+                        type="text"
+                        value={round2Time}
+                        onChange={(e) => setRound2Time(e.target.value)}
+                        placeholder="e.g. 02:45"
+                        className="w-full rounded-lg border border-white/10 bg-black/40 py-2 px-3 text-xs font-bold text-white focus:border-[#00F0FF] focus:outline-none"
+                      />
+                    </div>
+
+                    {/* Marks Configuration: Full Marks & Gain Marks */}
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                      <div>
+                        <label className="block text-xs font-bold tracking-wider text-zinc-300 uppercase mb-1">
+                          2A. FULL MARKS (TOTAL MAXIMUM)
+                        </label>
+                        <input
+                          type="number"
+                          min="0"
+                          step="1"
+                          value={round2MaxMarks}
+                          onChange={(e) => setRound2MaxMarks(e.target.value)}
+                          placeholder="100"
+                          className="w-full rounded-lg border border-white/10 bg-black/40 py-2 px-3 text-xs font-bold text-white focus:border-[#00F0FF] focus:outline-none"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="block text-xs font-bold tracking-wider text-zinc-300 uppercase mb-1">
+                          2B. GAIN MARKS (OBTAINED SCORE)
+                        </label>
+                        <input
+                          type="number"
+                          min="0"
+                          step="1"
+                          value={round2GainMarks}
+                          onChange={(e) => setRound2GainMarks(e.target.value)}
+                          placeholder="80"
+                          className="w-full rounded-lg border border-white/10 bg-black/40 py-2 px-3 text-xs font-bold text-[#00F0FF] focus:border-[#00F0FF] focus:outline-none"
+                        />
+                      </div>
+                    </div>
+
+                    {/* Penalties: Negative marks per touch & No. of touches */}
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                      <div>
+                        <label className="block text-xs font-bold tracking-wider text-zinc-300 uppercase mb-1">
+                          3A. DEDUCTION PER TOUCH (NEGATIVE)
+                        </label>
+                        <input
+                          type="number"
+                          min="0"
+                          step="1"
+                          value={round2PenaltyRate}
+                          onChange={(e) => setRound2PenaltyRate(e.target.value)}
+                          placeholder="5"
+                          className="w-full rounded-lg border border-white/10 bg-black/40 py-2 px-3 text-xs font-bold text-white focus:border-[#FF2A85] focus:outline-none"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="block text-xs font-bold tracking-wider text-zinc-300 uppercase mb-1">
+                          3B. NO. OF PENALTIES (OBSTACLE TOUCHES)
+                        </label>
+                        <input
+                          type="number"
+                          min="0"
+                          step="1"
+                          value={round2PenaltyCount}
+                          onChange={(e) => setRound2PenaltyCount(e.target.value)}
+                          placeholder="0"
+                          className="w-full rounded-lg border border-white/10 bg-black/40 py-2 px-3 text-xs font-bold text-red-400 focus:border-red-400 focus:outline-none"
+                        />
+                      </div>
+                    </div>
+
+                    {/* Live Calculation Preview */}
+                    <div className="rounded-lg border border-[#00F0FF]/30 bg-[#00F0FF]/10 p-3.5 space-y-1">
+                      <div className="flex items-center justify-between text-xs">
+                        <span className="text-zinc-300">
+                          Gain: <strong className="text-white">{computedRound2.gain_marks}</strong> / {computedRound2.max_marks} &bull; Penalties:{" "}
+                          <strong className="text-red-400">
+                            {computedRound2.penalty_count} &times; -{computedRound2.penalty_rate} = -{computedRound2.penalty_total} pts
+                          </strong>
+                        </span>
+                        <span className="font-black text-sm text-[#00F0FF]">
+                          = {computedRound2.total_marks} PTS
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* TAB 4: ROUND 3 (SECOND ARENA - 3 STAGES) */}
+              {activeTab === "round3" && (
+                <div className="space-y-4">
+                  {/* Stage Switcher */}
+                  <div className="flex items-center gap-2">
+                    {[0, 1, 2].map((idx) => {
+                      const stComputed = computedStages[idx];
+                      return (
+                        <button
+                          key={idx}
+                          type="button"
+                          onClick={() => setActiveStageIndex(idx)}
+                          className={`flex-1 rounded-lg py-2 px-3 text-xs font-bold uppercase transition-all cursor-pointer ${
+                            activeStageIndex === idx
+                              ? "bg-[#8A2BE2] text-white shadow-[0_0_15px_rgba(138,43,226,0.4)]"
+                              : "border border-white/10 bg-white/5 text-zinc-400 hover:text-white"
+                          }`}
+                        >
+                          STAGE {idx + 1} ({stComputed.total_marks} PTS)
+                        </button>
+                      );
+                    })}
+                  </div>
+
+                  {/* Active Stage Editor */}
+                  <div className="rounded-xl border border-white/10 bg-white/[0.02] p-4 space-y-4">
+                    <div className="flex items-center justify-between border-b border-white/10 pb-2">
+                      <span className="text-xs font-bold text-[#8A2BE2] uppercase">
+                        STAGE {activeStageIndex + 1} PARAMETERS
+                      </span>
+                      <span className="text-[11px] text-zinc-400">
+                        Formula: Gain &minus; (Touches &times; Deduction)
+                      </span>
+                    </div>
+
+                    {/* Completion Time */}
+                    <div>
+                      <label className="block text-xs font-bold tracking-wider text-zinc-300 uppercase mb-1">
+                        STAGE {activeStageIndex + 1} COMPLETION TIME (MM:SS)
+                      </label>
+                      <input
+                        type="text"
+                        value={stagesState[activeStageIndex].time}
+                        onChange={(e) =>
+                          handleStageFieldChange(activeStageIndex, "time", e.target.value)
+                        }
+                        placeholder="e.g. 01:30"
+                        className="w-full rounded-lg border border-white/10 bg-black/40 py-2 px-3 text-xs font-bold text-white focus:border-[#8A2BE2] focus:outline-none"
+                      />
+                    </div>
+
+                    {/* Marks Configuration */}
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                      <div>
+                        <label className="block text-xs font-bold tracking-wider text-zinc-300 uppercase mb-1">
+                          FULL MARKS (MAX SCORE)
+                        </label>
+                        <input
+                          type="number"
+                          min="0"
+                          step="1"
+                          value={stagesState[activeStageIndex].maxMarks}
+                          onChange={(e) =>
+                            handleStageFieldChange(activeStageIndex, "maxMarks", e.target.value)
+                          }
+                          placeholder="50"
+                          className="w-full rounded-lg border border-white/10 bg-black/40 py-2 px-3 text-xs font-bold text-white focus:border-[#8A2BE2] focus:outline-none"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="block text-xs font-bold tracking-wider text-zinc-300 uppercase mb-1">
+                          GAIN MARKS (SCORE OBTAINED)
+                        </label>
+                        <input
+                          type="number"
+                          min="0"
+                          step="1"
+                          value={stagesState[activeStageIndex].gainMarks}
+                          onChange={(e) =>
+                            handleStageFieldChange(activeStageIndex, "gainMarks", e.target.value)
+                          }
+                          placeholder="45"
+                          className="w-full rounded-lg border border-white/10 bg-black/40 py-2 px-3 text-xs font-bold text-[#8A2BE2] focus:border-[#8A2BE2] focus:outline-none"
+                        />
+                      </div>
+                    </div>
+
+                    {/* Penalties */}
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                      <div>
+                        <label className="block text-xs font-bold tracking-wider text-zinc-300 uppercase mb-1">
+                          DEDUCTION PER TOUCH (NEGATIVE)
+                        </label>
+                        <input
+                          type="number"
+                          min="0"
+                          step="1"
+                          value={stagesState[activeStageIndex].penaltyRate}
+                          onChange={(e) =>
+                            handleStageFieldChange(activeStageIndex, "penaltyRate", e.target.value)
+                          }
+                          placeholder="5"
+                          className="w-full rounded-lg border border-white/10 bg-black/40 py-2 px-3 text-xs font-bold text-white focus:border-[#8A2BE2] focus:outline-none"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="block text-xs font-bold tracking-wider text-zinc-300 uppercase mb-1">
+                          NO. OF PENALTIES (TOUCHES)
+                        </label>
+                        <input
+                          type="number"
+                          min="0"
+                          step="1"
+                          value={stagesState[activeStageIndex].penaltyCount}
+                          onChange={(e) =>
+                            handleStageFieldChange(activeStageIndex, "penaltyCount", e.target.value)
+                          }
+                          placeholder="0"
+                          className="w-full rounded-lg border border-white/10 bg-black/40 py-2 px-3 text-xs font-bold text-red-400 focus:border-red-400 focus:outline-none"
+                        />
+                      </div>
+                    </div>
+
+                    {/* Stage Preview */}
+                    <div className="rounded-lg border border-[#8A2BE2]/30 bg-[#8A2BE2]/10 p-3 space-y-1">
+                      <div className="flex items-center justify-between text-xs">
+                        <span className="text-zinc-300">
+                          Stage {activeStageIndex + 1} Net:{" "}
+                          <strong className="text-white">{computedStages[activeStageIndex].gain_marks}</strong> &minus;{" "}
+                          <strong className="text-red-400">
+                            {computedStages[activeStageIndex].penalty_total} pen
+                          </strong>
+                        </span>
+                        <span className="font-black text-sm text-[#8A2BE2]">
+                          = {computedStages[activeStageIndex].total_marks} PTS
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Round 3 Overall 3-Stage Summary Card */}
+                  <div className="rounded-xl border border-white/10 bg-black/40 p-4 space-y-2">
+                    <div className="flex items-center justify-between text-xs font-bold text-zinc-300">
+                      <span>ROUND 3 TOTAL ACCUMULATOR:</span>
+                      <span className="text-[#8A2BE2] font-black text-base">{computedRound3Total} PTS</span>
+                    </div>
+                    <div className="grid grid-cols-3 gap-2 text-center text-xs">
+                      <div className="rounded bg-white/5 p-2">
+                        <span className="text-[10px] text-zinc-400 block">Stage 1</span>
+                        <span className="font-bold text-white">{computedStages[0].total_marks} pts</span>
+                      </div>
+                      <div className="rounded bg-white/5 p-2">
+                        <span className="text-[10px] text-zinc-400 block">Stage 2</span>
+                        <span className="font-bold text-white">{computedStages[1].total_marks} pts</span>
+                      </div>
+                      <div className="rounded bg-white/5 p-2">
+                        <span className="text-[10px] text-zinc-400 block">Stage 3</span>
+                        <span className="font-bold text-white">{computedStages[2].total_marks} pts</span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* OVERALL GRAND TOTAL & C.T DISPLAY */}
+              <div className="rounded-xl border border-[#00F0FF]/40 bg-gradient-to-r from-[#FF2A85]/10 via-[#0A0718] to-[#00F0FF]/10 p-4">
+                <div className="flex flex-col sm:flex-row items-center justify-between gap-3">
                   <div>
                     <span className="text-[10px] text-zinc-400 uppercase block">
-                      TOTAL (READ ONLY // POSTGRESQL GENERATED)
+                      OVERALL TOURNAMENT SCORE (ROUND 2 TOTAL + ROUND 3 TOTAL)
                     </span>
-                    <span className="text-2xl font-black text-[#00F0FF]">
-                      {previewTotal} <span className="text-xs text-zinc-400 font-normal">PTS</span>
-                    </span>
+                    <div className="flex items-center gap-2 mt-0.5">
+                      <span className="text-2xl sm:text-3xl font-black text-transparent bg-clip-text bg-gradient-to-r from-[#FF2A85] via-[#FF6B35] to-[#00F0FF]">
+                        {computedGrandTotal} PTS
+                      </span>
+                      {screeningStatus === "not_qualified" && (
+                        <span className="rounded bg-red-500/20 text-red-400 text-xs px-2 py-0.5 font-bold">
+                          NOT QUALIFIED (0 PTS)
+                        </span>
+                      )}
+                    </div>
                   </div>
-                  <Sparkles className="h-6 w-6 text-[#00F0FF]" />
+
+                  <div className="flex items-center gap-4 text-xs font-mono text-zinc-300">
+                    <div className="text-center sm:text-right">
+                      <span className="text-[10px] text-zinc-500 block uppercase">OVERALL C.T</span>
+                      <span className="font-bold text-[#FF6B35] flex items-center gap-1">
+                        <Timer className="h-3.5 w-3.5" />
+                        {computedOverallTime}
+                      </span>
+                    </div>
+
+                    <div className="text-right border-l border-white/10 pl-3">
+                      <div>R2: <span className="text-white font-bold">{computedRound2.total_marks} pts</span></div>
+                      <div>R3: <span className="text-white font-bold">{computedRound3Total} pts</span></div>
+                    </div>
+                  </div>
                 </div>
               </div>
 
@@ -527,15 +1343,15 @@ export default function AdminScoresPage() {
                 <button
                   type="submit"
                   disabled={submitting}
-                  className="inline-flex items-center gap-2 rounded-lg bg-gradient-to-r from-[#FF6B35] to-[#FF2A85] px-6 py-2 text-xs font-black tracking-widest text-white uppercase shadow-[0_0_15px_rgba(255,107,53,0.3)] disabled:opacity-50 cursor-pointer"
+                  className="inline-flex items-center gap-2 rounded-lg bg-gradient-to-r from-[#FF6B35] to-[#FF2A85] px-6 py-2.5 text-xs font-black tracking-widest text-white uppercase shadow-[0_0_15px_rgba(255,107,53,0.3)] disabled:opacity-50 cursor-pointer"
                 >
                   {submitting ? (
                     <>
                       <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                      <span>UPDATING...</span>
+                      <span>SAVING SCORES...</span>
                     </>
                   ) : (
-                    <span>SAVE SCORE</span>
+                    <span>SAVE ALL ROUND SCORES</span>
                   )}
                 </button>
               </div>

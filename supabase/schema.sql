@@ -38,6 +38,11 @@ CREATE TABLE IF NOT EXISTS scores (
   round2_score NUMERIC NOT NULL DEFAULT 0 CHECK (round2_score >= 0),
   round3_score NUMERIC NOT NULL DEFAULT 0 CHECK (round3_score >= 0),
   total_score NUMERIC GENERATED ALWAYS AS (round1_score + round2_score + round3_score) STORED,
+  screening_status TEXT DEFAULT 'qualified' CHECK (screening_status IN ('qualified', 'not_qualified')),
+  round1_status TEXT DEFAULT 'pending' CHECK (round1_status IN ('qualified', 'not_qualified', 'pending')),
+  round2_details JSONB DEFAULT '{}'::JSONB,
+  round3_details JSONB DEFAULT '{}'::JSONB,
+  details JSONB DEFAULT '{}'::JSONB,
   updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 

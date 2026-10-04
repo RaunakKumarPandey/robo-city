@@ -16,6 +16,41 @@ export interface TeamMember {
   created_at?: string;
 }
 
+export interface Round2Details {
+  completion_time: string;
+  max_marks: number;
+  gain_marks: number;
+  penalty_rate: number;
+  penalty_count: number;
+  penalty_total: number;
+  total_marks: number;
+}
+
+export interface StageDetails {
+  stage_number: number;
+  stage_name?: string;
+  completion_time: string;
+  max_marks: number;
+  gain_marks: number;
+  penalty_rate: number;
+  penalty_count: number;
+  penalty_total: number;
+  total_marks: number;
+}
+
+export interface Round3Details {
+  stages: StageDetails[];
+  total_marks: number;
+}
+
+export interface ScoreDetails {
+  screening_status: "qualified" | "not_qualified";
+  round1_status: "qualified" | "not_qualified" | "pending";
+  round2: Round2Details;
+  round3: Round3Details;
+  overall_time?: string;
+}
+
 export interface Score {
   id: string;
   team_id: string;
@@ -23,6 +58,12 @@ export interface Score {
   round2_score: number;
   round3_score: number;
   total_score: number;
+  screening_status?: "qualified" | "not_qualified" | null;
+  round1_status?: "qualified" | "not_qualified" | "pending" | null;
+  round2_details?: Round2Details | null;
+  round3_details?: Round3Details | null;
+  details?: ScoreDetails | null;
+  overall_time?: string | null;
   updated_at: string;
 }
 
@@ -68,10 +109,16 @@ export interface LeaderboardEntry {
   leader_name?: string | null;
   team_logo_url?: string | null;
   robot_image_url?: string | null;
+  screening_status: "qualified" | "not_qualified";
+  round1_status: "qualified" | "not_qualified" | "pending";
   round1_score: number;
   round2_score: number;
   round3_score: number;
   total_score: number;
+  overall_time?: string;
+  round2_details?: Round2Details | null;
+  round3_details?: Round3Details | null;
+  details?: ScoreDetails | null;
   rank: number;
   updated_at?: string;
   members?: TeamMember[];

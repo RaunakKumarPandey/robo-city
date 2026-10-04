@@ -751,38 +751,38 @@ export default function AdminTeamsPage() {
               <div className="rounded-xl border border-[#00F0FF]/30 bg-[#00F0FF]/5 p-4 space-y-3">
                 <div className="flex items-center justify-between border-b border-[#00F0FF]/20 pb-2">
                   <span className="font-mono text-xs font-black text-[#00F0FF] uppercase">
-                    CURRENT SCORE (READ ONLY)
+                    TOURNAMENT SCORE TELEMETRY (READ ONLY)
                   </span>
                   <Trophy className="h-4 w-4 text-[#00F0FF]" />
                 </div>
                 <div className="grid grid-cols-4 gap-2 text-center font-mono">
                   <div className="rounded bg-black/40 p-2">
-                    <span className="text-[10px] text-zinc-400 uppercase block">R1</span>
-                    <span className="font-bold text-white">
-                      {viewingTeam.score?.round1_score ?? 0}
+                    <span className="text-[10px] text-zinc-400 uppercase block">SCREENING</span>
+                    <span className={`font-bold text-[11px] ${viewingTeam.score?.screening_status === 'not_qualified' ? 'text-red-400' : 'text-emerald-400'}`}>
+                      {viewingTeam.score?.screening_status === 'not_qualified' ? 'NOT QUAL' : 'QUALIFIED'}
                     </span>
                   </div>
                   <div className="rounded bg-black/40 p-2">
-                    <span className="text-[10px] text-zinc-400 uppercase block">R2</span>
+                    <span className="text-[10px] text-zinc-400 uppercase block">R2 ARENA 1</span>
                     <span className="font-bold text-white">
-                      {viewingTeam.score?.round2_score ?? 0}
+                      {viewingTeam.score?.round2_score ?? 0} pts
                     </span>
                   </div>
                   <div className="rounded bg-black/40 p-2">
-                    <span className="text-[10px] text-zinc-400 uppercase block">R3</span>
+                    <span className="text-[10px] text-zinc-400 uppercase block">R3 ARENA 2</span>
                     <span className="font-bold text-white">
-                      {viewingTeam.score?.round3_score ?? 0}
+                      {viewingTeam.score?.round3_score ?? 0} pts
                     </span>
                   </div>
                   <div className="rounded bg-[#00F0FF]/20 border border-[#00F0FF]/40 p-2">
-                    <span className="text-[10px] text-[#00F0FF] uppercase block font-black">TOTAL</span>
+                    <span className="text-[10px] text-[#00F0FF] uppercase block font-black">TOTAL XP</span>
                     <span className="font-black text-[#00F0FF]">
-                      {viewingTeam.score?.total_score ?? 0}
+                      {viewingTeam.score?.total_score ?? 0} pts
                     </span>
                   </div>
                 </div>
                 <p className="text-[10px] text-zinc-400 text-center font-mono">
-                  Score modifications are restricted to the /admin/scores portal.
+                  Detailed evaluation, time entry, and penalties are managed in the /admin/scores portal.
                 </p>
               </div>
             </div>

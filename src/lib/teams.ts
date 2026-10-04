@@ -1,5 +1,6 @@
 import { supabase } from "@/lib/supabase";
-import { TeamWithDetails, TeamMember } from "@/types/database";
+import { TeamWithDetails, TeamMember, Score } from "@/types/database";
+import { normalizeScoreData } from "./scoringUtils";
 
 /**
  * Fetch all teams from Supabase with their associated crew members and score record.
@@ -30,12 +31,32 @@ export async function fetchTeamsWithDetails(): Promise<TeamWithDetails[]> {
         .order("created_at", { ascending: false });
 
       return (fallbackData || []).map((t: any) => {
+        const rawScore = Array.isArray(t.score) ? t.score[0] || null : t.score || null;
+        const normalized = normalizeScoreData(rawScore);
         const membersList = t.members || [];
         const leaderName = Array.isArray(membersList) && membersList[0]?.name ? membersList[0].name : null;
+
+        const scoreObj: Score | null = rawScore
+          ? {
+              id: rawScore.id || `score-${t.id}`,
+              team_id: t.id,
+              round1_score: normalized.round1_score,
+              round2_score: normalized.round2_score,
+              round3_score: normalized.round3_score,
+              total_score: normalized.total_score,
+              screening_status: normalized.screening_status,
+              round1_status: normalized.round1_status,
+              round2_details: normalized.round2_details,
+              round3_details: normalized.round3_details,
+              details: normalized.details,
+              updated_at: rawScore.updated_at || new Date().toISOString(),
+            }
+          : null;
+
         return {
           ...t,
           members: membersList,
-          score: Array.isArray(t.score) ? t.score[0] || null : t.score || null,
+          score: scoreObj,
           leader_name: leaderName,
           captain_name: leaderName,
         };
@@ -49,10 +70,30 @@ export async function fetchTeamsWithDetails(): Promise<TeamWithDetails[]> {
         regObj?.captain_name?.trim() ||
         (Array.isArray(membersList) && membersList[0]?.name ? membersList[0].name.trim() : null);
 
+      const rawScore = Array.isArray(t.score) ? t.score[0] || null : t.score || null;
+      const normalized = normalizeScoreData(rawScore);
+
+      const scoreObj: Score | null = rawScore
+        ? {
+            id: rawScore.id || `score-${t.id}`,
+            team_id: t.id,
+            round1_score: normalized.round1_score,
+            round2_score: normalized.round2_score,
+            round3_score: normalized.round3_score,
+            total_score: normalized.total_score,
+            screening_status: normalized.screening_status,
+            round1_status: normalized.round1_status,
+            round2_details: normalized.round2_details,
+            round3_details: normalized.round3_details,
+            details: normalized.details,
+            updated_at: rawScore.updated_at || new Date().toISOString(),
+          }
+        : null;
+
       return {
         ...t,
         members: membersList,
-        score: Array.isArray(t.score) ? t.score[0] || null : t.score || null,
+        score: scoreObj,
         leader_name: leaderName,
         captain_name: leaderName,
       };

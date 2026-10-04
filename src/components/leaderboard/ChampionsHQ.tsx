@@ -87,7 +87,7 @@ export default function ChampionsHQ() {
     };
   }, [loadLeaderboard]);
 
-  const topThree = teams.slice(0, 3);
+  const topThree = teams.filter((t) => t.screening_status === "qualified").slice(0, 3);
 
   return (
     <section className="relative min-h-screen w-full overflow-hidden pt-24 pb-20 px-4 sm:px-6 lg:px-8">
