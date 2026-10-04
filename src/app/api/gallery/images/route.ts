@@ -1,57 +1,59 @@
 import { NextResponse } from "next/server";
 import { getServiceSupabase, isSupabaseConfigured } from "@/lib/supabase";
-import { initialGalleryImages } from "@/data/initialGalleryData";
 import { EventGalleryImage } from "@/types/database";
 
 export const dynamic = "force-dynamic";
 
-let memoryImages: EventGalleryImage[] = [...initialGalleryImages];
+const DUMMY_IMAGE_IDS = ["img-1", "img-2", "img-3", "img-4", "img-5", "img-6"];
+
+let memoryImages: EventGalleryImage[] = [];
 
 export async function GET() {
   if (isSupabaseConfigured) {
     try {
       const supabase = getServiceSupabase();
+
+      // Clean up legacy dummy mock images from database if present
+      try {
+        await supabase.from("event_gallery_images").delete().in("id", DUMMY_IMAGE_IDS);
+      } catch {}
+
       const { data, error } = await supabase
         .from("event_gallery_images")
         .select("*")
         .order("display_order", { ascending: true });
 
-      if (!error && Array.isArray(data) && data.length > 0) {
-        memoryImages = data as EventGalleryImage[];
+      if (!error && Array.isArray(data)) {
+        // Exclude any legacy dummy items
+        const filtered = (data as EventGalleryImage[]).filter(
+          (img) => !DUMMY_IMAGE_IDS.includes(img.id)
+        );
+        memoryImages = filtered;
         return NextResponse.json(
           { success: true, data: memoryImages },
           {
             headers: {
               "Cache-Control": "no-store, no-cache, must-revalidate, proxy-revalidate, max-age=0",
-              "Pragma": "no-cache",
-              "Expires": "0",
+              Pragma: "no-cache",
+              Expires: "0",
             },
           }
         );
-      }
-
-      // If table is empty, auto-seed initial gallery images into Supabase
-      if (!error && Array.isArray(data) && data.length === 0) {
-        try {
-          await supabase
-            .from("event_gallery_images")
-            .upsert(initialGalleryImages, { onConflict: "id" });
-        } catch {}
       }
     } catch (err) {
       console.warn("Supabase GET event_gallery_images notice:", err);
     }
   }
 
-  // Fast fallback to memoryImages or initialGalleryImages
-  const finalData = memoryImages.length > 0 ? memoryImages : initialGalleryImages;
+  // Fast fallback to memoryImages (filtered)
+  const cleanMemory = memoryImages.filter((img) => !DUMMY_IMAGE_IDS.includes(img.id));
   return NextResponse.json(
-    { success: true, data: finalData },
+    { success: true, data: cleanMemory },
     {
       headers: {
         "Cache-Control": "no-store, no-cache, must-revalidate, proxy-revalidate, max-age=0",
-        "Pragma": "no-cache",
-        "Expires": "0",
+        Pragma: "no-cache",
+        Expires: "0",
       },
     }
   );
@@ -84,6 +86,7 @@ export async function POST(request: Request) {
     } else {
       memoryImages.push(record);
     }
+    memoryImages = memoryImages.filter((img) => !DUMMY_IMAGE_IDS.includes(img.id));
     memoryImages.sort((a, b) => (a.display_order ?? 0) - (b.display_order ?? 0));
 
     // Persist to Supabase

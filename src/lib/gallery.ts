@@ -1,13 +1,23 @@
 import { supabase, isSupabaseConfigured } from "@/lib/supabase";
 import { EventPoster, EventGalleryImage } from "@/types/database";
-import { initialEventPosters, initialGalleryImages } from "@/data/initialGalleryData";
 
 const POSTERS_STORAGE_KEY = "robocity_event_posters";
 const IMAGES_STORAGE_KEY = "robocity_gallery_images";
 
+const DUMMY_POSTER_IDS = ["poster-1", "poster-2", "poster-3", "poster-4"];
+const DUMMY_IMAGE_IDS = ["img-1", "img-2", "img-3", "img-4", "img-5", "img-6"];
+
 // In-memory cache for instant 0ms loads
 let memoryPostersCache: EventPoster[] | null = null;
 let memoryImagesCache: EventGalleryImage[] | null = null;
+
+function filterPosters(list: EventPoster[]): EventPoster[] {
+  return list.filter((p) => p && !DUMMY_POSTER_IDS.includes(p.id));
+}
+
+function filterImages(list: EventGalleryImage[]): EventGalleryImage[] {
+  return list.filter((img) => img && !DUMMY_IMAGE_IDS.includes(img.id));
+}
 
 /**
  * Safely persist data to localStorage without crashing or keeping stale data on quota exceeded.
@@ -17,8 +27,6 @@ function safeSetStorage(key: string, data: any[]): void {
   try {
     localStorage.setItem(key, JSON.stringify(data));
   } catch {
-    // If quota exceeded due to large base64 strings or storage limit,
-    // clear the outdated localStorage entry to prevent it from overriding full database queries.
     try {
       localStorage.removeItem(key);
     } catch {}
@@ -26,11 +34,11 @@ function safeSetStorage(key: string, data: any[]): void {
 }
 
 /**
- * Synchronous getter for posters (reads memory -> localStorage -> initialEventPosters)
+ * Synchronous getter for posters (reads memory -> localStorage -> empty)
  */
 export function getCachedPosters(): EventPoster[] {
-  if (memoryPostersCache && memoryPostersCache.length > 0) {
-    return memoryPostersCache;
+  if (memoryPostersCache) {
+    return filterPosters(memoryPostersCache);
   }
 
   if (typeof window !== "undefined") {
@@ -38,23 +46,24 @@ export function getCachedPosters(): EventPoster[] {
       const cached = localStorage.getItem(POSTERS_STORAGE_KEY);
       if (cached) {
         const parsed = JSON.parse(cached);
-        if (Array.isArray(parsed) && parsed.length > 0) {
-          memoryPostersCache = parsed;
-          return parsed;
+        if (Array.isArray(parsed)) {
+          const filtered = filterPosters(parsed);
+          memoryPostersCache = filtered;
+          return filtered;
         }
       }
     } catch {}
   }
 
-  return initialEventPosters;
+  return [];
 }
 
 /**
- * Synchronous getter for gallery images (reads memory -> localStorage -> initialGalleryImages)
+ * Synchronous getter for gallery images (reads memory -> localStorage -> empty)
  */
 export function getCachedGalleryImages(): EventGalleryImage[] {
-  if (memoryImagesCache && memoryImagesCache.length > 0) {
-    return memoryImagesCache;
+  if (memoryImagesCache) {
+    return filterImages(memoryImagesCache);
   }
 
   if (typeof window !== "undefined") {
@@ -62,15 +71,16 @@ export function getCachedGalleryImages(): EventGalleryImage[] {
       const cached = localStorage.getItem(IMAGES_STORAGE_KEY);
       if (cached) {
         const parsed = JSON.parse(cached);
-        if (Array.isArray(parsed) && parsed.length > 0) {
-          memoryImagesCache = parsed;
-          return parsed;
+        if (Array.isArray(parsed)) {
+          const filtered = filterImages(parsed);
+          memoryImagesCache = filtered;
+          return filtered;
         }
       }
     } catch {}
   }
 
-  return initialGalleryImages;
+  return [];
 }
 
 /**
@@ -112,8 +122,9 @@ export async function fetchEventPosters(): Promise<EventPoster[]> {
       }, 12000);
       if (res.ok) {
         const json = await res.json();
-        if (json.success && Array.isArray(json.data) && json.data.length > 0) {
-          const sorted = json.data.sort(
+        if (json.success && Array.isArray(json.data)) {
+          const filtered = filterPosters(json.data);
+          const sorted = filtered.sort(
             (a: EventPoster, b: EventPoster) =>
               (a.display_order ?? 0) - (b.display_order ?? 0)
           );
@@ -141,8 +152,9 @@ export async function fetchEventPosters(): Promise<EventPoster[]> {
 
       const { data, error } = (await Promise.race([supabasePromise, timeoutPromise])) as any;
 
-      if (!error && Array.isArray(data) && data.length > 0) {
-        const sorted = (data as EventPoster[]).sort(
+      if (!error && Array.isArray(data)) {
+        const filtered = filterPosters(data);
+        const sorted = filtered.sort(
           (a, b) => (a.display_order ?? 0) - (b.display_order ?? 0)
         );
         memoryPostersCache = sorted;
@@ -154,7 +166,7 @@ export async function fetchEventPosters(): Promise<EventPoster[]> {
     }
   }
 
-  // 3. Fallback to cached or default seed
+  // 3. Fallback to cached
   return getCachedPosters();
 }
 
@@ -175,8 +187,9 @@ export async function saveEventPoster(
       const updated = current.some((p) => p.id === record.id)
         ? current.map((p) => (p.id === record.id ? record : p))
         : [...current, record].sort((a, b) => (a.display_order ?? 0) - (b.display_order ?? 0));
-      memoryPostersCache = updated;
-      safeSetStorage(POSTERS_STORAGE_KEY, updated);
+      const filtered = filterPosters(updated);
+      memoryPostersCache = filtered;
+      safeSetStorage(POSTERS_STORAGE_KEY, filtered);
       window.dispatchEvent(new Event("gallery_updated"));
     } catch {}
   }
@@ -233,8 +246,9 @@ export async function deleteEventPoster(
     try {
       const current = getCachedPosters();
       const updated = current.filter((p) => p.id !== id);
-      memoryPostersCache = updated;
-      safeSetStorage(POSTERS_STORAGE_KEY, updated);
+      const filtered = filterPosters(updated);
+      memoryPostersCache = filtered;
+      safeSetStorage(POSTERS_STORAGE_KEY, filtered);
       window.dispatchEvent(new Event("gallery_updated"));
     } catch {}
   }
@@ -274,8 +288,9 @@ export async function fetchGalleryImages(): Promise<EventGalleryImage[]> {
       }, 12000);
       if (res.ok) {
         const json = await res.json();
-        if (json.success && Array.isArray(json.data) && json.data.length > 0) {
-          const sorted = json.data.sort(
+        if (json.success && Array.isArray(json.data)) {
+          const filtered = filterImages(json.data);
+          const sorted = filtered.sort(
             (a: EventGalleryImage, b: EventGalleryImage) =>
               (a.display_order ?? 0) - (b.display_order ?? 0)
           );
@@ -303,8 +318,9 @@ export async function fetchGalleryImages(): Promise<EventGalleryImage[]> {
 
       const { data, error } = (await Promise.race([supabasePromise, timeoutPromise])) as any;
 
-      if (!error && Array.isArray(data) && data.length > 0) {
-        const sorted = (data as EventGalleryImage[]).sort(
+      if (!error && Array.isArray(data)) {
+        const filtered = filterImages(data);
+        const sorted = filtered.sort(
           (a, b) => (a.display_order ?? 0) - (b.display_order ?? 0)
         );
         memoryImagesCache = sorted;
@@ -316,7 +332,7 @@ export async function fetchGalleryImages(): Promise<EventGalleryImage[]> {
     }
   }
 
-  // 3. Fallback to cached or default seed
+  // 3. Fallback to cached
   return getCachedGalleryImages();
 }
 
@@ -337,8 +353,9 @@ export async function saveGalleryImage(
       const updated = current.some((img) => img.id === record.id)
         ? current.map((img) => (img.id === record.id ? record : img))
         : [...current, record].sort((a, b) => (a.display_order ?? 0) - (b.display_order ?? 0));
-      memoryImagesCache = updated;
-      safeSetStorage(IMAGES_STORAGE_KEY, updated);
+      const filtered = filterImages(updated);
+      memoryImagesCache = filtered;
+      safeSetStorage(IMAGES_STORAGE_KEY, filtered);
       window.dispatchEvent(new Event("gallery_updated"));
     } catch {}
   }
@@ -395,8 +412,9 @@ export async function deleteGalleryImage(
     try {
       const current = getCachedGalleryImages();
       const updated = current.filter((img) => img.id !== id);
-      memoryImagesCache = updated;
-      safeSetStorage(IMAGES_STORAGE_KEY, updated);
+      const filtered = filterImages(updated);
+      memoryImagesCache = filtered;
+      safeSetStorage(IMAGES_STORAGE_KEY, filtered);
       window.dispatchEvent(new Event("gallery_updated"));
     } catch {}
   }

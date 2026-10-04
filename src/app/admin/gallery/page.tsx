@@ -88,10 +88,10 @@ export default function AdminGalleryPage() {
         fetchEventPosters(),
         fetchGalleryImages(),
       ]);
-      if (postersData && postersData.length > 0) {
+      if (Array.isArray(postersData)) {
         setPosters(postersData);
       }
-      if (imagesData && imagesData.length > 0) {
+      if (Array.isArray(imagesData)) {
         setImages(imagesData);
       }
     } catch {

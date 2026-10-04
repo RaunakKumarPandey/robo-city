@@ -60,8 +60,8 @@ export default function EventGalleryView() {
         fetchEventPosters(),
         fetchGalleryImages(),
       ]);
-      if (postersData && postersData.length > 0) setPosters(postersData);
-      if (imagesData && imagesData.length > 0) setImages(imagesData);
+      if (Array.isArray(postersData)) setPosters(postersData);
+      if (Array.isArray(imagesData)) setImages(imagesData);
     } catch {
       // Keep cached data
     } finally {

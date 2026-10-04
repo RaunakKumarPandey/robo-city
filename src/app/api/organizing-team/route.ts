@@ -1,28 +1,39 @@
 import { NextResponse } from "next/server";
 import { getServiceSupabase } from "@/lib/supabase";
-import { initialOrganizingTeam } from "@/data/initialOrganizingTeam";
 import { OrganizingMember } from "@/types/database";
 
 export const dynamic = "force-dynamic";
 
-let memoryTeam: OrganizingMember[] = [...initialOrganizingTeam];
+const DUMMY_ORG_IDS = ["org-1", "org-2", "org-3", "org-4", "org-5"];
+
+let memoryTeam: OrganizingMember[] = [];
 
 export async function GET() {
   const supabase = getServiceSupabase();
 
   try {
+    // Clean up legacy dummy mock members from database if present
+    try {
+      await supabase.from("organizing_team").delete().in("id", DUMMY_ORG_IDS);
+    } catch {}
+
     const { data, error } = await supabase
       .from("organizing_team")
       .select("*")
       .order("display_order", { ascending: true });
 
-    if (!error && data && data.length > 0) {
-      memoryTeam = data as OrganizingMember[];
+    if (!error && Array.isArray(data)) {
+      const filtered = (data as OrganizingMember[]).filter(
+        (m) => !DUMMY_ORG_IDS.includes(m.id)
+      );
+      memoryTeam = filtered;
       return NextResponse.json(
-        { success: true, data },
+        { success: true, data: memoryTeam },
         {
           headers: {
-            "Cache-Control": "public, s-maxage=15, stale-while-revalidate=60",
+            "Cache-Control": "no-store, no-cache, must-revalidate, proxy-revalidate, max-age=0",
+            Pragma: "no-cache",
+            Expires: "0",
           },
         }
       );
@@ -31,11 +42,14 @@ export async function GET() {
     console.warn("API GET organizing_team error:", err);
   }
 
+  const cleanMemory = memoryTeam.filter((m) => !DUMMY_ORG_IDS.includes(m.id));
   return NextResponse.json(
-    { success: true, data: memoryTeam },
+    { success: true, data: cleanMemory },
     {
       headers: {
-        "Cache-Control": "public, s-maxage=15, stale-while-revalidate=60",
+        "Cache-Control": "no-store, no-cache, must-revalidate, proxy-revalidate, max-age=0",
+        Pragma: "no-cache",
+        Expires: "0",
       },
     }
   );
@@ -72,6 +86,7 @@ export async function POST(request: Request) {
     } else {
       memoryTeam.push(record);
     }
+    memoryTeam = memoryTeam.filter((m) => !DUMMY_ORG_IDS.includes(m.id));
     memoryTeam.sort((a, b) => (a.display_order ?? 0) - (b.display_order ?? 0));
 
     const { data, error } = await supabase
