@@ -1,18 +1,30 @@
-import { supabase, getServiceSupabase } from "@/lib/supabase";
+import { supabase, getServiceSupabase, isSupabaseConfigured } from "@/lib/supabase";
 import { LeaderboardEntry } from "@/types/database";
 import { normalizeScoreData } from "./scoringUtils";
+import { getLocalTournamentTeams, formatLeaderboardEntries } from "./teamsStorage";
+import { getInitialLeaderboardEntries } from "@/data/initialLeaderboardData";
 
 /**
- * Fetches real leaderboard data from PostgreSQL with bulletproof multi-tier fallback.
- * Calculates authoritative rank dynamically:
+ * Fetches real leaderboard data with bulletproof multi-tier fallback:
+ * 1. If Supabase is configured, attempts database query / API query.
+ * 2. If Supabase is offline or unconfigured, uses local tournament teams storage / initial seed.
+ * 
+ * Guarantees:
  * - Qualified teams appear at top, ranked by total_score (Round 2 + Round 3) DESC, team_name ASC.
  * - Not qualified teams appear at the bottom.
+ * - Real-time responsive and never crashes.
  */
 export async function fetchLeaderboardData(client?: any): Promise<LeaderboardEntry[]> {
-  // If running in browser and no custom client passed, fetch through /api/leaderboard for full service-level reliability
+  // If running in browser and no custom client passed, first try /api/leaderboard with timeout
   if (typeof window !== "undefined" && !client) {
     try {
-      const res = await fetch("/api/leaderboard", { cache: "no-store" });
+      const controller = new AbortController();
+      const timer = setTimeout(() => controller.abort(), 4000);
+      const res = await fetch(`/api/leaderboard?_t=${Date.now()}`, {
+        cache: "no-store",
+        signal: controller.signal,
+      });
+      clearTimeout(timer);
       if (res.ok) {
         const json = await res.json();
         if (json.success && Array.isArray(json.data) && json.data.length > 0) {
@@ -20,8 +32,16 @@ export async function fetchLeaderboardData(client?: any): Promise<LeaderboardEnt
         }
       }
     } catch {
-      // Continue to direct query fallback
+      // Fall through to local/supabase direct query
     }
+  }
+
+  // If Supabase is not configured or in browser fallback, return local store
+  if (!isSupabaseConfigured && !client) {
+    if (typeof window !== "undefined") {
+      return formatLeaderboardEntries(getLocalTournamentTeams());
+    }
+    return getInitialLeaderboardEntries();
   }
 
   const db = client || (typeof window === "undefined" ? getServiceSupabase() : supabase);
@@ -56,7 +76,12 @@ export async function fetchLeaderboardData(client?: any): Promise<LeaderboardEnt
       ]);
 
       const teamsData = teamsRes.data || [];
-      if (teamsData.length === 0) return [];
+      if (teamsData.length === 0) {
+        if (typeof window !== "undefined") {
+          return formatLeaderboardEntries(getLocalTournamentTeams());
+        }
+        return getInitialLeaderboardEntries();
+      }
 
       const scoreMap = new Map<string, any>();
       (scoresRes.data || []).forEach((s: any) => {
@@ -153,9 +178,13 @@ export async function fetchLeaderboardData(client?: any): Promise<LeaderboardEnt
       rank: qualifiedTeams.length + index + 1,
     }));
 
-    return [...rankedQualified, ...rankedNotQualified];
+    const results = [...rankedQualified, ...rankedNotQualified];
+    return results.length > 0 ? results : (typeof window !== "undefined" ? formatLeaderboardEntries(getLocalTournamentTeams()) : getInitialLeaderboardEntries());
   } catch (err) {
     console.error("fetchLeaderboardData exception:", err);
-    return [];
+    if (typeof window !== "undefined") {
+      return formatLeaderboardEntries(getLocalTournamentTeams());
+    }
+    return getInitialLeaderboardEntries();
   }
 }

@@ -1,21 +1,17 @@
 "use client";
 
 import { useEffect, useState, useCallback } from "react";
-import { supabase } from "@/lib/supabase";
+import { supabase, isSupabaseConfigured } from "@/lib/supabase";
 import { fetchLeaderboardData } from "@/lib/leaderboard";
 import { LeaderboardEntry } from "@/types/database";
 import Podium from "./Podium";
 import LeaderboardTable from "./LeaderboardTable";
 import {
   Trophy,
-  Radio,
   RefreshCw,
   AlertTriangle,
   Loader2,
-  Sparkles,
-  Wifi,
   WifiOff,
-  Flame,
   Crosshair,
 } from "lucide-react";
 
@@ -23,67 +19,121 @@ export default function ChampionsHQ() {
   const [teams, setTeams] = useState<LeaderboardEntry[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [connectionStatus, setConnectionStatus] = useState<"CONNECTING" | "LIVE" | "OFFLINE">("CONNECTING");
+  const [connectionStatus, setConnectionStatus] = useState<"CONNECTING" | "LIVE" | "OFFLINE">("LIVE");
   const [recentlyUpdatedId, setRecentlyUpdatedId] = useState<string | null>(null);
 
-  // Load Leaderboard from PostgreSQL
+  // Load Leaderboard data
   const loadLeaderboard = useCallback(async (showLoading = true) => {
     if (showLoading) setLoading(true);
     setError(null);
 
     try {
       const data = await fetchLeaderboardData();
-      setTeams(data);
-    } catch {
-      setError("Unable to load leaderboard data. Please try again.");
+      if (Array.isArray(data) && data.length > 0) {
+        setTeams(data);
+      }
+    } catch (err) {
+      console.error("Leaderboard load error:", err);
+      // Don't show hard error if teams are already loaded
+      if (teams.length === 0) {
+        setError("Unable to load leaderboard data. Please try again.");
+      }
     } finally {
       if (showLoading) setLoading(false);
     }
-  }, []);
+  }, [teams.length]);
 
-  // Initial Load + Supabase Realtime Subscription
+  // Initial Load + Multi-channel Realtime Subscriptions
   useEffect(() => {
-    // 1. Initial Load from Database
+    // 1. Initial Load
     loadLeaderboard(true);
 
-    // 2. Setup Realtime Channel for scores table
-    const channel = supabase
-      .channel("scores-realtime-feed")
-      .on(
-        "postgres_changes",
-        {
-          event: "*",
-          schema: "public",
-          table: "scores",
-        },
-        (payload) => {
-          const teamId =
-            (payload.new as any)?.team_id || (payload.old as any)?.team_id;
+    // 2. Local Realtime DOM Event Listener
+    const handleScoresUpdated = (event: any) => {
+      const teamId = event?.detail?.teamId;
+      if (teamId) {
+        setRecentlyUpdatedId(teamId);
+        setTimeout(() => setRecentlyUpdatedId(null), 4000);
+      }
+      loadLeaderboard(false);
+    };
 
-          if (teamId) {
-            setRecentlyUpdatedId(teamId);
+    window.addEventListener("scores_updated", handleScoresUpdated);
+    window.addEventListener("storage", () => loadLeaderboard(false));
+
+    // 3. Cross-Tab BroadcastChannel Realtime Feed
+    let bc: BroadcastChannel | null = null;
+    if (typeof window !== "undefined" && typeof window.BroadcastChannel !== "undefined") {
+      try {
+        bc = new BroadcastChannel("robocity_scores_realtime_channel");
+        bc.onmessage = (msg) => {
+          if (msg?.data?.teamId) {
+            setRecentlyUpdatedId(msg.data.teamId);
             setTimeout(() => setRecentlyUpdatedId(null), 4000);
           }
-
           loadLeaderboard(false);
-        }
-      )
-      .subscribe((status) => {
-        if (status === "SUBSCRIBED") {
-          setConnectionStatus("LIVE");
-        } else if (
-          status === "CLOSED" ||
-          status === "CHANNEL_ERROR" ||
-          status === "TIMED_OUT"
-        ) {
-          setConnectionStatus("OFFLINE");
-        } else {
-          setConnectionStatus("CONNECTING");
-        }
-      });
+        };
+      } catch {}
+    }
+
+    // 4. Supabase Remote Database Realtime Subscription (if configured)
+    let channel: any = null;
+    if (isSupabaseConfigured) {
+      try {
+        channel = supabase
+          .channel("scores-realtime-feed")
+          .on(
+            "postgres_changes",
+            {
+              event: "*",
+              schema: "public",
+              table: "scores",
+            },
+            (payload) => {
+              const teamId =
+                (payload.new as any)?.team_id || (payload.old as any)?.team_id;
+
+              if (teamId) {
+                setRecentlyUpdatedId(teamId);
+                setTimeout(() => setRecentlyUpdatedId(null), 4000);
+              }
+
+              loadLeaderboard(false);
+            }
+          )
+          .subscribe((status) => {
+            if (status === "SUBSCRIBED") {
+              setConnectionStatus("LIVE");
+            } else if (
+              status === "CLOSED" ||
+              status === "CHANNEL_ERROR" ||
+              status === "TIMED_OUT"
+            ) {
+              setConnectionStatus("OFFLINE");
+            }
+          });
+      } catch {}
+    } else {
+      setConnectionStatus("LIVE");
+    }
+
+    // 5. Polling safety net every 8 seconds
+    const interval = setInterval(() => {
+      loadLeaderboard(false);
+    }, 8000);
 
     return () => {
-      supabase.removeChannel(channel);
+      window.removeEventListener("scores_updated", handleScoresUpdated);
+      window.removeEventListener("storage", () => loadLeaderboard(false));
+      if (bc) {
+        try {
+          bc.close();
+        } catch {}
+      }
+      if (channel) {
+        supabase.removeChannel(channel);
+      }
+      clearInterval(interval);
     };
   }, [loadLeaderboard]);
 

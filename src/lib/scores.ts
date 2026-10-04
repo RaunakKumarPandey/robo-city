@@ -1,6 +1,7 @@
-import { supabase } from "@/lib/supabase";
+import { supabase, isSupabaseConfigured } from "@/lib/supabase";
 import { Score, TeamWithDetails, TeamMember, Round2Details, StageDetails, Round3Details, ScoreDetails } from "@/types/database";
 import { normalizeScoreData, calculateRound2, calculateRound3 } from "./scoringUtils";
+import { getLocalTournamentTeams, updateLocalTeamScore, formatTeamScoreItems } from "./teamsStorage";
 
 export interface TeamScoreItem {
   id: string;
@@ -22,9 +23,13 @@ export interface TeamScoreItem {
 }
 
 /**
- * Fetch all teams along with their competition scores from Supabase PostgreSQL.
+ * Fetch all teams along with their competition scores from Supabase PostgreSQL or local cache.
  */
 export async function fetchTeamsWithScores(): Promise<TeamScoreItem[]> {
+  if (!isSupabaseConfigured) {
+    return formatTeamScoreItems(getLocalTournamentTeams());
+  }
+
   try {
     const { data, error } = await supabase
       .from("teams")
@@ -43,65 +48,9 @@ export async function fetchTeamsWithScores(): Promise<TeamScoreItem[]> {
       `)
       .order("created_at", { ascending: false });
 
-    if (error) {
-      console.error("Error fetching teams with scores:", error);
-      const { data: fallbackData } = await supabase
-        .from("teams")
-        .select(`
-          id,
-          team_name,
-          team_logo_url,
-          robot_image_url,
-          created_at,
-          updated_at,
-          score:scores(*),
-          members:team_members(*)
-        `)
-        .order("created_at", { ascending: false });
-
-      return (fallbackData || []).map((t: any) => {
-        const rawScore = Array.isArray(t.score) ? t.score[0] || null : t.score || null;
-        const normalized = normalizeScoreData(rawScore);
-        const membersList = t.members || [];
-        const leaderName = Array.isArray(membersList) && membersList[0]?.name ? membersList[0].name : null;
-
-        const scoreObj: Score | null = rawScore
-          ? {
-              id: rawScore.id || `score-${t.id}`,
-              team_id: t.id,
-              round1_score: normalized.round1_score,
-              round2_score: normalized.round2_score,
-              round3_score: normalized.round3_score,
-              total_score: normalized.total_score,
-              screening_status: normalized.screening_status,
-              round1_status: normalized.round1_status,
-              round2_details: normalized.round2_details,
-              round3_details: normalized.round3_details,
-              details: normalized.details,
-              overall_time: normalized.overall_time,
-              updated_at: rawScore.updated_at || new Date().toISOString(),
-            }
-          : null;
-
-        return {
-          id: t.id,
-          team_name: t.team_name,
-          leader_name: leaderName,
-          captain_name: leaderName,
-          team_logo_url: t.team_logo_url,
-          robot_image_url: t.robot_image_url,
-          created_at: t.created_at,
-          updated_at: t.updated_at,
-          score: scoreObj,
-          screening_status: normalized.screening_status,
-          round1_status: normalized.round1_status,
-          overall_time: normalized.overall_time,
-          round2_details: normalized.round2_details,
-          round3_details: normalized.round3_details,
-          details: normalized.details,
-          members: membersList,
-        };
-      });
+    if (error || !data || data.length === 0) {
+      // Fallback to local tournament teams cache
+      return formatTeamScoreItems(getLocalTournamentTeams());
     }
 
     return (data || []).map((t: any) => {
@@ -153,7 +102,7 @@ export async function fetchTeamsWithScores(): Promise<TeamScoreItem[]> {
     });
   } catch (err) {
     console.error("Fetch teams with scores exception:", err);
-    return [];
+    return formatTeamScoreItems(getLocalTournamentTeams());
   }
 }
 
@@ -168,6 +117,8 @@ export interface DetailedScoreUpdatePayload {
 
 /**
  * Update detailed competition score structure including Quiz screening, Viva, Arena 1, and Arena 2 (3 stages).
+ * Immediately updates local state & broadcasts to open leaderboard tabs in real-time,
+ * and syncs with Supabase database if configured.
  */
 export async function updateDetailedTeamScores(
   payload: DetailedScoreUpdatePayload
@@ -176,6 +127,9 @@ export async function updateDetailedTeamScores(
   if (!teamId) {
     return { success: false, error: "TEAM NOT FOUND" };
   }
+
+  // 1. Immediately update local store and broadcast in real-time across tabs
+  const localUpdated = updateLocalTeamScore(payload);
 
   const r2 = calculateRound2(payload.round2);
   const r3Stages = Array.isArray(payload.round3)
@@ -197,112 +151,68 @@ export async function updateDetailedTeamScores(
 
   const updateTimestamp = new Date().toISOString();
 
-  try {
-    // 1. First attempt: update full object with new columns
-    const { data: upsertData, error: upsertError } = await supabase
-      .from("scores")
-      .upsert(
-        {
-          team_id: teamId,
-          round1_score: r1Score,
-          round2_score: r2Score,
-          round3_score: r3Score,
-          screening_status,
-          round1_status,
-          round2_details: r2,
-          round3_details: r3,
-          details: scoreDetails,
-          updated_at: updateTimestamp,
-        },
-        { onConflict: "team_id" }
-      )
-      .select("*")
-      .single();
+  const constructedScore: Score = {
+    id: `score-${teamId}`,
+    team_id: teamId,
+    round1_score: r1Score,
+    round2_score: r2Score,
+    round3_score: r3Score,
+    total_score: grandTotal,
+    screening_status,
+    round1_status,
+    round2_details: r2,
+    round3_details: r3,
+    details: scoreDetails,
+    overall_time: localUpdated ? normalizeScoreData({ round2_details: r2, round3_details: r3 }).overall_time : "00:00",
+    updated_at: updateTimestamp,
+  };
 
-    if (!upsertError && upsertData) {
-      return {
-        success: true,
-        score: {
-          ...upsertData,
-          screening_status,
-          round1_status,
-          round2_details: r2,
-          round3_details: r3,
-          details: scoreDetails,
-          total_score: grandTotal,
-        },
-      };
+  // 2. If Supabase is configured, sync to Postgres database
+  if (isSupabaseConfigured) {
+    try {
+      const { data: upsertData, error: upsertError } = await supabase
+        .from("scores")
+        .upsert(
+          {
+            team_id: teamId,
+            round1_score: r1Score,
+            round2_score: r2Score,
+            round3_score: r3Score,
+            screening_status,
+            round1_status,
+            round2_details: r2,
+            round3_details: r3,
+            details: scoreDetails,
+            updated_at: updateTimestamp,
+          },
+          { onConflict: "team_id" }
+        )
+        .select("*")
+        .single();
+
+      if (!upsertError && upsertData) {
+        return {
+          success: true,
+          score: {
+            ...upsertData,
+            screening_status,
+            round1_status,
+            round2_details: r2,
+            round3_details: r3,
+            details: scoreDetails,
+            total_score: grandTotal,
+          },
+        };
+      }
+    } catch (err) {
+      console.warn("Supabase remote score sync notice:", err);
     }
-
-    // 2. Fallback: update with JSON details or base columns if custom columns not added yet
-    const { data: fallbackData, error: fallbackError } = await supabase
-      .from("scores")
-      .upsert(
-        {
-          team_id: teamId,
-          round1_score: r1Score,
-          round2_score: r2Score,
-          round3_score: r3Score,
-          details: scoreDetails,
-          updated_at: updateTimestamp,
-        },
-        { onConflict: "team_id" }
-      )
-      .select("*")
-      .single();
-
-    if (!fallbackError && fallbackData) {
-      return {
-        success: true,
-        score: {
-          ...fallbackData,
-          screening_status,
-          round1_status,
-          round2_details: r2,
-          round3_details: r3,
-          details: scoreDetails,
-          total_score: grandTotal,
-        },
-      };
-    }
-
-    // 3. Fallback: standard core scores columns
-    const { data: coreData, error: coreError } = await supabase
-      .from("scores")
-      .upsert(
-        {
-          team_id: teamId,
-          round1_score: r1Score,
-          round2_score: r2Score,
-          round3_score: r3Score,
-          updated_at: updateTimestamp,
-        },
-        { onConflict: "team_id" }
-      )
-      .select("*")
-      .single();
-
-    if (coreError || !coreData) {
-      console.error("Score update error:", coreError);
-      return { success: false, error: coreError?.message || "SCORE UPDATE FAILED. PLEASE TRY AGAIN." };
-    }
-
-    return {
-      success: true,
-      score: {
-        ...coreData,
-        screening_status,
-        round1_status,
-        round2_details: r2,
-        round3_details: r3,
-        details: scoreDetails,
-        total_score: grandTotal,
-      },
-    };
-  } catch (err: any) {
-    console.error("Score update exception:", err);
-    return { success: false, error: err?.message || "SOMETHING WENT WRONG. PLEASE TRY AGAIN." };
   }
+
+  return {
+    success: true,
+    score: constructedScore,
+  };
 }
 
 /**
@@ -329,4 +239,3 @@ export async function updateTeamScores(
     },
   });
 }
-

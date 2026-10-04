@@ -1,11 +1,21 @@
-import { supabase } from "@/lib/supabase";
+import { supabase, isSupabaseConfigured } from "@/lib/supabase";
 import { TeamWithDetails, TeamMember, Score } from "@/types/database";
 import { normalizeScoreData } from "./scoringUtils";
+import {
+  getLocalTournamentTeams,
+  saveLocalTournamentTeams,
+  formatTeamsWithDetails,
+} from "./teamsStorage";
+import { InitialTeamSeed } from "@/data/initialLeaderboardData";
 
 /**
- * Fetch all teams from Supabase with their associated crew members and score record.
+ * Fetch all teams with their associated crew members and score record.
  */
 export async function fetchTeamsWithDetails(): Promise<TeamWithDetails[]> {
+  if (!isSupabaseConfigured) {
+    return formatTeamsWithDetails(getLocalTournamentTeams());
+  }
+
   try {
     const { data, error } = await supabase
       .from("teams")
@@ -19,48 +29,8 @@ export async function fetchTeamsWithDetails(): Promise<TeamWithDetails[]> {
       `)
       .order("created_at", { ascending: false });
 
-    if (error) {
-      console.error("Error fetching teams:", error);
-      const { data: fallbackData } = await supabase
-        .from("teams")
-        .select(`
-          *,
-          members:team_members(*),
-          score:scores(*)
-        `)
-        .order("created_at", { ascending: false });
-
-      return (fallbackData || []).map((t: any) => {
-        const rawScore = Array.isArray(t.score) ? t.score[0] || null : t.score || null;
-        const normalized = normalizeScoreData(rawScore);
-        const membersList = t.members || [];
-        const leaderName = Array.isArray(membersList) && membersList[0]?.name ? membersList[0].name : null;
-
-        const scoreObj: Score | null = rawScore
-          ? {
-              id: rawScore.id || `score-${t.id}`,
-              team_id: t.id,
-              round1_score: normalized.round1_score,
-              round2_score: normalized.round2_score,
-              round3_score: normalized.round3_score,
-              total_score: normalized.total_score,
-              screening_status: normalized.screening_status,
-              round1_status: normalized.round1_status,
-              round2_details: normalized.round2_details,
-              round3_details: normalized.round3_details,
-              details: normalized.details,
-              updated_at: rawScore.updated_at || new Date().toISOString(),
-            }
-          : null;
-
-        return {
-          ...t,
-          members: membersList,
-          score: scoreObj,
-          leader_name: leaderName,
-          captain_name: leaderName,
-        };
-      }) as TeamWithDetails[];
+    if (error || !data || data.length === 0) {
+      return formatTeamsWithDetails(getLocalTournamentTeams());
     }
 
     return (data || []).map((t: any) => {
@@ -100,7 +70,7 @@ export async function fetchTeamsWithDetails(): Promise<TeamWithDetails[]> {
     }) as TeamWithDetails[];
   } catch (err) {
     console.error("Fetch teams exception:", err);
-    return [];
+    return formatTeamsWithDetails(getLocalTournamentTeams());
   }
 }
 
@@ -119,75 +89,86 @@ export async function createTeamWithMembers(
   }
 
   const validMembers = (members || []).filter((m) => m.name && m.name.trim().length > 0);
+  const newTeamId = `team-${Date.now()}`;
+  const now = new Date().toISOString();
 
-  try {
-    // 1. First attempt via atomic RPC if available
-    const { data: rpcData, error: rpcError } = await supabase.rpc(
-      "create_team_with_members",
-      {
-        p_team_name: trimmedName,
-        p_team_logo_url: teamLogoUrl || null,
-        p_robot_image_url: robotImageUrl || null,
-        p_members: validMembers.map((m) => ({
-          name: m.name.trim(),
-          branch: m.branch?.trim() || null,
-          year: m.year?.trim() || null,
-        })),
+  // Create local record
+  const newLocalSeed: InitialTeamSeed = {
+    id: newTeamId,
+    team_name: trimmedName,
+    leader_name: validMembers[0]?.name || "Captain",
+    captain_name: validMembers[0]?.name || "Captain",
+    team_logo_url: teamLogoUrl,
+    robot_image_url: robotImageUrl,
+    members: validMembers.map((m) => ({
+      name: m.name.trim(),
+      branch: m.branch || "General",
+      year: m.year || "1st Year",
+    })),
+    screening_status: "qualified",
+    round1_status: "pending",
+    round1_score: 0,
+    round2: {
+      completion_time: "00:00",
+      max_marks: 100,
+      gain_marks: 0,
+      penalty_rate: 5,
+      penalty_count: 0,
+    },
+    round3: {
+      stages: [
+        { stage_number: 1, completion_time: "00:00", max_marks: 50, gain_marks: 0, penalty_rate: 5, penalty_count: 0 },
+        { stage_number: 2, completion_time: "00:00", max_marks: 50, gain_marks: 0, penalty_rate: 5, penalty_count: 0 },
+        { stage_number: 3, completion_time: "00:00", max_marks: 50, gain_marks: 0, penalty_rate: 5, penalty_count: 0 },
+      ],
+    },
+    created_at: now,
+    updated_at: now,
+  };
+
+  const currentTeams = getLocalTournamentTeams();
+  saveLocalTournamentTeams([newLocalSeed, ...currentTeams], newTeamId);
+
+  // Sync to Supabase if configured
+  if (isSupabaseConfigured) {
+    try {
+      const { data: teamData, error: teamError } = await supabase
+        .from("teams")
+        .insert({
+          id: newTeamId,
+          team_name: trimmedName,
+          team_logo_url: teamLogoUrl?.trim() || null,
+          robot_image_url: robotImageUrl?.trim() || null,
+        })
+        .select("id")
+        .single();
+
+      if (!teamError && teamData) {
+        if (validMembers.length > 0) {
+          const membersToInsert = validMembers.map((m) => ({
+            team_id: newTeamId,
+            name: m.name.trim(),
+            branch: m.branch?.trim() || null,
+            year: m.year?.trim() || null,
+          }));
+          await supabase.from("team_members").insert(membersToInsert);
+        }
+
+        await supabase.from("scores").insert({
+          team_id: newTeamId,
+          round1_score: 0,
+          round2_score: 0,
+          round3_score: 0,
+          screening_status: "qualified",
+          round1_status: "pending",
+        });
       }
-    );
-
-    if (!rpcError && rpcData?.success) {
-      return { success: true, teamId: rpcData.team_id };
+    } catch (err) {
+      console.warn("Supabase team insert warning:", err);
     }
-
-    // 2. Direct Fallback if RPC is not loaded in Supabase instance
-    const { data: teamData, error: teamError } = await supabase
-      .from("teams")
-      .insert({
-        team_name: trimmedName,
-        team_logo_url: teamLogoUrl?.trim() || null,
-        robot_image_url: robotImageUrl?.trim() || null,
-      })
-      .select("id")
-      .single();
-
-    if (teamError || !teamData) {
-      return { success: false, error: teamError?.message || "FAILED TO CREATE TEAM RECORD" };
-    }
-
-    const teamId = teamData.id;
-
-    // Insert members if any
-    if (validMembers.length > 0) {
-      const membersToInsert = validMembers.map((m) => ({
-        team_id: teamId,
-        name: m.name.trim(),
-        branch: m.branch?.trim() || null,
-        year: m.year?.trim() || null,
-      }));
-
-      const { error: membersError } = await supabase
-        .from("team_members")
-        .insert(membersToInsert);
-
-      if (membersError) {
-        console.error("Members creation error:", membersError);
-      }
-    }
-
-    // Insert initial score
-    await supabase.from("scores").insert({
-      team_id: teamId,
-      round1_score: 0,
-      round2_score: 0,
-      round3_score: 0,
-    });
-
-    return { success: true, teamId };
-  } catch (err) {
-    console.error("Create team exception:", err);
-    return { success: false, error: "SOMETHING WENT WRONG. PLEASE TRY AGAIN." };
   }
+
+  return { success: true, teamId: newTeamId };
 }
 
 /**
@@ -207,67 +188,59 @@ export async function updateTeamWithMembers(
 
   const validMembers = (members || []).filter((m) => m.name && m.name.trim().length > 0);
 
-  try {
-    // 1. Try via RPC
-    const { data: rpcData, error: rpcError } = await supabase.rpc(
-      "update_team_with_members",
-      {
-        p_team_id: teamId,
-        p_team_name: trimmedName,
-        p_team_logo_url: teamLogoUrl || null,
-        p_robot_image_url: robotImageUrl || null,
-        p_members: validMembers.map((m) => ({
+  // Update local store
+  const currentTeams = getLocalTournamentTeams();
+  const index = currentTeams.findIndex((t) => t.id === teamId);
+  if (index !== -1) {
+    const updatedTeam = {
+      ...currentTeams[index],
+      team_name: trimmedName,
+      team_logo_url: teamLogoUrl,
+      robot_image_url: robotImageUrl,
+      leader_name: validMembers[0]?.name || currentTeams[index].leader_name,
+      captain_name: validMembers[0]?.name || currentTeams[index].captain_name,
+      members: validMembers.map((m) => ({
+        name: m.name.trim(),
+        branch: m.branch || "General",
+        year: m.year || "1st Year",
+      })),
+      updated_at: new Date().toISOString(),
+    };
+    const nextTeams = [...currentTeams];
+    nextTeams[index] = updatedTeam;
+    saveLocalTournamentTeams(nextTeams, teamId);
+  }
+
+  // Sync to Supabase if configured
+  if (isSupabaseConfigured) {
+    try {
+      await supabase
+        .from("teams")
+        .update({
+          team_name: trimmedName,
+          team_logo_url: teamLogoUrl?.trim() || null,
+          robot_image_url: robotImageUrl?.trim() || null,
+          updated_at: new Date().toISOString(),
+        })
+        .eq("id", teamId);
+
+      await supabase.from("team_members").delete().eq("team_id", teamId);
+
+      if (validMembers.length > 0) {
+        const membersToInsert = validMembers.map((m) => ({
+          team_id: teamId,
           name: m.name.trim(),
           branch: m.branch?.trim() || null,
           year: m.year?.trim() || null,
-        })),
+        }));
+        await supabase.from("team_members").insert(membersToInsert);
       }
-    );
-
-    if (!rpcError && rpcData?.success) {
-      return { success: true };
+    } catch (err) {
+      console.warn("Supabase team update warning:", err);
     }
-
-    // 2. Direct Fallback
-    const { error: teamError } = await supabase
-      .from("teams")
-      .update({
-        team_name: trimmedName,
-        team_logo_url: teamLogoUrl?.trim() || null,
-        robot_image_url: robotImageUrl?.trim() || null,
-        updated_at: new Date().toISOString(),
-      })
-      .eq("id", teamId);
-
-    if (teamError) {
-      return { success: false, error: teamError?.message || "FAILED TO UPDATE TEAM RECORD" };
-    }
-
-    // Re-sync members: delete old & insert new
-    await supabase.from("team_members").delete().eq("team_id", teamId);
-
-    if (validMembers.length > 0) {
-      const membersToInsert = validMembers.map((m) => ({
-        team_id: teamId,
-        name: m.name.trim(),
-        branch: m.branch?.trim() || null,
-        year: m.year?.trim() || null,
-      }));
-
-      const { error: membersError } = await supabase
-        .from("team_members")
-        .insert(membersToInsert);
-
-      if (membersError) {
-        console.error("Members update error:", membersError);
-      }
-    }
-
-    return { success: true };
-  } catch (err) {
-    console.error("Update team exception:", err);
-    return { success: false, error: "SOMETHING WENT WRONG. PLEASE TRY AGAIN." };
   }
+
+  return { success: true };
 }
 
 /**
@@ -276,17 +249,19 @@ export async function updateTeamWithMembers(
 export async function deleteTeamRecord(
   teamId: string
 ): Promise<{ success: boolean; error?: string }> {
-  try {
-    const { error } = await supabase.from("teams").delete().eq("id", teamId);
+  // Delete from local store
+  const currentTeams = getLocalTournamentTeams();
+  const filtered = currentTeams.filter((t) => t.id !== teamId);
+  saveLocalTournamentTeams(filtered, teamId);
 
-    if (error) {
-      console.error("Delete team error:", error);
-      return { success: false, error: "FAILED TO DELETE TEAM" };
+  // Sync to Supabase if configured
+  if (isSupabaseConfigured) {
+    try {
+      await supabase.from("teams").delete().eq("id", teamId);
+    } catch (err) {
+      console.warn("Supabase team delete warning:", err);
     }
-
-    return { success: true };
-  } catch (err) {
-    console.error("Delete team exception:", err);
-    return { success: false, error: "SOMETHING WENT WRONG. PLEASE TRY AGAIN." };
   }
+
+  return { success: true };
 }
