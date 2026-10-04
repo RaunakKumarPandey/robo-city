@@ -6,54 +6,24 @@ export const dynamic = "force-dynamic";
 
 let memoryImages: EventGalleryImage[] = [];
 
-/**
- * Filter out any mock Unsplash photos so only real uploaded photos are served.
- */
-function sanitizeGalleryImages(images: EventGalleryImage[]): EventGalleryImage[] {
-  return images.filter(
-    (img) =>
-      img &&
-      img.image_url &&
-      !img.image_url.includes("images.unsplash.com") &&
-      !img.image_url.includes("photo-1485827404703") &&
-      !img.image_url.includes("photo-1518770660439") &&
-      !img.image_url.includes("photo-1581092160607") &&
-      !img.image_url.includes("photo-1567427017947") &&
-      !img.image_url.includes("photo-1531482615713") &&
-      !img.image_url.includes("photo-1475721027785")
-  );
-}
-
 export async function GET() {
   if (isSupabaseConfigured) {
     try {
       const supabase = getServiceSupabase();
-
-      // Clean up any legacy Unsplash mock entries in background
-      try {
-        await supabase
-          .from("event_gallery_images")
-          .delete()
-          .ilike("image_url", "%unsplash.com%");
-      } catch {}
-
       const { data, error } = await supabase
         .from("event_gallery_images")
         .select("*")
         .order("display_order", { ascending: true });
 
-      if (!error && Array.isArray(data)) {
-        const clean = sanitizeGalleryImages(data as EventGalleryImage[]);
-        if (clean.length > 0 || memoryImages.length === 0) {
-          memoryImages = clean;
-        }
+      if (!error && Array.isArray(data) && data.length > 0) {
+        memoryImages = data as EventGalleryImage[];
         return NextResponse.json(
           { success: true, data: memoryImages },
           {
             headers: {
               "Cache-Control": "no-store, no-cache, must-revalidate, proxy-revalidate, max-age=0",
-              "Pragma": "no-cache",
-              "Expires": "0",
+              Pragma: "no-cache",
+              Expires: "0",
             },
           }
         );
@@ -63,15 +33,13 @@ export async function GET() {
     }
   }
 
-  // Fast fallback to memoryImages (sanitized)
-  const finalData = sanitizeGalleryImages(memoryImages);
   return NextResponse.json(
-    { success: true, data: finalData },
+    { success: true, data: memoryImages },
     {
       headers: {
         "Cache-Control": "no-store, no-cache, must-revalidate, proxy-revalidate, max-age=0",
-        "Pragma": "no-cache",
-        "Expires": "0",
+        Pragma: "no-cache",
+        Expires: "0",
       },
     }
   );
@@ -98,10 +66,8 @@ export async function POST(request: Request) {
         updated_at: new Date().toISOString(),
       }));
 
-      const cleanBatch = sanitizeGalleryImages(batchRecords);
-
-      // Merge into in-memory store
-      for (const rec of cleanBatch) {
+      // Merge all batch records into memory store without dropping any image
+      for (const rec of batchRecords) {
         const idx = memoryImages.findIndex((img) => img.id === rec.id);
         if (idx >= 0) {
           memoryImages[idx] = rec;
@@ -112,17 +78,17 @@ export async function POST(request: Request) {
       memoryImages.sort((a, b) => (a.display_order ?? 0) - (b.display_order ?? 0));
 
       // Persist batch to Supabase
-      if (isSupabaseConfigured && cleanBatch.length > 0) {
+      if (isSupabaseConfigured && batchRecords.length > 0) {
         try {
           await supabase
             .from("event_gallery_images")
-            .upsert(cleanBatch, { onConflict: "id" });
+            .upsert(batchRecords, { onConflict: "id" });
         } catch (err) {
           console.warn("Supabase batch upsert notice:", err);
         }
       }
 
-      return NextResponse.json({ success: true, count: cleanBatch.length, data: memoryImages });
+      return NextResponse.json({ success: true, count: batchRecords.length, data: memoryImages });
     }
 
     // Single Record Save
@@ -149,7 +115,6 @@ export async function POST(request: Request) {
     } else {
       memoryImages.push(record);
     }
-    memoryImages = sanitizeGalleryImages(memoryImages);
     memoryImages.sort((a, b) => (a.display_order ?? 0) - (b.display_order ?? 0));
 
     // Persist to Supabase
