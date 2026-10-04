@@ -1,5 +1,5 @@
 import { supabase, isSupabaseConfigured } from "@/lib/supabase";
-import { Score, TeamWithDetails, TeamMember, Round2Details, StageDetails, Round3Details, ScoreDetails } from "@/types/database";
+import { Score, TeamMember, Round2Details, StageDetails, Round3Details, ScoreDetails } from "@/types/database";
 import { normalizeScoreData, calculateRound2, calculateRound3 } from "./scoringUtils";
 import { getLocalTournamentTeams, updateLocalTeamScore, formatTeamScoreItems } from "./teamsStorage";
 
@@ -23,9 +23,27 @@ export interface TeamScoreItem {
 }
 
 /**
- * Fetch all teams along with their competition scores from Supabase PostgreSQL or local cache.
+ * Fetch all teams along with their competition scores from server API, Supabase, or local cache.
  */
 export async function fetchTeamsWithScores(): Promise<TeamScoreItem[]> {
+  // 1. In browser, try server-side API endpoint for service-role direct access
+  if (typeof window !== "undefined") {
+    try {
+      const res = await fetch(`/api/admin/scores?_t=${Date.now()}`, {
+        cache: "no-store",
+        headers: { "Cache-Control": "no-cache" },
+      });
+      if (res.ok) {
+        const json = await res.json();
+        if (json.success && Array.isArray(json.data) && json.data.length > 0) {
+          return json.data;
+        }
+      }
+    } catch {
+      // Continue to Supabase / Local fallback
+    }
+  }
+
   if (!isSupabaseConfigured) {
     return formatTeamScoreItems(getLocalTournamentTeams());
   }
@@ -49,7 +67,6 @@ export async function fetchTeamsWithScores(): Promise<TeamScoreItem[]> {
       .order("created_at", { ascending: false });
 
     if (error || !data || data.length === 0) {
-      // Fallback to local tournament teams cache
       return formatTeamScoreItems(getLocalTournamentTeams());
     }
 
@@ -118,7 +135,7 @@ export interface DetailedScoreUpdatePayload {
 /**
  * Update detailed competition score structure including Quiz screening, Viva, Arena 1, and Arena 2 (3 stages).
  * Immediately updates local state & broadcasts to open leaderboard tabs in real-time,
- * and syncs with Supabase database if configured.
+ * and authoritatively saves to PostgreSQL via /api/admin/scores.
  */
 export async function updateDetailedTeamScores(
   payload: DetailedScoreUpdatePayload
@@ -167,7 +184,27 @@ export async function updateDetailedTeamScores(
     updated_at: updateTimestamp,
   };
 
-  // 2. If Supabase is configured, sync to Postgres database
+  // 2. Authoritatively send to server-side API endpoint with Service Role Key
+  if (typeof window !== "undefined") {
+    try {
+      const res = await fetch("/api/admin/scores", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+
+      if (res.ok) {
+        const json = await res.json();
+        if (json.success && json.score) {
+          return { success: true, score: json.score };
+        }
+      }
+    } catch (err) {
+      console.warn("API /api/admin/scores call notice:", err);
+    }
+  }
+
+  // 3. Fallback direct Supabase upsert
   if (isSupabaseConfigured) {
     try {
       const { data: upsertData, error: upsertError } = await supabase
