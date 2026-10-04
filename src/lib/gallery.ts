@@ -37,7 +37,8 @@ function safeSetStorage(key: string, data: any[]): void {
     localStorage.setItem(key, JSON.stringify(data));
   } catch {
     try {
-      localStorage.removeItem(key);
+      const light = data.slice(0, 30);
+      localStorage.setItem(key, JSON.stringify(light));
     } catch {}
   }
 }

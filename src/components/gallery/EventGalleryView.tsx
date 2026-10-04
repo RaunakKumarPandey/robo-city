@@ -43,7 +43,7 @@ const GALLERY_CATEGORIES = [
 export default function EventGalleryView() {
   const [posters, setPosters] = useState<EventPoster[]>(() => getCachedPosters());
   const [images, setImages] = useState<EventGalleryImage[]>(() => getCachedGalleryImages());
-  const [loading, setLoading] = useState<boolean>(false);
+  const [loading, setLoading] = useState<boolean>(() => getCachedGalleryImages().length === 0);
   const [selectedCategory, setSelectedCategory] = useState<string>("ALL PHOTOS");
   const [searchQuery, setSearchQuery] = useState("");
 
@@ -205,7 +205,7 @@ export default function EventGalleryView() {
               className="inline-flex items-center gap-2 rounded-xl border border-[#35D9FF]/40 bg-[#35D9FF]/10 px-4 py-2 font-mono text-xs font-bold text-[#35D9FF] hover:bg-[#35D9FF]/20 hover:border-[#35D9FF] transition-all shadow-[0_0_15px_rgba(53,217,255,0.2)]"
             >
               <Camera className="h-3.5 w-3.5" />
-              <span>EVENT GALLERY ({images.length})</span>
+              <span>EVENT GALLERY ({loading && images.length === 0 ? "..." : images.length})</span>
             </a>
           </div>
         </div>
@@ -382,7 +382,7 @@ export default function EventGalleryView() {
               </span>
             </div>
             <span className="rounded-md border border-[#35D9FF]/40 bg-[#35D9FF]/15 px-2.5 py-0.5 font-mono text-[11px] font-bold text-[#35D9FF] uppercase">
-              {filteredImages.length} PHOTOS DISPLAYED
+              {loading && filteredImages.length === 0 ? "LOADING..." : `${filteredImages.length} PHOTOS DISPLAYED`}
             </span>
           </div>
 
@@ -424,10 +424,10 @@ export default function EventGalleryView() {
           </div>
 
           {/* Photo Gallery Grid */}
-          {loading ? (
-            <div className="py-12 text-center font-mono text-sm text-zinc-400">
+          {loading && images.length === 0 ? (
+            <div className="py-16 text-center font-mono text-sm text-zinc-400">
               <div className="inline-block h-8 w-8 animate-spin rounded-full border-2 border-[#35D9FF] border-t-transparent mb-3" />
-              <div>LOADING PHOTO ARCHIVES...</div>
+              <div className="text-xs font-bold uppercase tracking-widest text-[#35D9FF]">LOADING PHOTO ARCHIVES...</div>
             </div>
           ) : filteredImages.length === 0 ? (
             <div className="rounded-2xl border border-white/10 bg-[#120B20]/60 p-12 text-center backdrop-blur-xl">

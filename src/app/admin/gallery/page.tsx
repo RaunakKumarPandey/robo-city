@@ -51,7 +51,7 @@ export default function AdminGalleryPage() {
   const [activeTab, setActiveTab] = useState<"posters" | "photos">("posters");
   const [posters, setPosters] = useState<EventPoster[]>(() => getCachedPosters());
   const [images, setImages] = useState<EventGalleryImage[]>(() => getCachedGalleryImages());
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState<boolean>(() => getCachedGalleryImages().length === 0);
   const [notification, setNotification] = useState<{
     type: "success" | "error";
     message: string;
@@ -435,17 +435,17 @@ export default function AdminGalleryPage() {
           }`}
         >
           <Camera className="h-4 w-4" />
-          <span>EVENT MOMENTS GALLERY ({images.length})</span>
+          <span>EVENT MOMENTS GALLERY ({loading && images.length === 0 ? "..." : images.length})</span>
         </button>
       </div>
 
       {/* TAB 1: POSTERS MANAGEMENT */}
       {activeTab === "posters" && (
         <div className="space-y-6">
-          {loading ? (
+          {loading && posters.length === 0 ? (
             <div className="py-20 text-center font-mono text-sm text-zinc-400">
               <div className="inline-block h-8 w-8 animate-spin rounded-full border-2 border-[#FF7A3D] border-t-transparent mb-3" />
-              <div>LOADING POSTERS...</div>
+              <div className="text-xs font-bold uppercase tracking-widest text-[#FF7A3D]">LOADING POSTERS...</div>
             </div>
           ) : posters.length === 0 ? (
             <div className="rounded-2xl border border-white/10 bg-[#0F0B1E] p-12 text-center">
@@ -537,10 +537,10 @@ export default function AdminGalleryPage() {
       {/* TAB 2: PHOTOS GALLERY MANAGEMENT */}
       {activeTab === "photos" && (
         <div className="space-y-6">
-          {loading ? (
+          {loading && images.length === 0 ? (
             <div className="py-20 text-center font-mono text-sm text-zinc-400">
               <div className="inline-block h-8 w-8 animate-spin rounded-full border-2 border-[#35D9FF] border-t-transparent mb-3" />
-              <div>LOADING GALLERY PHOTOS...</div>
+              <div className="text-xs font-bold uppercase tracking-widest text-[#35D9FF]">SYNCING GALLERY PHOTOS...</div>
             </div>
           ) : images.length === 0 ? (
             <div className="rounded-2xl border border-white/10 bg-[#0F0B1E] p-12 text-center">
