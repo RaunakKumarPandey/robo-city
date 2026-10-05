@@ -1,19 +1,30 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getSiteVisitCount, recordSiteVisit } from "@/lib/visitors";
+import { getSiteVisitCount, recordSiteVisit, setSiteVisitCount } from "@/lib/visitors";
 
 export const dynamic = "force-dynamic";
 
 /**
+ * Check if the request is from an automated bot, crawler, or preview generator.
+ */
+function isBotUserAgent(userAgent: string | null): boolean {
+  if (!userAgent) return false;
+  const botRegex = /bot|crawl|spider|slurp|facebookexternalhit|lighthouse|vercel|pingdom|uptime|ptst|headless|phantom|postman|insomnia/i;
+  return botRegex.test(userAgent);
+}
+
+/**
  * GET /api/visitors
- * Optional query: ?inc=1 to atomically increment visit count.
- * Without query: returns current cached visit count.
+ * Optional query: ?inc=1 to increment visit count (only for real human sessions).
+ * Without query: returns current real visit count.
  */
 export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url);
     const shouldIncrement = searchParams.get("inc") === "1" || searchParams.get("increment") === "true";
+    const userAgent = request.headers.get("user-agent");
 
-    if (shouldIncrement) {
+    // If bot/spider, do NOT increment, only return current count
+    if (shouldIncrement && !isBotUserAgent(userAgent)) {
       const result = await recordSiteVisit();
       return NextResponse.json(
         { success: true, count: result.count, source: result.source },
@@ -30,14 +41,14 @@ export async function GET(request: NextRequest) {
       { success: true, count: result.count, source: result.source },
       {
         headers: {
-          "Cache-Control": "public, s-maxage=15, stale-while-revalidate=45",
+          "Cache-Control": "public, s-maxage=10, stale-while-revalidate=30",
         },
       }
     );
   } catch (error: any) {
     return NextResponse.json({
       success: true,
-      count: 1240,
+      count: 0,
       source: "error-fallback",
       error: error?.message,
     });
@@ -46,10 +57,17 @@ export async function GET(request: NextRequest) {
 
 /**
  * POST /api/visitors
- * Explicitly increment visit count.
+ * Set or reset real visit count.
  */
-export async function POST() {
+export async function POST(request: NextRequest) {
   try {
+    const body = await request.json().catch(() => ({}));
+    if (typeof body.resetTo === "number" || typeof body.count === "number") {
+      const target = typeof body.resetTo === "number" ? body.resetTo : body.count;
+      const res = await setSiteVisitCount(target);
+      return NextResponse.json({ success: res.success, count: res.count });
+    }
+
     const result = await recordSiteVisit();
     return NextResponse.json(
       { success: true, count: result.count, source: result.source },
@@ -61,10 +79,10 @@ export async function POST() {
     );
   } catch (error: any) {
     return NextResponse.json({
-      success: true,
-      count: 1240,
-      source: "error-fallback",
+      success: false,
+      count: 0,
       error: error?.message,
     });
   }
 }
+

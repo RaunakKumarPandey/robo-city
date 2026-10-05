@@ -4,18 +4,18 @@ import { useEffect, useState } from "react";
 import { Users } from "lucide-react";
 
 export default function VisitorCounter({ className = "" }: { className?: string }) {
-  // Instant synchronous initial value from localStorage or fallback (0ms load, zero layout shift)
+  // Instant synchronous initial value from localStorage or 0 (0ms load, zero layout shift)
   const [visitorCount, setVisitorCount] = useState<number>(() => {
     if (typeof window !== "undefined") {
       try {
         const cached = localStorage.getItem("robocity_cached_visits");
         if (cached) {
           const num = parseInt(cached, 10);
-          if (!isNaN(num) && num > 0) return num;
+          if (!isNaN(num) && num >= 0) return num;
         }
       } catch {}
     }
-    return 1428;
+    return 0;
   });
 
   useEffect(() => {

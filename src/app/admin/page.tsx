@@ -240,9 +240,9 @@ export default function AdminDashboardPage() {
             </span>
           </div>
           <div className="text-3xl font-black font-mono text-white">
-            {counts.visits ? counts.visits.toLocaleString("en-IN") : "1,428"}
+            {counts.visits.toLocaleString("en-IN")}
           </div>
-          <p className="mt-1 text-[11px] text-zinc-400 font-mono">Site traffic logged</p>
+          <p className="mt-1 text-[11px] text-zinc-400 font-mono">Real traffic logged</p>
         </div>
       </div>
 

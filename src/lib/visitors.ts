@@ -1,7 +1,7 @@
 import { getServiceSupabase, isSupabaseConfigured } from "@/lib/supabase";
 
 // Global fallback in-memory counter if Supabase is offline / unconfigured
-let inMemoryVisitorCount = 1240;
+let inMemoryVisitorCount = 0;
 
 /**
  * Increment site visits atomically.
@@ -45,7 +45,6 @@ export async function recordSiteVisit(): Promise<{ count: number; source: string
       return { count: nextCount, source: "supabase-table" };
     }
 
-    // If upsert failed, return memory counter
     inMemoryVisitorCount += 1;
     return { count: inMemoryVisitorCount, source: "memory-fallback" };
   } catch (err) {
@@ -68,7 +67,7 @@ export async function getSiteVisitCount(): Promise<{ count: number; source: stri
 
     // 1. Try RPC function
     const { data: rpcData, error: rpcError } = await db.rpc("get_site_visits");
-    if (!rpcError && typeof rpcData === "number" && rpcData > 0) {
+    if (!rpcError && typeof rpcData === "number" && rpcData >= 0) {
       inMemoryVisitorCount = rpcData;
       return { count: rpcData, source: "supabase-rpc" };
     }
@@ -91,3 +90,30 @@ export async function getSiteVisitCount(): Promise<{ count: number; source: stri
     return { count: inMemoryVisitorCount, source: "memory-fallback" };
   }
 }
+
+/**
+ * Set or reset site visit count in Supabase.
+ */
+export async function setSiteVisitCount(newCount: number): Promise<{ success: boolean; count: number }> {
+  inMemoryVisitorCount = Math.max(0, newCount);
+
+  if (!isSupabaseConfigured) {
+    return { success: true, count: inMemoryVisitorCount };
+  }
+
+  try {
+    const db = getServiceSupabase();
+    const { error } = await db
+      .from("site_stats")
+      .upsert(
+        { id: "global_visits", total_visits: inMemoryVisitorCount, updated_at: new Date().toISOString() },
+        { onConflict: "id" }
+      );
+
+    return { success: !error, count: inMemoryVisitorCount };
+  } catch (err) {
+    console.error("Failed to reset site visits:", err);
+    return { success: false, count: inMemoryVisitorCount };
+  }
+}
+
