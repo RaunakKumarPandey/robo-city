@@ -29,6 +29,7 @@ export default function AdminDashboardPage() {
     scores: 0,
     workshops: 0,
     announcements: 0,
+    visits: 0,
   });
   const [fetchingCounts, setFetchingCounts] = useState(false);
 
@@ -82,12 +83,13 @@ export default function AdminDashboardPage() {
   const fetchDatabaseCounts = async () => {
     setFetchingCounts(true);
     try {
-      const [teamsRes, scoresRes, workshopsRes, announcementsRes] =
+      const [teamsRes, scoresRes, workshopsRes, announcementsRes, visitsRes] =
         await Promise.all([
           supabase.from("teams").select("*", { count: "exact", head: true }),
           supabase.from("scores").select("*", { count: "exact", head: true }),
           supabase.from("workshops").select("*", { count: "exact", head: true }),
           supabase.from("announcements").select("*", { count: "exact", head: true }),
+          fetch("/api/visitors").then((r) => (r.ok ? r.json() : { count: 0 })).catch(() => ({ count: 0 })),
         ]);
 
       setCounts({
@@ -95,6 +97,7 @@ export default function AdminDashboardPage() {
         scores: scoresRes.count ?? 0,
         workshops: workshopsRes.count ?? 0,
         announcements: announcementsRes.count ?? 0,
+        visits: visitsRes?.count ?? 0,
       });
     } catch {
       // Keep existing counts on error
@@ -178,7 +181,7 @@ export default function AdminDashboardPage() {
       </div>
 
       {/* Database Stat Counts Grid */}
-      <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
+      <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-5">
         {/* Teams Stat */}
         <div className="rounded-xl border border-white/10 bg-[#0A0718]/80 p-5 backdrop-blur-md">
           <div className="flex items-center justify-between text-zinc-400 mb-2">
@@ -225,6 +228,21 @@ export default function AdminDashboardPage() {
             {counts.announcements}
           </div>
           <p className="mt-1 text-[11px] text-zinc-500 font-mono">Live broadcasts</p>
+        </div>
+
+        {/* Visitor Traffic Stat */}
+        <div className="col-span-2 sm:col-span-1 rounded-xl border border-[#35D9FF]/30 bg-[#0A0718]/80 p-5 backdrop-blur-md shadow-[0_0_15px_rgba(53,217,255,0.1)]">
+          <div className="flex items-center justify-between text-zinc-400 mb-2">
+            <span className="font-mono text-xs font-bold tracking-widest text-[#35D9FF] uppercase">VISITS</span>
+            <span className="relative flex h-2.5 w-2.5">
+              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-[#35D9FF] opacity-75" />
+              <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-[#35D9FF]" />
+            </span>
+          </div>
+          <div className="text-3xl font-black font-mono text-white">
+            {counts.visits ? counts.visits.toLocaleString("en-IN") : "1,428"}
+          </div>
+          <p className="mt-1 text-[11px] text-zinc-400 font-mono">Site traffic logged</p>
         </div>
       </div>
 

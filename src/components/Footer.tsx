@@ -16,11 +16,11 @@ export default function Footer() {
 
   return (
     <footer className="relative z-10 w-full border-t border-[#FF2D8D]/20 bg-[#08070D]/95 py-10 text-zinc-400 backdrop-blur-xl">
-      <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-        <div className="flex flex-col items-center justify-between gap-6 text-center sm:flex-row sm:text-left">
+      <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 space-y-8">
+        <div className="flex flex-col items-center justify-between gap-6 text-center lg:flex-row lg:text-left">
           {/* Organization & Event */}
           <div className="space-y-1">
-            <div className="flex items-center justify-center sm:justify-start gap-2">
+            <div className="flex items-center justify-center lg:justify-start gap-2">
               <span className="font-mono text-sm font-black tracking-widest text-white uppercase">
                 ROBO CITY // ROBOVERSE &apos;26
               </span>
@@ -31,9 +31,12 @@ export default function Footer() {
             </p>
           </div>
 
-          {/* Tagline */}
-          <div className="font-mono text-xs text-zinc-400">
-            <span className="text-[#FF2D8D] font-black">ROBO CITY</span> — THE CITY NEVER SLEEPS. NEITHER DO THE BOTS.
+          {/* Center: Live Visitor Counter & Tagline */}
+          <div className="flex flex-col items-center gap-2.5">
+            <VisitorCounter />
+            <div className="font-mono text-[11px] text-zinc-400">
+              <span className="text-[#FF2D8D] font-black">ROBO CITY</span> — THE CITY NEVER SLEEPS. NEITHER DO THE BOTS.
+            </div>
           </div>
 
           {/* Social / Contact & Admin Portal */}
@@ -62,9 +65,12 @@ export default function Footer() {
         </div>
 
         {/* Bottom Sub-Strip */}
-        <div className="mt-8 flex flex-col md:flex-row items-center justify-between border-t border-white/5 pt-4 text-[10px] font-mono text-zinc-500 gap-3">
+        <div className="flex flex-col sm:flex-row items-center justify-between border-t border-white/5 pt-4 text-[10px] font-mono text-zinc-500 gap-3">
           <span>GPS COORDINATES: 26.7323° N, 83.4332° E // GORAKHPUR HUB</span>
-          <VisitorCounter />
+          <span className="text-zinc-400 flex items-center gap-1.5">
+            <span className="h-1.5 w-1.5 rounded-full bg-emerald-400 shadow-[0_0_6px_#34d399]" />
+            NETWORK STATUS: 100% OPERATIONAL // ZERO LOAD TELEMETRY
+          </span>
           <span>IEEE-SB MMMUT © 2026 // ALL ARENA PROTOCOLS ACTIVE</span>
         </div>
       </div>
