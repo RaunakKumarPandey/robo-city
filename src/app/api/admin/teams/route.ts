@@ -212,7 +212,7 @@ export async function POST(request: NextRequest) {
     const r3 = createDefaultRound3();
 
     try {
-      await db.from("scores").insert({
+      const { error: fullScoreErr } = await db.from("scores").insert({
         team_id: generatedTeamId,
         round1_score: 0,
         round2_score: 0,
@@ -230,6 +230,16 @@ export async function POST(request: NextRequest) {
         },
         updated_at: now,
       });
+
+      if (fullScoreErr) {
+        console.warn("Full score insert failed, attempting basic score insert:", fullScoreErr.message);
+        await db.from("scores").insert({
+          team_id: generatedTeamId,
+          round1_score: 0,
+          round2_score: 0,
+          round3_score: 0,
+        });
+      }
     } catch (scoreErr) {
       console.warn("Score insert warning:", scoreErr);
     }
