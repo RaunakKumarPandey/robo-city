@@ -566,4 +566,75 @@ BEGIN
   END;
 END $$;
 
+-- ==============================================================================
+-- 13. TABLE & FUNCTIONS: site_stats & Visitor Counter
+-- ==============================================================================
+CREATE TABLE IF NOT EXISTS site_stats (
+  id TEXT PRIMARY KEY,
+  total_visits BIGINT NOT NULL DEFAULT 0,
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+INSERT INTO site_stats (id, total_visits)
+VALUES ('global_visits', 100)
+ON CONFLICT (id) DO NOTHING;
+
+ALTER TABLE site_stats ENABLE ROW LEVEL SECURITY;
+
+DROP POLICY IF EXISTS "Public can view site stats" ON site_stats;
+CREATE POLICY "Public can view site stats"
+  ON site_stats FOR SELECT
+  TO public, anon, authenticated
+  USING (true);
+
+DROP POLICY IF EXISTS "Allow public update site stats" ON site_stats;
+CREATE POLICY "Allow public update site stats"
+  ON site_stats FOR UPDATE
+  TO public, anon, authenticated
+  USING (true)
+  WITH CHECK (true);
+
+DROP POLICY IF EXISTS "Allow public insert site stats" ON site_stats;
+CREATE POLICY "Allow public insert site stats"
+  ON site_stats FOR INSERT
+  TO public, anon, authenticated
+  WITH CHECK (true);
+
+CREATE OR REPLACE FUNCTION increment_site_visits()
+RETURNS BIGINT
+LANGUAGE plpgsql
+SECURITY DEFINER
+AS $$
+DECLARE
+  new_count BIGINT;
+BEGIN
+  INSERT INTO site_stats (id, total_visits, updated_at)
+  VALUES ('global_visits', 1, now())
+  ON CONFLICT (id)
+  DO UPDATE SET
+    total_visits = site_stats.total_visits + 1,
+    updated_at = now()
+  RETURNING total_visits INTO new_count;
+  
+  RETURN new_count;
+END;
+$$;
+
+CREATE OR REPLACE FUNCTION get_site_visits()
+RETURNS BIGINT
+LANGUAGE plpgsql
+SECURITY DEFINER
+AS $$
+DECLARE
+  current_count BIGINT;
+BEGIN
+  SELECT total_visits INTO current_count FROM site_stats WHERE id = 'global_visits';
+  RETURN COALESCE(current_count, 0);
+END;
+$$;
+
+GRANT EXECUTE ON FUNCTION increment_site_visits() TO public, anon, authenticated, service_role;
+GRANT EXECUTE ON FUNCTION get_site_visits() TO public, anon, authenticated, service_role;
+
+
 

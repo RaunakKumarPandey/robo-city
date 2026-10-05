@@ -3,7 +3,8 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { eventData } from "@/data/eventData";
-import { Shield, Sparkles } from "lucide-react";
+import { Shield } from "lucide-react";
+import VisitorCounter from "@/components/VisitorCounter";
 
 export default function Footer() {
   const pathname = usePathname();
@@ -61,8 +62,9 @@ export default function Footer() {
         </div>
 
         {/* Bottom Sub-Strip */}
-        <div className="mt-8 flex flex-col sm:flex-row items-center justify-between border-t border-white/5 pt-4 text-[10px] font-mono text-zinc-500 gap-2">
+        <div className="mt-8 flex flex-col md:flex-row items-center justify-between border-t border-white/5 pt-4 text-[10px] font-mono text-zinc-500 gap-3">
           <span>GPS COORDINATES: 26.7323° N, 83.4332° E // GORAKHPUR HUB</span>
+          <VisitorCounter />
           <span>IEEE-SB MMMUT © 2026 // ALL ARENA PROTOCOLS ACTIVE</span>
         </div>
       </div>
