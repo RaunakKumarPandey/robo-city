@@ -10,6 +10,7 @@ let memoryImages: EventGalleryImage[] = [];
  * Filter out any mock Unsplash photos so only real uploaded photos are served.
  */
 function sanitizeGalleryImages(images: EventGalleryImage[]): EventGalleryImage[] {
+  if (!Array.isArray(images)) return [];
   return images.filter(
     (img) =>
       img &&
@@ -44,11 +45,9 @@ export async function GET() {
 
       if (!error && Array.isArray(data)) {
         const clean = sanitizeGalleryImages(data as EventGalleryImage[]);
-        if (clean.length > 0 || memoryImages.length === 0) {
-          memoryImages = clean;
-        }
+        memoryImages = clean;
         return NextResponse.json(
-          { success: true, data: memoryImages },
+          { success: true, count: clean.length, data: clean },
           {
             headers: {
               "Cache-Control": "no-store, no-cache, must-revalidate, proxy-revalidate, max-age=0",
@@ -66,7 +65,7 @@ export async function GET() {
   // Fast fallback to memoryImages (sanitized)
   const finalData = sanitizeGalleryImages(memoryImages);
   return NextResponse.json(
-    { success: true, data: finalData },
+    { success: true, count: finalData.length, data: finalData },
     {
       headers: {
         "Cache-Control": "no-store, no-cache, must-revalidate, proxy-revalidate, max-age=0",

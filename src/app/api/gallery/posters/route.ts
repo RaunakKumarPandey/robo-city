@@ -1,11 +1,10 @@
 import { NextResponse } from "next/server";
 import { getServiceSupabase, isSupabaseConfigured } from "@/lib/supabase";
-import { initialEventPosters } from "@/data/initialGalleryData";
 import { EventPoster } from "@/types/database";
 
 export const dynamic = "force-dynamic";
 
-let memoryPosters: EventPoster[] = [...initialEventPosters];
+let memoryPosters: EventPoster[] = [];
 
 export async function GET() {
   if (isSupabaseConfigured) {
@@ -16,10 +15,10 @@ export async function GET() {
         .select("*")
         .order("display_order", { ascending: true });
 
-      if (!error && Array.isArray(data) && data.length > 0) {
+      if (!error && Array.isArray(data)) {
         memoryPosters = data as EventPoster[];
         return NextResponse.json(
-          { success: true, data: memoryPosters },
+          { success: true, count: data.length, data },
           {
             headers: {
               "Cache-Control": "no-store, no-cache, must-revalidate, proxy-revalidate, max-age=0",
@@ -29,24 +28,13 @@ export async function GET() {
           }
         );
       }
-
-      // If table is empty, auto-seed initial posters into Supabase
-      if (!error && Array.isArray(data) && data.length === 0) {
-        try {
-          await supabase
-            .from("event_posters")
-            .upsert(initialEventPosters, { onConflict: "id" });
-        } catch {}
-      }
     } catch (err) {
-      console.warn("Supabase GET event_posters notice:", err);
+      console.warn("Supabase GET event_posters error:", err);
     }
   }
 
-  // Fast fallback to memoryPosters or initialEventPosters
-  const finalData = memoryPosters.length > 0 ? memoryPosters : initialEventPosters;
   return NextResponse.json(
-    { success: true, data: finalData },
+    { success: true, count: memoryPosters.length, data: memoryPosters },
     {
       headers: {
         "Cache-Control": "no-store, no-cache, must-revalidate, proxy-revalidate, max-age=0",
@@ -87,18 +75,20 @@ export async function POST(request: Request) {
     memoryPosters.sort((a, b) => (a.display_order ?? 0) - (b.display_order ?? 0));
 
     // Persist to Supabase
-    try {
-      const { data, error } = await supabase
-        .from("event_posters")
-        .upsert([record], { onConflict: "id" })
-        .select()
-        .maybeSingle();
+    if (isSupabaseConfigured) {
+      try {
+        const { data, error } = await supabase
+          .from("event_posters")
+          .upsert([record], { onConflict: "id" })
+          .select()
+          .maybeSingle();
 
-      if (!error && data) {
-        return NextResponse.json({ success: true, data: data || record });
+        if (!error && data) {
+          return NextResponse.json({ success: true, data: data || record });
+        }
+      } catch (err) {
+        console.warn("Supabase upsert poster notice:", err);
       }
-    } catch (err) {
-      console.warn("Supabase upsert poster notice:", err);
     }
 
     return NextResponse.json({ success: true, data: record });
@@ -128,10 +118,12 @@ export async function DELETE(request: Request) {
     memoryPosters = memoryPosters.filter((p) => p.id !== id);
 
     // Persist delete to Supabase
-    try {
-      await supabase.from("event_posters").delete().eq("id", id);
-    } catch (err) {
-      console.warn("Supabase delete poster notice:", err);
+    if (isSupabaseConfigured) {
+      try {
+        await supabase.from("event_posters").delete().eq("id", id);
+      } catch (err) {
+        console.warn("Supabase delete poster notice:", err);
+      }
     }
 
     return NextResponse.json({ success: true });

@@ -56,7 +56,7 @@ export function getCachedPosters(): EventPoster[] {
       const cached = localStorage.getItem(POSTERS_STORAGE_KEY);
       if (cached) {
         const parsed = JSON.parse(cached);
-        if (Array.isArray(parsed) && parsed.length > 0) {
+        if (Array.isArray(parsed)) {
           memoryPostersCache = parsed;
           return parsed;
         }
@@ -64,7 +64,7 @@ export function getCachedPosters(): EventPoster[] {
     } catch {}
   }
 
-  return initialEventPosters;
+  return [];
 }
 
 /**
@@ -131,7 +131,7 @@ export async function fetchEventPosters(): Promise<EventPoster[]> {
       }, 12000);
       if (res.ok) {
         const json = await res.json();
-        if (json.success && Array.isArray(json.data) && json.data.length > 0) {
+        if (json.success && Array.isArray(json.data)) {
           const sorted = json.data.sort(
             (a: EventPoster, b: EventPoster) =>
               (a.display_order ?? 0) - (b.display_order ?? 0)
@@ -160,7 +160,7 @@ export async function fetchEventPosters(): Promise<EventPoster[]> {
 
       const { data, error } = (await Promise.race([supabasePromise, timeoutPromise])) as any;
 
-      if (!error && Array.isArray(data) && data.length > 0) {
+      if (!error && Array.isArray(data)) {
         const sorted = (data as EventPoster[]).sort(
           (a, b) => (a.display_order ?? 0) - (b.display_order ?? 0)
         );
@@ -173,7 +173,7 @@ export async function fetchEventPosters(): Promise<EventPoster[]> {
     }
   }
 
-  // 3. Fallback to cached or default seed
+  // 3. Fallback to cached or empty array
   return getCachedPosters();
 }
 
