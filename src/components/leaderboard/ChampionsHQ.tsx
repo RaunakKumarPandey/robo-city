@@ -101,6 +101,25 @@ export default function ChampionsHQ() {
               loadLeaderboard(false);
             }
           )
+          .on(
+            "postgres_changes",
+            {
+              event: "*",
+              schema: "public",
+              table: "teams",
+            },
+            (payload) => {
+              const teamId =
+                (payload.new as any)?.id || (payload.old as any)?.id;
+
+              if (teamId) {
+                setRecentlyUpdatedId(teamId);
+                setTimeout(() => setRecentlyUpdatedId(null), 4000);
+              }
+
+              loadLeaderboard(false);
+            }
+          )
           .subscribe((status) => {
             if (status === "SUBSCRIBED") {
               setConnectionStatus("LIVE");

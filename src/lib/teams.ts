@@ -1,81 +1,39 @@
-import { supabase, isSupabaseConfigured } from "@/lib/supabase";
-import { TeamWithDetails, TeamMember, Score } from "@/types/database";
-import { normalizeScoreData } from "./scoringUtils";
+import { TeamWithDetails, TeamMember } from "@/types/database";
 import {
   getLocalTournamentTeams,
   saveLocalTournamentTeams,
   formatTeamsWithDetails,
 } from "./teamsStorage";
 import { InitialTeamSeed } from "@/data/initialLeaderboardData";
+import { createDefaultRound2, createDefaultRound3 } from "./scoringUtils";
 
 /**
  * Fetch all teams with their associated crew members and score record.
  */
 export async function fetchTeamsWithDetails(): Promise<TeamWithDetails[]> {
-  if (!isSupabaseConfigured) {
-    return formatTeamsWithDetails(getLocalTournamentTeams());
-  }
-
-  try {
-    const { data, error } = await supabase
-      .from("teams")
-      .select(`
-        *,
-        members:team_members(*),
-        score:scores(*),
-        registrations (
-          captain_name
-        )
-      `)
-      .order("created_at", { ascending: false });
-
-    if (error || !data || data.length === 0) {
-      return formatTeamsWithDetails(getLocalTournamentTeams());
+  // 1. Try server API endpoint for direct service-role access (works on both local & remote Supabase)
+  if (typeof window !== "undefined") {
+    try {
+      const res = await fetch(`/api/admin/teams?_t=${Date.now()}`, {
+        cache: "no-store",
+        headers: { "Cache-Control": "no-cache" },
+      });
+      if (res.ok) {
+        const json = await res.json();
+        if (json.success && Array.isArray(json.data) && json.data.length > 0) {
+          return json.data;
+        }
+      }
+    } catch {
+      // Fall through to local tournament teams
     }
-
-    return (data || []).map((t: any) => {
-      const regObj = Array.isArray(t.registrations) ? t.registrations[0] : t.registrations;
-      const membersList = t.members || [];
-      const leaderName =
-        regObj?.captain_name?.trim() ||
-        (Array.isArray(membersList) && membersList[0]?.name ? membersList[0].name.trim() : null);
-
-      const rawScore = Array.isArray(t.score) ? t.score[0] || null : t.score || null;
-      const normalized = normalizeScoreData(rawScore, t.team_name, leaderName, membersList);
-
-      const scoreObj: Score | null = rawScore
-        ? {
-            id: rawScore.id || `score-${t.id}`,
-            team_id: t.id,
-            round1_score: normalized.round1_score,
-            round2_score: normalized.round2_score,
-            round3_score: normalized.round3_score,
-            total_score: normalized.total_score,
-            screening_status: normalized.screening_status,
-            round1_status: normalized.round1_status,
-            round2_details: normalized.round2_details,
-            round3_details: normalized.round3_details,
-            details: normalized.details,
-            updated_at: rawScore.updated_at || new Date().toISOString(),
-          }
-        : null;
-
-      return {
-        ...t,
-        members: membersList,
-        score: scoreObj,
-        leader_name: leaderName,
-        captain_name: leaderName,
-      };
-    }) as TeamWithDetails[];
-  } catch (err) {
-    console.error("Fetch teams exception:", err);
-    return formatTeamsWithDetails(getLocalTournamentTeams());
   }
+
+  return formatTeamsWithDetails(getLocalTournamentTeams());
 }
 
 /**
- * Create a team along with 3-5 members and an initial zero-score record.
+ * Create a team along with members, captain registration, and initial score record.
  */
 export async function createTeamWithMembers(
   teamName: string,
@@ -89,15 +47,71 @@ export async function createTeamWithMembers(
   }
 
   const validMembers = (members || []).filter((m) => m.name && m.name.trim().length > 0);
-  const newTeamId = `team-${Date.now()}`;
+  const captainName = validMembers[0]?.name || "Captain";
   const now = new Date().toISOString();
 
-  // Create local record
+  // 1. In browser, send to server API endpoint (/api/admin/teams)
+  if (typeof window !== "undefined") {
+    try {
+      const res = await fetch("/api/admin/teams", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          team_name: trimmedName,
+          team_logo_url: teamLogoUrl?.trim() || null,
+          robot_image_url: robotImageUrl?.trim() || null,
+          members: validMembers,
+        }),
+      });
+
+      if (res.ok) {
+        const json = await res.json();
+        if (json.success && json.teamId) {
+          // Notify any other tabs & components
+          saveLocalTournamentTeams(
+            [
+              {
+                id: json.teamId,
+                team_name: trimmedName,
+                leader_name: captainName,
+                captain_name: captainName,
+                team_logo_url: teamLogoUrl,
+                robot_image_url: robotImageUrl,
+                members: validMembers.map((m) => ({
+                  name: m.name.trim(),
+                  branch: m.branch || "General",
+                  year: m.year || "1st Year",
+                })),
+                screening_status: "qualified",
+                round1_status: "pending",
+                round1_score: 0,
+                round2: createDefaultRound2(),
+                round3: createDefaultRound3(),
+                created_at: now,
+                updated_at: now,
+              },
+              ...getLocalTournamentTeams().filter((t) => t.id !== json.teamId),
+            ],
+            json.teamId
+          );
+
+          return { success: true, teamId: json.teamId };
+        } else if (json.error) {
+          return { success: false, error: json.error };
+        }
+      }
+    } catch (err: any) {
+      console.warn("POST /api/admin/teams fetch error:", err);
+    }
+  }
+
+  // 2. Fallback to local tournament store
+  const newTeamId = `team-${Date.now()}`;
   const newLocalSeed: InitialTeamSeed = {
     id: newTeamId,
     team_name: trimmedName,
-    leader_name: validMembers[0]?.name || "Captain",
-    captain_name: validMembers[0]?.name || "Captain",
+    leader_name: captainName,
+    captain_name: captainName,
     team_logo_url: teamLogoUrl,
     robot_image_url: robotImageUrl,
     members: validMembers.map((m) => ({
@@ -108,65 +122,14 @@ export async function createTeamWithMembers(
     screening_status: "qualified",
     round1_status: "pending",
     round1_score: 0,
-    round2: {
-      completion_time: "00:00",
-      max_marks: 100,
-      gain_marks: 0,
-      penalty_rate: 5,
-      penalty_count: 0,
-    },
-    round3: {
-      stages: [
-        { stage_number: 1, completion_time: "00:00", max_marks: 50, gain_marks: 0, penalty_rate: 5, penalty_count: 0 },
-        { stage_number: 2, completion_time: "00:00", max_marks: 50, gain_marks: 0, penalty_rate: 5, penalty_count: 0 },
-        { stage_number: 3, completion_time: "00:00", max_marks: 50, gain_marks: 0, penalty_rate: 5, penalty_count: 0 },
-      ],
-    },
+    round2: createDefaultRound2(),
+    round3: createDefaultRound3(),
     created_at: now,
     updated_at: now,
   };
 
   const currentTeams = getLocalTournamentTeams();
   saveLocalTournamentTeams([newLocalSeed, ...currentTeams], newTeamId);
-
-  // Sync to Supabase if configured
-  if (isSupabaseConfigured) {
-    try {
-      const { data: teamData, error: teamError } = await supabase
-        .from("teams")
-        .insert({
-          id: newTeamId,
-          team_name: trimmedName,
-          team_logo_url: teamLogoUrl?.trim() || null,
-          robot_image_url: robotImageUrl?.trim() || null,
-        })
-        .select("id")
-        .single();
-
-      if (!teamError && teamData) {
-        if (validMembers.length > 0) {
-          const membersToInsert = validMembers.map((m) => ({
-            team_id: newTeamId,
-            name: m.name.trim(),
-            branch: m.branch?.trim() || null,
-            year: m.year?.trim() || null,
-          }));
-          await supabase.from("team_members").insert(membersToInsert);
-        }
-
-        await supabase.from("scores").insert({
-          team_id: newTeamId,
-          round1_score: 0,
-          round2_score: 0,
-          round3_score: 0,
-          screening_status: "qualified",
-          round1_status: "pending",
-        });
-      }
-    } catch (err) {
-      console.warn("Supabase team insert warning:", err);
-    }
-  }
 
   return { success: true, teamId: newTeamId };
 }
@@ -187,8 +150,55 @@ export async function updateTeamWithMembers(
   }
 
   const validMembers = (members || []).filter((m) => m.name && m.name.trim().length > 0);
+  const captainName = validMembers[0]?.name || "Captain";
 
-  // Update local store
+  if (typeof window !== "undefined") {
+    try {
+      const res = await fetch("/api/admin/teams", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          id: teamId,
+          team_name: trimmedName,
+          team_logo_url: teamLogoUrl?.trim() || null,
+          robot_image_url: robotImageUrl?.trim() || null,
+          members: validMembers,
+        }),
+      });
+
+      if (res.ok) {
+        const json = await res.json();
+        if (json.success) {
+          // Update local store
+          const currentTeams = getLocalTournamentTeams();
+          const index = currentTeams.findIndex((t) => t.id === teamId);
+          if (index !== -1) {
+            const nextTeams = [...currentTeams];
+            nextTeams[index] = {
+              ...nextTeams[index],
+              team_name: trimmedName,
+              team_logo_url: teamLogoUrl,
+              robot_image_url: robotImageUrl,
+              leader_name: captainName,
+              captain_name: captainName,
+              members: validMembers.map((m) => ({
+                name: m.name.trim(),
+                branch: m.branch || "General",
+                year: m.year || "1st Year",
+              })),
+              updated_at: new Date().toISOString(),
+            };
+            saveLocalTournamentTeams(nextTeams, teamId);
+          }
+          return { success: true };
+        }
+      }
+    } catch (err: any) {
+      console.warn("PUT /api/admin/teams error:", err);
+    }
+  }
+
+  // Fallback update local store
   const currentTeams = getLocalTournamentTeams();
   const index = currentTeams.findIndex((t) => t.id === teamId);
   if (index !== -1) {
@@ -197,8 +207,8 @@ export async function updateTeamWithMembers(
       team_name: trimmedName,
       team_logo_url: teamLogoUrl,
       robot_image_url: robotImageUrl,
-      leader_name: validMembers[0]?.name || currentTeams[index].leader_name,
-      captain_name: validMembers[0]?.name || currentTeams[index].captain_name,
+      leader_name: captainName,
+      captain_name: captainName,
       members: validMembers.map((m) => ({
         name: m.name.trim(),
         branch: m.branch || "General",
@@ -211,35 +221,6 @@ export async function updateTeamWithMembers(
     saveLocalTournamentTeams(nextTeams, teamId);
   }
 
-  // Sync to Supabase if configured
-  if (isSupabaseConfigured) {
-    try {
-      await supabase
-        .from("teams")
-        .update({
-          team_name: trimmedName,
-          team_logo_url: teamLogoUrl?.trim() || null,
-          robot_image_url: robotImageUrl?.trim() || null,
-          updated_at: new Date().toISOString(),
-        })
-        .eq("id", teamId);
-
-      await supabase.from("team_members").delete().eq("team_id", teamId);
-
-      if (validMembers.length > 0) {
-        const membersToInsert = validMembers.map((m) => ({
-          team_id: teamId,
-          name: m.name.trim(),
-          branch: m.branch?.trim() || null,
-          year: m.year?.trim() || null,
-        }));
-        await supabase.from("team_members").insert(membersToInsert);
-      }
-    } catch (err) {
-      console.warn("Supabase team update warning:", err);
-    }
-  }
-
   return { success: true };
 }
 
@@ -249,19 +230,29 @@ export async function updateTeamWithMembers(
 export async function deleteTeamRecord(
   teamId: string
 ): Promise<{ success: boolean; error?: string }> {
-  // Delete from local store
+  if (typeof window !== "undefined") {
+    try {
+      const res = await fetch(`/api/admin/teams?id=${encodeURIComponent(teamId)}`, {
+        method: "DELETE",
+      });
+      if (res.ok) {
+        const json = await res.json();
+        if (json.success) {
+          const currentTeams = getLocalTournamentTeams();
+          const filtered = currentTeams.filter((t) => t.id !== teamId);
+          saveLocalTournamentTeams(filtered, teamId);
+          return { success: true };
+        }
+      }
+    } catch (err: any) {
+      console.warn("DELETE /api/admin/teams error:", err);
+    }
+  }
+
+  // Fallback local delete
   const currentTeams = getLocalTournamentTeams();
   const filtered = currentTeams.filter((t) => t.id !== teamId);
   saveLocalTournamentTeams(filtered, teamId);
-
-  // Sync to Supabase if configured
-  if (isSupabaseConfigured) {
-    try {
-      await supabase.from("teams").delete().eq("id", teamId);
-    } catch (err) {
-      console.warn("Supabase team delete warning:", err);
-    }
-  }
 
   return { success: true };
 }
