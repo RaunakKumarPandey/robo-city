@@ -54,9 +54,9 @@ export async function GET() {
 
     const items = teamsData.map((t: any) => {
       const rawScore = scoreMap.get(t.id) || null;
-      const normalized = normalizeScoreData(rawScore);
       const membersList = memberMap.get(t.id) || [];
       const leaderName = regMap.get(t.id) || (membersList[0]?.name ? membersList[0].name.trim() : null);
+      const normalized = normalizeScoreData(rawScore, t.team_name, leaderName, membersList);
 
       const scoreObj = rawScore
         ? {

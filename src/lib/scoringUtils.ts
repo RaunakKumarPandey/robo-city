@@ -5,6 +5,7 @@ import {
   ScoreDetails,
   Score,
 } from "@/types/database";
+import { getDefaultScreeningStatus } from "@/data/qualifiedTeamsSeed";
 
 export const DEFAULT_ROUND2_MAX_MARKS = 100;
 export const DEFAULT_ROUND2_PENALTY_RATE = 5;
@@ -104,7 +105,7 @@ export function createDefaultRound3(): Round3Details {
 
 export function createDefaultScoreDetails(): ScoreDetails {
   return {
-    screening_status: "qualified",
+    screening_status: "not_qualified",
     round1_status: "pending",
     round2: createDefaultRound2(),
     round3: createDefaultRound3(),
@@ -185,8 +186,14 @@ export function calculateRound3(stagesInput?: Partial<StageDetails>[] | null): R
 
 /**
  * Normalizes raw score object from database or JSON into standardized scoring structures.
+ * If screening_status is not explicitly set in database/details, matches against the PDF qualified list.
  */
-export function normalizeScoreData(rawScore: any): {
+export function normalizeScoreData(
+  rawScore: any,
+  teamName?: string | null,
+  leaderName?: string | null,
+  members?: { name?: string | null }[] | null
+): {
   screening_status: "qualified" | "not_qualified";
   round1_status: "qualified" | "not_qualified" | "pending";
   round1_score: number;
@@ -199,8 +206,15 @@ export function normalizeScoreData(rawScore: any): {
   details: ScoreDetails;
 } {
   const details = rawScore?.details || {};
-  const screening_status: "qualified" | "not_qualified" =
-    rawScore?.screening_status || details?.screening_status || "qualified";
+
+  // Check explicit database record first
+  let screening_status: "qualified" | "not_qualified" =
+    rawScore?.screening_status || details?.screening_status;
+
+  // If not explicitly recorded, match against PDF schedule
+  if (!screening_status) {
+    screening_status = getDefaultScreeningStatus(teamName, leaderName, members);
+  }
 
   const round1_status: "qualified" | "not_qualified" | "pending" =
     rawScore?.round1_status || details?.round1_status || "pending";
@@ -234,7 +248,7 @@ export function normalizeScoreData(rawScore: any): {
   const round2_score = r2.total_marks;
   const round3_score = r3.total_marks;
 
-  // Total tournament score is Round 2 + Round 3
+  // Total tournament score is Round 2 + Round 3 (0 if not qualified)
   const total_score =
     screening_status === "not_qualified" ? 0 : round2_score + round3_score;
 

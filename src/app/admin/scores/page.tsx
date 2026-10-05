@@ -99,11 +99,34 @@ export default function AdminScoresPage() {
     loadScores();
   }, []);
 
+  const [syncingPdf, setSyncingPdf] = useState(false);
+
   const loadScores = async () => {
     setLoading(true);
     const data = await fetchTeamsWithScores();
     setTeams(data);
     setLoading(false);
+  };
+
+  const handleSyncPdfQualification = async () => {
+    setSyncingPdf(true);
+    try {
+      const res = await fetch("/api/admin/sync-qualification", { method: "POST" });
+      const json = await res.json();
+      if (json.success) {
+        showFeedback(
+          "success",
+          `PDF MATCH COMPLETE: ${json.qualified_count ?? 0} QUALIFIED, ${json.not_qualified_count ?? 0} NOT QUALIFIED`
+        );
+        await loadScores();
+      } else {
+        showFeedback("error", json.error || "FAILED TO SYNC PDF QUALIFICATION");
+      }
+    } catch {
+      showFeedback("error", "SYNC REQUEST FAILED");
+    } finally {
+      setSyncingPdf(false);
+    }
   };
 
   const showFeedback = (type: "success" | "error", message: string) => {
@@ -337,14 +360,25 @@ export default function AdminScoresPage() {
             </p>
           </div>
 
-          <button
-            onClick={loadScores}
-            disabled={loading}
-            className="inline-flex items-center gap-2 self-start rounded-lg border border-white/10 bg-white/5 px-4 py-2 text-xs font-mono font-bold tracking-wider text-zinc-300 uppercase transition-colors hover:bg-white/10 hover:text-white disabled:opacity-50 cursor-pointer"
-          >
-            <RefreshCw className={`h-3.5 w-3.5 ${loading ? "animate-spin" : ""}`} />
-            <span>REFRESH SCORES</span>
-          </button>
+          <div className="flex flex-wrap items-center gap-2.5 self-start">
+            <button
+              onClick={handleSyncPdfQualification}
+              disabled={syncingPdf || loading}
+              className="inline-flex items-center gap-2 rounded-lg border border-[#00F0FF]/40 bg-[#00F0FF]/10 px-4 py-2 text-xs font-mono font-bold tracking-wider text-[#00F0FF] uppercase transition-colors hover:bg-[#00F0FF]/20 disabled:opacity-50 cursor-pointer shadow-[0_0_12px_rgba(0,240,255,0.2)]"
+            >
+              <Sparkles className={`h-3.5 w-3.5 ${syncingPdf ? "animate-spin" : ""}`} />
+              <span>{syncingPdf ? "SYNCING PDF..." : "AUTO-SYNC PDF STATUS"}</span>
+            </button>
+
+            <button
+              onClick={loadScores}
+              disabled={loading}
+              className="inline-flex items-center gap-2 rounded-lg border border-white/10 bg-white/5 px-4 py-2 text-xs font-mono font-bold tracking-wider text-zinc-300 uppercase transition-colors hover:bg-white/10 hover:text-white disabled:opacity-50 cursor-pointer"
+            >
+              <RefreshCw className={`h-3.5 w-3.5 ${loading ? "animate-spin" : ""}`} />
+              <span>REFRESH SCORES</span>
+            </button>
+          </div>
         </div>
 
         {/* Feedback Alert Banner */}

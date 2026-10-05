@@ -78,7 +78,7 @@ export async function fetchTeamsWithScores(): Promise<TeamScoreItem[]> {
         (Array.isArray(membersList) && membersList[0]?.name ? membersList[0].name.trim() : null);
 
       const rawScore = Array.isArray(t.score) ? t.score[0] || null : t.score || null;
-      const normalized = normalizeScoreData(rawScore);
+      const normalized = normalizeScoreData(rawScore, t.team_name, leaderName, membersList);
 
       const scoreObj: Score | null = rawScore
         ? {

@@ -123,7 +123,7 @@ export async function fetchLeaderboardData(client?: any): Promise<LeaderboardEnt
         regObj?.captain_name?.trim() ||
         (Array.isArray(rawMembers) && rawMembers[0]?.name ? rawMembers[0].name.trim() : null);
 
-      const normalized = normalizeScoreData(scoreObj);
+      const normalized = normalizeScoreData(scoreObj, t.team_name, leaderName, rawMembers);
 
       return {
         id: t.id,
