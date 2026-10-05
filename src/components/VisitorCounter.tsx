@@ -21,30 +21,21 @@ export default function VisitorCounter({ className = "" }: { className?: string 
   useEffect(() => {
     let isCancelled = false;
 
-    // Asynchronous non-blocking background fetch (zero impact on page rendering or network speed)
+    // Asynchronous non-blocking background fetch — increments on EVERY page load / refresh
     const fetchVisits = async () => {
       try {
-        const isCountedInSession =
-          typeof window !== "undefined" &&
-          sessionStorage.getItem("robocity_visit_recorded") === "1";
-
-        const endpoint = isCountedInSession ? "/api/visitors" : "/api/visitors?inc=1";
-
-        const res = await fetch(endpoint, {
+        const res = await fetch("/api/visitors?inc=1", {
           priority: "low" as any,
           headers: { "Content-Type": "application/json" },
         });
 
         if (res.ok && !isCancelled) {
           const data = await res.json();
-          if (data && typeof data.count === "number" && data.count > 0) {
+          if (data && typeof data.count === "number" && data.count >= 0) {
             setVisitorCount(data.count);
             if (typeof window !== "undefined") {
               try {
                 localStorage.setItem("robocity_cached_visits", data.count.toString());
-                if (!isCountedInSession) {
-                  sessionStorage.setItem("robocity_visit_recorded", "1");
-                }
               } catch {}
             }
           }
