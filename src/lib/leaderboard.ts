@@ -15,8 +15,13 @@ import { getInitialLeaderboardEntries } from "@/data/initialLeaderboardData";
  * - Real-time responsive and never crashes.
  */
 export async function fetchLeaderboardData(client?: any): Promise<LeaderboardEntry[]> {
-  // If running in browser and no custom client passed, first try /api/leaderboard with timeout
-  if (typeof window !== "undefined" && !client) {
+  // If Supabase is not configured, directly return local tournament store
+  if (!isSupabaseConfigured && !client) {
+    return formatLeaderboardEntries(getLocalTournamentTeams());
+  }
+
+  // If running in browser and Supabase is configured, try /api/leaderboard with timeout
+  if (typeof window !== "undefined" && !client && isSupabaseConfigured) {
     try {
       const controller = new AbortController();
       const timer = setTimeout(() => controller.abort(), 4000);
@@ -34,14 +39,6 @@ export async function fetchLeaderboardData(client?: any): Promise<LeaderboardEnt
     } catch {
       // Fall through to local/supabase direct query
     }
-  }
-
-  // If Supabase is not configured or in browser fallback, return local store
-  if (!isSupabaseConfigured && !client) {
-    if (typeof window !== "undefined") {
-      return formatLeaderboardEntries(getLocalTournamentTeams());
-    }
-    return getInitialLeaderboardEntries();
   }
 
   const db = client || (typeof window === "undefined" ? getServiceSupabase() : supabase);

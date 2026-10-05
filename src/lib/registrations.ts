@@ -1,5 +1,7 @@
-import { supabase } from "@/lib/supabase";
+import { supabase, isSupabaseConfigured } from "@/lib/supabase";
 import { RegistrationSubmission, RegistrationResult } from "@/types/database";
+import { getLocalTournamentTeams, saveLocalTournamentTeams } from "./teamsStorage";
+import { createDefaultRound2, createDefaultRound3 } from "./scoringUtils";
 
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
@@ -85,6 +87,45 @@ export async function submitRegistration(
     year: m.year?.trim() || null,
     role: m.role?.trim() || "Member",
   }));
+
+  if (!isSupabaseConfigured) {
+    const newTeamId = `team-${Date.now()}`;
+    const randomSuffix = Math.floor(1000 + Math.random() * 9000);
+    const regNumber = `RBV-${randomSuffix}`;
+    const now = new Date().toISOString();
+
+    const localTeam = {
+      id: newTeamId,
+      team_name: teamName,
+      leader_name: captainName,
+      captain_name: captainName,
+      team_logo_url: null,
+      robot_image_url: robotImageUrl,
+      members: members.map((m) => ({
+        name: m.name,
+        branch: m.branch || "General",
+        year: m.year || "1st Year",
+      })),
+      screening_status: "qualified" as const,
+      round1_status: "pending" as const,
+      round1_score: 0,
+      round2: createDefaultRound2(),
+      round3: createDefaultRound3(),
+      created_at: now,
+      updated_at: now,
+    };
+
+    const current = getLocalTournamentTeams();
+    saveLocalTournamentTeams([localTeam, ...current], newTeamId);
+
+    return {
+      success: true,
+      registrationId: `reg-${Date.now()}`,
+      registrationNumber: regNumber,
+      teamId: newTeamId,
+      status: "pending",
+    };
+  }
 
   try {
     // 1. First attempt: Atomic Database RPC Function

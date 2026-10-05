@@ -41,10 +41,6 @@ function safeSetStorage(data: InitialTeamSeed[]): void {
  * Get current tournament teams (In-memory -> localStorage -> Initial Seed).
  */
 export function getLocalTournamentTeams(): InitialTeamSeed[] {
-  if (memoryTeamsCache && memoryTeamsCache.length > 0) {
-    return memoryTeamsCache;
-  }
-
   if (typeof window !== "undefined") {
     try {
       const stored = localStorage.getItem(TEAMS_STORAGE_KEY);
@@ -56,6 +52,10 @@ export function getLocalTournamentTeams(): InitialTeamSeed[] {
         }
       }
     } catch {}
+  }
+
+  if (memoryTeamsCache && memoryTeamsCache.length > 0) {
+    return memoryTeamsCache;
   }
 
   memoryTeamsCache = [...initialTournamentTeams];

@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { getServiceSupabase, isSupabaseConfigured } from "@/lib/supabase";
 import { fetchLeaderboardData } from "@/lib/leaderboard";
-import { getInitialLeaderboardEntries } from "@/data/initialLeaderboardData";
+import { getLocalTournamentTeams, formatLeaderboardEntries } from "@/lib/teamsStorage";
 
 export const dynamic = "force-dynamic";
 
@@ -12,7 +12,7 @@ export const dynamic = "force-dynamic";
 export async function GET() {
   try {
     if (!isSupabaseConfigured) {
-      const fallbackList = getInitialLeaderboardEntries();
+      const fallbackList = formatLeaderboardEntries(getLocalTournamentTeams());
       return NextResponse.json({
         success: true,
         source: "local-seed-store",
@@ -67,7 +67,7 @@ export async function GET() {
       .filter((t) => !scoreTeamIds.has(t.id))
       .map((t) => ({ id: t.id, team_name: t.team_name }));
 
-    const finalData = list.length > 0 ? list : getInitialLeaderboardEntries();
+    const finalData = list.length > 0 ? list : formatLeaderboardEntries(getLocalTournamentTeams());
 
     return NextResponse.json({
       success: true,
@@ -90,7 +90,7 @@ export async function GET() {
       data: finalData,
     });
   } catch (err: any) {
-    const fallbackList = getInitialLeaderboardEntries();
+    const fallbackList = formatLeaderboardEntries(getLocalTournamentTeams());
     return NextResponse.json({
       success: true,
       source: "fallback-on-error",
