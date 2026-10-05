@@ -1,6 +1,6 @@
 /**
  * Official Qualified Teams & Leaders list from the Screening Schedule PDF (Quiz & Kit buyers).
- * Teams matching this list default to "qualified", while other teams default to "not_qualified".
+ * Only teams matching this list will be "qualified" by default. All other teams will be "not_qualified".
  * Admin can manually override any team's status in the Admin Console.
  */
 
@@ -139,7 +139,7 @@ export const QUALIFIED_TEAMS_PDF: QualifiedEntry[] = [
 ];
 
 /**
- * Standardize string for fuzzy/normalized comparison
+ * Standardize string for normalized comparison
  */
 function cleanStr(s?: string | null): string {
   if (!s) return "";
@@ -163,31 +163,42 @@ export function isTeamPdfQualified(
 
   if (!cleanTeam && !cleanCap && cleanMembers.length === 0) return false;
 
+  // Ignore probe / diagnostic test teams
+  if (cleanTeam.includes("diagnostic") || cleanTeam.includes("probe") || cleanTeam.includes("test")) {
+    return false;
+  }
+
   for (const entry of QUALIFIED_TEAMS_PDF) {
     const entryTeam = cleanStr(entry.teamName);
     const entryLead = cleanStr(entry.leaderName);
 
-    // 1. Exact or Substring match on Team Name
-    if (cleanTeam && entryTeam) {
-      if (cleanTeam === entryTeam) return true;
+    // 1. Exact Match on Team Name
+    if (cleanTeam && entryTeam && cleanTeam === entryTeam) {
+      return true;
+    }
+
+    // 2. Exact Match on Leader/Captain Name
+    if (cleanCap && entryLead && cleanCap === entryLead) {
+      return true;
+    }
+
+    // 3. Substring match with minimum length check to avoid accidental false positives
+    if (cleanTeam && entryTeam && cleanTeam.length >= 5 && entryTeam.length >= 5) {
       if (cleanTeam.includes(entryTeam) || entryTeam.includes(cleanTeam)) {
-        // Double check length so we don't false positive on tiny strings
-        if (cleanTeam.length >= 4 && entryTeam.length >= 4) return true;
+        return true;
       }
     }
 
-    // 2. Exact or Substring match on Leader Name
-    if (cleanCap && entryLead) {
-      if (cleanCap === entryLead) return true;
+    if (cleanCap && entryLead && cleanCap.length >= 6 && entryLead.length >= 6) {
       if (cleanCap.includes(entryLead) || entryLead.includes(cleanCap)) {
-        if (cleanCap.length >= 4 && entryLead.length >= 4) return true;
+        return true;
       }
     }
 
-    // 3. Match against any crew member
+    // 4. Match against any crew member
     if (entryLead) {
       for (const cm of cleanMembers) {
-        if (cm === entryLead || (cm.length >= 4 && cm.includes(entryLead))) {
+        if (cm === entryLead || (cm.length >= 6 && cm.includes(entryLead))) {
           return true;
         }
       }

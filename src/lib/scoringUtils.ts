@@ -207,12 +207,13 @@ export function normalizeScoreData(
 } {
   const details = rawScore?.details || {};
 
-  // Check explicit database record first
-  let screening_status: "qualified" | "not_qualified" =
-    rawScore?.screening_status || details?.screening_status;
+  // If explicitly overridden by admin (flagged via admin_manually_set), respect it.
+  // Otherwise, determine screening status by matching against the PDF qualified schedule.
+  let screening_status: "qualified" | "not_qualified";
 
-  // If not explicitly recorded, match against PDF schedule
-  if (!screening_status) {
+  if (details?.admin_manually_set === true && (rawScore?.screening_status || details?.screening_status)) {
+    screening_status = (rawScore?.screening_status || details?.screening_status) as "qualified" | "not_qualified";
+  } else {
     screening_status = getDefaultScreeningStatus(teamName, leaderName, members);
   }
 

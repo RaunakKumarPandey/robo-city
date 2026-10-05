@@ -136,7 +136,8 @@ export async function POST(request: Request) {
       round1_status,
       round2: r2,
       round3: r3,
-    };
+      admin_manually_set: true,
+    } as any;
 
     const updateTimestamp = new Date().toISOString();
 
