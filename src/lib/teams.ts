@@ -6,12 +6,18 @@ import {
 } from "./teamsStorage";
 import { InitialTeamSeed } from "@/data/initialLeaderboardData";
 import { createDefaultRound2, createDefaultRound3 } from "./scoringUtils";
+import { isSupabaseConfigured } from "./supabase";
 
 /**
  * Fetch all teams with their associated crew members and score record.
  */
 export async function fetchTeamsWithDetails(): Promise<TeamWithDetails[]> {
-  // 1. Try server API endpoint for direct service-role access (works on both local & remote Supabase)
+  // 1. If Supabase is NOT configured, return local tournament store directly from browser localStorage
+  if (!isSupabaseConfigured) {
+    return formatTeamsWithDetails(getLocalTournamentTeams());
+  }
+
+  // 2. If Supabase IS configured, try server API endpoint for direct service-role access
   if (typeof window !== "undefined") {
     try {
       const res = await fetch(`/api/admin/teams?_t=${Date.now()}`, {
@@ -50,7 +56,37 @@ export async function createTeamWithMembers(
   const captainName = validMembers[0]?.name || "Captain";
   const now = new Date().toISOString();
 
-  // 1. In browser, send to server API endpoint (/api/admin/teams)
+  // If Supabase is NOT configured, directly create in local storage & dispatch events
+  if (!isSupabaseConfigured) {
+    const newTeamId = `team-${Date.now()}`;
+    const newLocalSeed: InitialTeamSeed = {
+      id: newTeamId,
+      team_name: trimmedName,
+      leader_name: captainName,
+      captain_name: captainName,
+      team_logo_url: teamLogoUrl,
+      robot_image_url: robotImageUrl,
+      members: validMembers.map((m) => ({
+        name: m.name.trim(),
+        branch: m.branch || "General",
+        year: m.year || "1st Year",
+      })),
+      screening_status: "qualified",
+      round1_status: "pending",
+      round1_score: 0,
+      round2: createDefaultRound2(),
+      round3: createDefaultRound3(),
+      created_at: now,
+      updated_at: now,
+    };
+
+    const currentTeams = getLocalTournamentTeams();
+    saveLocalTournamentTeams([newLocalSeed, ...currentTeams], newTeamId);
+
+    return { success: true, teamId: newTeamId };
+  }
+
+  // If Supabase IS configured, call server API endpoint
   if (typeof window !== "undefined") {
     try {
       const res = await fetch("/api/admin/teams", {
@@ -67,7 +103,6 @@ export async function createTeamWithMembers(
       if (res.ok) {
         const json = await res.json();
         if (json.success && json.teamId) {
-          // Notify any other tabs & components
           saveLocalTournamentTeams(
             [
               {
@@ -105,7 +140,7 @@ export async function createTeamWithMembers(
     }
   }
 
-  // 2. Fallback to local tournament store
+  // Fallback
   const newTeamId = `team-${Date.now()}`;
   const newLocalSeed: InitialTeamSeed = {
     id: newTeamId,
@@ -152,6 +187,30 @@ export async function updateTeamWithMembers(
   const validMembers = (members || []).filter((m) => m.name && m.name.trim().length > 0);
   const captainName = validMembers[0]?.name || "Captain";
 
+  if (!isSupabaseConfigured) {
+    const currentTeams = getLocalTournamentTeams();
+    const index = currentTeams.findIndex((t) => t.id === teamId);
+    if (index !== -1) {
+      const nextTeams = [...currentTeams];
+      nextTeams[index] = {
+        ...nextTeams[index],
+        team_name: trimmedName,
+        team_logo_url: teamLogoUrl,
+        robot_image_url: robotImageUrl,
+        leader_name: captainName,
+        captain_name: captainName,
+        members: validMembers.map((m) => ({
+          name: m.name.trim(),
+          branch: m.branch || "General",
+          year: m.year || "1st Year",
+        })),
+        updated_at: new Date().toISOString(),
+      };
+      saveLocalTournamentTeams(nextTeams, teamId);
+    }
+    return { success: true };
+  }
+
   if (typeof window !== "undefined") {
     try {
       const res = await fetch("/api/admin/teams", {
@@ -169,7 +228,6 @@ export async function updateTeamWithMembers(
       if (res.ok) {
         const json = await res.json();
         if (json.success) {
-          // Update local store
           const currentTeams = getLocalTournamentTeams();
           const index = currentTeams.findIndex((t) => t.id === teamId);
           if (index !== -1) {
@@ -230,7 +288,7 @@ export async function updateTeamWithMembers(
 export async function deleteTeamRecord(
   teamId: string
 ): Promise<{ success: boolean; error?: string }> {
-  if (typeof window !== "undefined") {
+  if (isSupabaseConfigured && typeof window !== "undefined") {
     try {
       const res = await fetch(`/api/admin/teams?id=${encodeURIComponent(teamId)}`, {
         method: "DELETE",
@@ -249,7 +307,7 @@ export async function deleteTeamRecord(
     }
   }
 
-  // Fallback local delete
+  // Local delete
   const currentTeams = getLocalTournamentTeams();
   const filtered = currentTeams.filter((t) => t.id !== teamId);
   saveLocalTournamentTeams(filtered, teamId);

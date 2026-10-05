@@ -26,6 +26,10 @@ export interface TeamScoreItem {
  * Fetch all teams along with their competition scores from server API, Supabase, or local cache.
  */
 export async function fetchTeamsWithScores(): Promise<TeamScoreItem[]> {
+  if (!isSupabaseConfigured) {
+    return formatTeamScoreItems(getLocalTournamentTeams());
+  }
+
   // 1. In browser, try server-side API endpoint for service-role direct access
   if (typeof window !== "undefined") {
     try {
@@ -42,10 +46,6 @@ export async function fetchTeamsWithScores(): Promise<TeamScoreItem[]> {
     } catch {
       // Continue to Supabase / Local fallback
     }
-  }
-
-  if (!isSupabaseConfigured) {
-    return formatTeamScoreItems(getLocalTournamentTeams());
   }
 
   try {
