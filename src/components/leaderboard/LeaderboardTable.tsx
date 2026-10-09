@@ -2,7 +2,7 @@
 
 import { useState, useMemo } from "react";
 import { LeaderboardEntry } from "@/types/database";
-import { parseTimeToSeconds } from "@/lib/scoringUtils";
+import { parseTimeToSeconds, formatSecondsToReadable } from "@/lib/scoringUtils";
 import {
   Search,
   Trophy,
@@ -20,20 +20,25 @@ import {
   ChevronRight,
   AlertCircle,
   CheckCircle2,
+  Flame,
 } from "lucide-react";
 
 interface LeaderboardTableProps {
   teams: LeaderboardEntry[];
   recentlyUpdatedId: string | null;
+  viewMode?: "all_rounds" | "round2_arena";
 }
 
 export default function LeaderboardTable({
   teams,
   recentlyUpdatedId,
+  viewMode = "all_rounds",
 }: LeaderboardTableProps) {
   const [searchQuery, setSearchQuery] = useState("");
   const [inspectingTeam, setInspectingTeam] = useState<LeaderboardEntry | null>(null);
   const [modalActiveTab, setModalActiveTab] = useState<"overview" | "round1" | "round2" | "round3">("overview");
+
+  const isArenaMode = viewMode === "round2_arena";
 
   // Filter teams by search query
   const filteredTeams = useMemo(() => {
@@ -143,30 +148,155 @@ export default function LeaderboardTable({
         </div>
       </div>
 
-      {/* Desktop Table View */}
+      {/* ========================================================================= */}
+      {/* 1. DESKTOP TABLE VIEW */}
+      {/* ========================================================================= */}
       <div className="hidden md:block">
         <table className="w-full text-left text-xs font-mono border-separate border-spacing-y-2.5">
-          <thead className="text-zinc-400 uppercase tracking-widest text-[11px]">
-            <tr>
-              <th className="py-2 px-3 font-bold w-14">RANK</th>
-              <th className="py-2 px-3 font-bold">CREW / SYNDICATE</th>
-              <th className="py-2 px-3 font-bold text-center">STATUS</th>
-              <th className="py-2 px-3 font-bold text-center">ROUND 1</th>
-              <th className="py-2 px-3 font-bold text-center">ROUND 2 TOTAL</th>
-              <th className="py-2 px-3 font-bold text-center">ROUND 3 TOTAL</th>
-              <th className="py-2 px-3 font-bold text-center text-[#FF6B35]">OVERALL C.T</th>
-              <th className="py-2 px-3 font-bold text-center text-[#35D9FF]">OVERALL TOTAL</th>
-              <th className="py-2 px-3 font-bold text-center w-16">INTEL</th>
-            </tr>
-          </thead>
+          {/* A. ROUND 2 – ARENA LEADERBOARD THEAD (8 COLUMNS) */}
+          {isArenaMode ? (
+            <thead className="text-zinc-400 uppercase tracking-widest text-[11px]">
+              <tr>
+                <th className="py-2.5 px-3 font-bold w-14">RANK</th>
+                <th className="py-2.5 px-3 font-bold">CREW / SYNDICATE</th>
+                <th className="py-2.5 px-3 font-bold text-center text-emerald-400">VIVA MARKS / 60</th>
+                <th className="py-2.5 px-3 font-bold text-center text-[#35D9FF]">COMPLETION TIME</th>
+                <th className="py-2.5 px-3 font-bold text-center text-[#FF7A3D]">SKIP PENALTIES</th>
+                <th className="py-2.5 px-3 font-bold text-center text-[#FF7A3D]">TOUCH PENALTIES</th>
+                <th className="py-2.5 px-3 font-bold text-center text-red-400">TOTAL PENALTY TIME</th>
+                <th className="py-2.5 px-3 font-bold text-center text-transparent bg-clip-text bg-gradient-to-r from-[#FF7A3D] to-[#35D9FF]">
+                  OVERALL TIME
+                </th>
+                <th className="py-2.5 px-3 font-bold text-center w-14">INTEL</th>
+              </tr>
+            </thead>
+          ) : (
+            /* B. GLOBAL ALL ROUNDS THEAD */
+            <thead className="text-zinc-400 uppercase tracking-widest text-[11px]">
+              <tr>
+                <th className="py-2 px-3 font-bold w-14">RANK</th>
+                <th className="py-2 px-3 font-bold">CREW / SYNDICATE</th>
+                <th className="py-2 px-3 font-bold text-center">STATUS</th>
+                <th className="py-2 px-3 font-bold text-center">ROUND 1</th>
+                <th className="py-2 px-3 font-bold text-center">ROUND 2 TOTAL</th>
+                <th className="py-2 px-3 font-bold text-center">ROUND 3 TOTAL</th>
+                <th className="py-2 px-3 font-bold text-center text-[#FF6B35]">OVERALL C.T</th>
+                <th className="py-2 px-3 font-bold text-center text-[#35D9FF]">OVERALL TOTAL</th>
+                <th className="py-2 px-3 font-bold text-center w-16">INTEL</th>
+              </tr>
+            </thead>
+          )}
+
           <tbody>
-            {/* 1. QUALIFIED TEAMS (TOP OF LEADERBOARD) */}
+            {/* 1. QUALIFIED TEAMS */}
             {qualifiedTeams.map((team) => {
               const isUpdated = recentlyUpdatedId === team.id;
               const r2 = team.round2_details;
               const r3 = team.round3_details;
               const overallTime = team.overall_time || "00:00";
 
+              if (isArenaMode) {
+                // Round 2 Arena Row
+                const compSeconds = r2?.completion_time_seconds ?? (r2?.time_taken_seconds ?? 0);
+                const viva = r2?.viva_marks ?? 0;
+                const skips = r2?.skip_penalties ?? 0;
+                const touches = r2?.touch_penalties ?? r2?.hand_touches ?? 0;
+                const penaltyTime = r2?.total_penalty_time ?? 0;
+                const overallSeconds = r2?.overall_time_seconds ?? team.round2_score;
+                const formattedOverall = r2?.overall_time_formatted || formatSecondsToReadable(overallSeconds);
+
+                return (
+                  <tr
+                    key={team.id}
+                    className={`group transition-all duration-200 bg-gradient-to-r from-[#160E2E]/85 via-[#120B20]/90 to-[#160E2E]/85 backdrop-blur-xl hover:from-[#1E133D] hover:via-[#191033] hover:to-[#1E133D] shadow-[0_4px_20px_rgba(0,0,0,0.5)] hover:shadow-[0_0_25px_rgba(53,217,255,0.2)] ${
+                      isUpdated ? "bg-[#35D9FF]/20 ring-1 ring-[#35D9FF] animate-pulse" : ""
+                    }`}
+                  >
+                    {/* Rank */}
+                    <td className="py-3.5 px-3 rounded-l-2xl border-y border-l border-white/10 group-hover:border-[#35D9FF]/40">
+                      {getRankBadge(team.rank, true)}
+                    </td>
+
+                    {/* Crew & Captain */}
+                    <td className="py-3.5 px-3 border-y border-white/10 group-hover:border-[#35D9FF]/40">
+                      <div className="font-bold text-white text-sm group-hover:text-[#FFE8C7] transition-colors">
+                        {team.team_name}
+                      </div>
+                      {(team.leader_name || team.members?.[0]?.name) && (
+                        <div className="text-[11px] font-mono text-zinc-400 mt-0.5">
+                          Cap:{" "}
+                          <span className="text-zinc-300 font-semibold">
+                            {team.leader_name || team.members?.[0]?.name}
+                          </span>
+                        </div>
+                      )}
+                    </td>
+
+                    {/* Viva Marks / 60 */}
+                    <td className="py-3.5 px-3 text-center border-y border-white/10 group-hover:border-[#35D9FF]/40">
+                      <span className="inline-flex items-center gap-1 rounded-lg bg-emerald-500/10 border border-emerald-500/30 px-2.5 py-1 text-xs font-bold text-emerald-400">
+                        {viva} / 60
+                      </span>
+                    </td>
+
+                    {/* Completion Time (seconds) */}
+                    <td className="py-3.5 px-3 text-center border-y border-white/10 group-hover:border-[#35D9FF]/40">
+                      <div className="font-bold text-white text-xs">
+                        {compSeconds} sec
+                      </div>
+                      {r2?.completion_time_minutes !== undefined && r2?.completion_time_minutes > 0 && (
+                        <div className="text-[10px] text-zinc-400">
+                          ({r2.completion_time_minutes} min)
+                        </div>
+                      )}
+                    </td>
+
+                    {/* Number of Skip Penalties */}
+                    <td className="py-3.5 px-3 text-center border-y border-white/10 group-hover:border-[#35D9FF]/40">
+                      <span className="inline-flex items-center justify-center rounded-lg bg-white/5 border border-white/10 px-2.5 py-1 text-xs font-bold text-[#FF7A3D]">
+                        {skips}
+                      </span>
+                    </td>
+
+                    {/* Number of Touch Penalties */}
+                    <td className="py-3.5 px-3 text-center border-y border-white/10 group-hover:border-[#35D9FF]/40">
+                      <span className="inline-flex items-center justify-center rounded-lg bg-white/5 border border-white/10 px-2.5 py-1 text-xs font-bold text-[#FF7A3D]">
+                        {touches}
+                      </span>
+                    </td>
+
+                    {/* Total Penalty Time (seconds) */}
+                    <td className="py-3.5 px-3 text-center border-y border-white/10 group-hover:border-[#35D9FF]/40">
+                      <span className="inline-flex items-center gap-1 rounded-lg bg-red-500/10 border border-red-500/30 px-2.5 py-1 text-xs font-bold text-red-400">
+                        +{penaltyTime} sec
+                      </span>
+                    </td>
+
+                    {/* Overall Time (seconds) */}
+                    <td className="py-3.5 px-3 text-center border-y border-white/10 group-hover:border-[#35D9FF]/40">
+                      <div className="font-black text-sm text-transparent bg-clip-text bg-gradient-to-r from-[#FF7A3D] to-[#35D9FF]">
+                        {overallSeconds} SEC
+                      </div>
+                      <div className="text-[10px] text-zinc-400">
+                        {formattedOverall.split("(")[1]?.replace(")", "") || ""}
+                      </div>
+                    </td>
+
+                    {/* Action Intel Button */}
+                    <td className="py-3.5 px-3 text-center rounded-r-2xl border-y border-r border-white/10 group-hover:border-[#35D9FF]/40">
+                      <button
+                        onClick={() => handleOpenRoundModal(team, "round2")}
+                        title="Inspect Round 2 Breakdown"
+                        className="inline-flex h-8 w-8 items-center justify-center rounded-xl border border-white/10 bg-white/5 text-zinc-400 hover:border-[#35D9FF] hover:bg-[#35D9FF]/15 hover:text-white transition-all cursor-pointer shadow-sm hover:scale-105"
+                      >
+                        <Eye className="h-4 w-4" />
+                      </button>
+                    </td>
+                  </tr>
+                );
+              }
+
+              // Default All Rounds Row
               return (
                 <tr
                   key={team.id}
@@ -225,11 +355,11 @@ export default function LeaderboardTable({
                     </button>
                   </td>
 
-                  {/* Round 2 Total: First Arena Marks (Clickable) */}
+                  {/* Round 2 Total: Arena Marks (Clickable) */}
                   <td className="py-3.5 px-3 text-center border-y border-white/10 group-hover:border-[#35D9FF]/40">
                     <button
                       onClick={() => handleOpenRoundModal(team, "round2")}
-                      title="Click to view First Arena details (Time, Viva, Hand Touches)"
+                      title="Click to view Round 2 Arena details (Time, Viva, Penalties)"
                       className="inline-flex flex-col items-center rounded-lg border border-white/10 bg-white/5 px-2.5 py-1 transition-all hover:border-[#FF7A3D] hover:bg-[#FF7A3D]/10 cursor-pointer shadow-sm"
                     >
                       <span className="font-bold text-white text-xs text-[#FF7A3D]">
@@ -237,7 +367,7 @@ export default function LeaderboardTable({
                       </span>
                       {r2 && (
                         <span className="text-[9px] text-zinc-400">
-                          {r2.completion_time !== "00:00" ? r2.completion_time : "—"} &bull; H:{r2.hand_touches ?? r2.penalty_count ?? 0} &bull; V:+{r2.viva_marks ?? 0}
+                          {r2.completion_time_seconds ? `${r2.completion_time_seconds}s` : r2.completion_time || "—"} &bull; S:{r2.skip_penalties ?? 0} &bull; T:{r2.touch_penalties ?? r2.hand_touches ?? 0} &bull; V:+{r2.viva_marks ?? 0}
                         </span>
                       )}
                     </button>
@@ -290,11 +420,11 @@ export default function LeaderboardTable({
               );
             })}
 
-            {/* 2. NOT QUALIFIED TEAMS SECTION (BOTTOM OF LEADERBOARD) */}
+            {/* 2. NOT QUALIFIED TEAMS SECTION */}
             {notQualifiedTeams.length > 0 && (
               <>
                 <tr>
-                  <td colSpan={9} className="py-3 px-2">
+                  <td colSpan={isArenaMode ? 9 : 9} className="py-3 px-2">
                     <div className="flex items-center gap-3">
                       <div className="h-px flex-1 bg-red-500/20" />
                       <span className="font-mono text-[10px] font-bold uppercase tracking-widest text-red-400/80">
@@ -336,22 +466,29 @@ export default function LeaderboardTable({
                     </td>
 
                     {/* Locked Tournament Rounds */}
-                    <td colSpan={3} className="py-3 px-3 text-center border-y border-red-500/20 text-zinc-500 text-[11px] font-mono">
+                    <td colSpan={isArenaMode ? 5 : 3} className="py-3 px-3 text-center border-y border-red-500/20 text-zinc-500 text-[11px] font-mono">
                       <span className="inline-flex items-center gap-1.5 text-zinc-500">
                         <Lock className="h-3 w-3" />
                         <span>ROUNDS LOCKED (EVENT SCREENING REQUIRED)</span>
                       </span>
                     </td>
 
-                    {/* Overall C.T */}
-                    <td className="py-3 px-3 text-center border-y border-red-500/20 text-zinc-600 font-mono">
-                      —
-                    </td>
+                    {!isArenaMode && (
+                      <>
+                        <td className="py-3 px-3 text-center border-y border-red-500/20 text-zinc-600 font-mono">
+                          —
+                        </td>
+                        <td className="py-3 px-3 text-center border-y border-red-500/20 text-zinc-600 font-bold">
+                          —
+                        </td>
+                      </>
+                    )}
 
-                    {/* XP */}
-                    <td className="py-3 px-3 text-center border-y border-red-500/20 text-zinc-600 font-bold">
-                      —
-                    </td>
+                    {isArenaMode && (
+                      <td className="py-3 px-3 text-center border-y border-red-500/20 text-zinc-600 font-bold">
+                        —
+                      </td>
+                    )}
 
                     {/* Intel */}
                     <td className="py-3 px-3 text-center rounded-r-2xl border-y border-r border-red-500/20">
@@ -371,62 +508,131 @@ export default function LeaderboardTable({
         </table>
       </div>
 
-      {/* Mobile Cards View */}
+      {/* ========================================================================= */}
+      {/* 2. MOBILE CARDS VIEW */}
+      {/* ========================================================================= */}
       <div className="grid grid-cols-1 gap-3 md:hidden">
         {/* Qualified */}
-        {qualifiedTeams.map((team) => (
-          <div
-            key={team.id}
-            onClick={() => handleOpenRoundModal(team, "overview")}
-            className="rounded-2xl border border-white/10 bg-gradient-to-r from-[#160E2E]/90 to-[#120B20]/90 p-4 font-mono shadow-lg cursor-pointer hover:border-[#35D9FF]/50 transition-all backdrop-blur-xl space-y-3"
-          >
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-3">
-                {getRankBadge(team.rank, true)}
-                <div>
-                  <div className="font-bold text-white text-sm">
-                    {team.team_name}
-                  </div>
-                  {(team.leader_name || team.members?.[0]?.name) && (
-                    <div className="text-[10px] text-zinc-400 mt-0.5">
-                      Cap: <span className="text-zinc-300 font-semibold">{team.leader_name || team.members?.[0]?.name}</span>
-                    </div>
-                  )}
-                </div>
-              </div>
-              <div className="text-right">
-                <div className="font-mono text-base font-black text-transparent bg-clip-text bg-gradient-to-r from-[#FF2D8D] to-[#35D9FF]">
-                  XP {team.total_score}
-                </div>
-                <div className="text-[10px] text-zinc-400 flex items-center justify-end gap-1 mt-0.5">
-                  <Timer className="h-2.5 w-2.5 text-[#FF6B35]" />
-                  <span>C.T: {team.overall_time || "00:00"}</span>
-                </div>
-              </div>
-            </div>
+        {qualifiedTeams.map((team) => {
+          const r2 = team.round2_details;
+          const overallSeconds = r2?.overall_time_seconds ?? team.round2_score;
 
-            <div className="grid grid-cols-3 gap-2 text-center text-xs">
-              <div className="rounded bg-black/40 p-1.5 border border-white/5">
-                <span className="text-[9px] text-zinc-400 block">R1 VIVA</span>
-                <span className="font-bold text-emerald-400 text-[10px] uppercase">
-                  {team.round1_status || "PENDING"}
-                </span>
+          if (isArenaMode) {
+            return (
+              <div
+                key={team.id}
+                onClick={() => handleOpenRoundModal(team, "round2")}
+                className="rounded-2xl border border-white/10 bg-gradient-to-r from-[#160E2E]/90 to-[#120B20]/90 p-4 font-mono shadow-lg cursor-pointer hover:border-[#35D9FF]/50 transition-all backdrop-blur-xl space-y-3"
+              >
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    {getRankBadge(team.rank, true)}
+                    <div>
+                      <div className="font-bold text-white text-sm">
+                        {team.team_name}
+                      </div>
+                      {(team.leader_name || team.members?.[0]?.name) && (
+                        <div className="text-[10px] text-zinc-400 mt-0.5">
+                          Cap: <span className="text-zinc-300 font-semibold">{team.leader_name || team.members?.[0]?.name}</span>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                  <div className="text-right">
+                    <div className="font-mono text-base font-black text-transparent bg-clip-text bg-gradient-to-r from-[#FF7A3D] to-[#35D9FF]">
+                      {overallSeconds} SEC
+                    </div>
+                    <div className="text-[10px] text-zinc-400">
+                      {r2?.overall_time_formatted?.split("(")[1]?.replace(")", "") || "Overall Time"}
+                    </div>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-4 gap-1.5 text-center text-xs">
+                  <div className="rounded bg-black/40 p-1.5 border border-white/5">
+                    <span className="text-[9px] text-zinc-400 block">VIVA</span>
+                    <span className="font-bold text-emerald-400 text-[11px]">
+                      {r2?.viva_marks ?? 0}/60
+                    </span>
+                  </div>
+                  <div className="rounded bg-black/40 p-1.5 border border-white/5">
+                    <span className="text-[9px] text-zinc-400 block">TIME</span>
+                    <span className="font-bold text-white text-[11px]">
+                      {r2?.completion_time_seconds ?? 0}s
+                    </span>
+                  </div>
+                  <div className="rounded bg-black/40 p-1.5 border border-white/5">
+                    <span className="text-[9px] text-zinc-400 block">SKIPS</span>
+                    <span className="font-bold text-[#FF7A3D] text-[11px]">
+                      {r2?.skip_penalties ?? 0}
+                    </span>
+                  </div>
+                  <div className="rounded bg-black/40 p-1.5 border border-white/5">
+                    <span className="text-[9px] text-zinc-400 block">TOUCHES</span>
+                    <span className="font-bold text-[#FF7A3D] text-[11px]">
+                      {r2?.touch_penalties ?? r2?.hand_touches ?? 0}
+                    </span>
+                  </div>
+                </div>
               </div>
-              <div className="rounded bg-black/40 p-1.5 border border-white/5">
-                <span className="text-[9px] text-zinc-400 block">R2 ARENA 1</span>
-                <span className="font-bold text-[#FF7A3D] text-[11px]">
-                  {team.round2_score} PTS
-                </span>
+            );
+          }
+
+          // Default All Rounds Card
+          return (
+            <div
+              key={team.id}
+              onClick={() => handleOpenRoundModal(team, "overview")}
+              className="rounded-2xl border border-white/10 bg-gradient-to-r from-[#160E2E]/90 to-[#120B20]/90 p-4 font-mono shadow-lg cursor-pointer hover:border-[#35D9FF]/50 transition-all backdrop-blur-xl space-y-3"
+            >
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  {getRankBadge(team.rank, true)}
+                  <div>
+                    <div className="font-bold text-white text-sm">
+                      {team.team_name}
+                    </div>
+                    {(team.leader_name || team.members?.[0]?.name) && (
+                      <div className="text-[10px] text-zinc-400 mt-0.5">
+                        Cap: <span className="text-zinc-300 font-semibold">{team.leader_name || team.members?.[0]?.name}</span>
+                      </div>
+                    )}
+                  </div>
+                </div>
+                <div className="text-right">
+                  <div className="font-mono text-base font-black text-transparent bg-clip-text bg-gradient-to-r from-[#FF2D8D] to-[#35D9FF]">
+                    XP {team.total_score}
+                  </div>
+                  <div className="text-[10px] text-zinc-400 flex items-center justify-end gap-1 mt-0.5">
+                    <Timer className="h-2.5 w-2.5 text-[#FF6B35]" />
+                    <span>C.T: {team.overall_time || "00:00"}</span>
+                  </div>
+                </div>
               </div>
-              <div className="rounded bg-black/40 p-1.5 border border-white/5">
-                <span className="text-[9px] text-zinc-400 block">R3 ARENA 2</span>
-                <span className="font-bold text-[#35D9FF] text-[11px]">
-                  {team.round3_score} PTS
-                </span>
+
+              <div className="grid grid-cols-3 gap-2 text-center text-xs">
+                <div className="rounded bg-black/40 p-1.5 border border-white/5">
+                  <span className="text-[9px] text-zinc-400 block">R1 VIVA</span>
+                  <span className="font-bold text-emerald-400 text-[10px] uppercase">
+                    {team.round1_status || "PENDING"}
+                  </span>
+                </div>
+                <div className="rounded bg-black/40 p-1.5 border border-white/5">
+                  <span className="text-[9px] text-zinc-400 block">R2 ARENA</span>
+                  <span className="font-bold text-[#FF7A3D] text-[11px]">
+                    {team.round2_score} PTS
+                  </span>
+                </div>
+                <div className="rounded bg-black/40 p-1.5 border border-white/5">
+                  <span className="text-[9px] text-zinc-400 block">R3 ARENA</span>
+                  <span className="font-bold text-[#35D9FF] text-[11px]">
+                    {team.round3_score} PTS
+                  </span>
+                </div>
               </div>
             </div>
-          </div>
-        ))}
+          );
+        })}
 
         {/* Not Qualified Mobile */}
         {notQualifiedTeams.map((team) => (
@@ -518,7 +724,7 @@ export default function LeaderboardTable({
                     : "bg-white/5 text-zinc-400 hover:text-white"
                 }`}
               >
-                R2 FIRST ARENA
+                R2 ARENA
               </button>
 
               <button
@@ -580,15 +786,15 @@ export default function LeaderboardTable({
 
                   {/* R2 */}
                   <div className="rounded-xl border border-white/10 bg-[#08070D] p-3.5">
-                    <div className="text-[10px] text-zinc-400">R2 ARENA 1</div>
+                    <div className="text-[10px] text-zinc-400">R2 ARENA</div>
                     <div className="mt-1 text-base font-black text-[#FF7A3D]">
                       {inspectingTeam.screening_status === "not_qualified"
                         ? "—"
                         : `${inspectingTeam.round2_score} pts`}
                     </div>
-                    {inspectingTeam.round2_details?.completion_time && (
+                    {inspectingTeam.round2_details?.completion_time_seconds !== undefined && (
                       <div className="text-[9px] text-zinc-500 mt-0.5">
-                        Time: {inspectingTeam.round2_details.completion_time}
+                        Time: {inspectingTeam.round2_details.completion_time_seconds}s
                       </div>
                     )}
                   </div>
@@ -623,7 +829,7 @@ export default function LeaderboardTable({
                     </div>
                   </div>
                   <span className="text-xs text-zinc-400 font-mono">
-                    R2 ({inspectingTeam.round2_details?.completion_time || "00:00"}) + R3 Stages
+                    R2 ({inspectingTeam.round2_details?.completion_time_seconds ? `${inspectingTeam.round2_details.completion_time_seconds}s` : inspectingTeam.round2_details?.completion_time || "00:00"}) + R3 Stages
                   </span>
                 </div>
 
@@ -636,7 +842,7 @@ export default function LeaderboardTable({
                     {inspectingTeam.total_score} XP
                   </div>
                   <p className="mt-1 text-[11px] text-zinc-400">
-                    Rank #{inspectingTeam.rank} on Global Leaderboard
+                    Rank #{inspectingTeam.rank} on Leaderboard
                   </p>
                 </div>
               </div>
@@ -675,101 +881,134 @@ export default function LeaderboardTable({
               </div>
             )}
 
-            {/* TAB: ROUND 2 (FIRST ARENA / BOAT RACE & VIVA BREAKDOWN) */}
-            {modalActiveTab === "round2" && (
-              <div className="space-y-4 font-mono">
-                <div className="rounded-xl border border-white/10 bg-[#08070D] p-4 space-y-4">
-                  <div className="flex flex-col sm:flex-row sm:items-center justify-between border-b border-white/10 pb-2 gap-2">
-                    <div>
-                      <span className="text-xs font-bold text-[#FF7A3D] uppercase block">
-                        ROUND 2: FIRST ARENA SCORING TABLE (BOAT TRACK &amp; VIVA)
-                      </span>
-                      <span className="text-[11px] text-zinc-400 font-mono">
-                        Formula: S = (720 &minus; T) &minus; H + V
+            {/* TAB: ROUND 2 (ARENA EVALUATION BREAKDOWN) */}
+            {modalActiveTab === "round2" && (() => {
+              const r2 = inspectingTeam.round2_details;
+              const viva = r2?.viva_marks ?? 0;
+              const compMinutes = r2?.completion_time_minutes ?? (Math.round(((r2?.completion_time_seconds ?? 0) / 60) * 100) / 100);
+              const compSeconds = r2?.completion_time_seconds ?? (r2?.time_taken_seconds ?? 0);
+              const skips = r2?.skip_penalties ?? 0;
+              const touches = r2?.touch_penalties ?? r2?.hand_touches ?? 0;
+              const skipCost = r2?.skip_penalty_cost ?? 50;
+              const touchCost = r2?.touch_penalty_cost ?? 10;
+              const skipPenaltyTotal = skips * skipCost;
+              const touchPenaltyTotal = touches * touchCost;
+              const totalPenaltyTime = r2?.total_penalty_time ?? (skipPenaltyTotal + touchPenaltyTotal);
+              const overallSeconds = r2?.overall_time_seconds ?? inspectingTeam.round2_score;
+              const formattedOverall = r2?.overall_time_formatted || formatSecondsToReadable(overallSeconds);
+
+              return (
+                <div className="space-y-4 font-mono">
+                  <div className="rounded-xl border border-white/10 bg-[#08070D] p-4 space-y-4">
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between border-b border-white/10 pb-2 gap-2">
+                      <div>
+                        <span className="text-xs font-bold text-[#FF7A3D] uppercase block">
+                          ROUND 2: ARENA EVALUATION &amp; TIME BREAKDOWN
+                        </span>
+                        <span className="text-[11px] text-zinc-400 font-mono">
+                          Formula: Overall Time = Completion Time + Penalty Time &minus; Viva Marks
+                        </span>
+                      </div>
+                      <span className="font-black text-base text-transparent bg-clip-text bg-gradient-to-r from-[#FF7A3D] to-[#35D9FF]">
+                        {overallSeconds} SEC
                       </span>
                     </div>
-                    <span className="font-black text-sm text-[#FF7A3D]">
-                      TOTAL: {inspectingTeam.round2_score} PTS
-                    </span>
-                  </div>
 
-                  {/* Standard Parameter Table matching exact evaluation formula */}
-                  <div className="overflow-hidden rounded-lg border border-white/10 bg-black/40">
-                    <table className="w-full text-left text-xs">
-                      <thead className="bg-white/5 text-zinc-400 uppercase text-[10px]">
-                        <tr>
-                          <th className="py-2.5 px-3">PARAMETER</th>
-                          <th className="py-2.5 px-3 text-center">CALCULATION</th>
-                          <th className="py-2.5 px-3 text-right">SCORE</th>
-                        </tr>
-                      </thead>
-                      <tbody className="divide-y divide-white/5 text-zinc-300">
-                        <tr>
-                          <td className="py-2 px-3 text-zinc-400">Total Track Time Limit</td>
-                          <td className="py-2 px-3 text-center text-zinc-400">12 &times; 60</td>
-                          <td className="py-2 px-3 text-right font-bold text-white">
-                            {inspectingTeam.round2_details?.total_time ?? 720} sec
-                          </td>
-                        </tr>
-                        <tr>
-                          <td className="py-2 px-3 text-zinc-400">Time Taken (T)</td>
-                          <td className="py-2 px-3 text-center text-zinc-400">
-                            {inspectingTeam.round2_details?.completion_time || "00:00"}
-                          </td>
-                          <td className="py-2 px-3 text-right font-bold text-white">
-                            {inspectingTeam.round2_details?.time_taken_seconds ?? parseTimeToSeconds(inspectingTeam.round2_details?.completion_time)} sec
-                          </td>
-                        </tr>
-                        <tr>
-                          <td className="py-2 px-3 text-zinc-400">Time Score</td>
-                          <td className="py-2 px-3 text-center text-zinc-400">
-                            720 &minus; {inspectingTeam.round2_details?.time_taken_seconds ?? parseTimeToSeconds(inspectingTeam.round2_details?.completion_time)}
-                          </td>
-                          <td className="py-2 px-3 text-right font-bold text-[#00F0FF]">
-                            {inspectingTeam.round2_details?.time_score ?? Math.max(0, (inspectingTeam.round2_details?.total_time ?? 720) - (inspectingTeam.round2_details?.time_taken_seconds ?? parseTimeToSeconds(inspectingTeam.round2_details?.completion_time)))} pts
-                          </td>
-                        </tr>
-                        <tr>
-                          <td className="py-2 px-3 text-zinc-400">Hand-Touch Penalty (H)</td>
-                          <td className="py-2 px-3 text-center text-red-400">
-                            {inspectingTeam.round2_details?.hand_touches ?? inspectingTeam.round2_details?.penalty_count ?? 0} &times; (-1)
-                          </td>
-                          <td className="py-2 px-3 text-right font-bold text-red-400">
-                            -{inspectingTeam.round2_details?.penalty_total ?? ((inspectingTeam.round2_details?.hand_touches ?? inspectingTeam.round2_details?.penalty_count ?? 0) * (inspectingTeam.round2_details?.penalty_rate ?? 1))} pts
-                          </td>
-                        </tr>
-                        <tr>
-                          <td className="py-2 px-3 text-zinc-400">Viva Marks (V - out of 10)</td>
-                          <td className="py-2 px-3 text-center text-emerald-400">
-                            Direct Addition
-                          </td>
-                          <td className="py-2 px-3 text-right font-bold text-emerald-400">
-                            +{inspectingTeam.round2_details?.viva_marks ?? 0} pts
-                          </td>
-                        </tr>
-                        <tr className="bg-[#FF7A3D]/10 font-bold">
-                          <td className="py-2.5 px-3 text-[#FF7A3D]">ROUND 2 FINAL SCORE</td>
-                          <td className="py-2.5 px-3 text-center text-[#FF7A3D]">
-                            ({inspectingTeam.round2_details?.time_score ?? 0}) &minus; ({inspectingTeam.round2_details?.penalty_total ?? 0}) + ({inspectingTeam.round2_details?.viva_marks ?? 0})
-                          </td>
-                          <td className="py-2.5 px-3 text-right text-base text-[#FF7A3D]">
-                            {inspectingTeam.round2_score} PTS
-                          </td>
-                        </tr>
-                      </tbody>
-                    </table>
-                  </div>
+                    {/* Standard Parameter Table */}
+                    <div className="overflow-hidden rounded-lg border border-white/10 bg-black/40">
+                      <table className="w-full text-left text-xs">
+                        <thead className="bg-white/5 text-zinc-400 uppercase text-[10px]">
+                          <tr>
+                            <th className="py-2.5 px-3">PARAMETER</th>
+                            <th className="py-2.5 px-3 text-center">INPUT / CALCULATION</th>
+                            <th className="py-2.5 px-3 text-right">TIME EFFECT</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-white/5 text-zinc-300">
+                          {/* Viva Marks */}
+                          <tr>
+                            <td className="py-2 px-3 text-zinc-400">Viva Marks (0 to 60)</td>
+                            <td className="py-2 px-3 text-center text-emerald-400 font-bold">
+                              {viva} / 60 marks
+                            </td>
+                            <td className="py-2 px-3 text-right font-bold text-emerald-400">
+                              -{viva} sec
+                            </td>
+                          </tr>
 
-                  {/* Calculation Formula Note */}
-                  <div className="rounded-lg border border-[#FF7A3D]/30 bg-[#FF7A3D]/5 p-3 text-xs text-zinc-300 space-y-1">
-                    <span className="font-bold text-white block">Formula Note:</span>
-                    <p className="text-[11px] text-zinc-400 font-mono leading-relaxed">
-                      S = (720 &minus; T) &minus; H + V &bull; 1 point per second saved from total 720s (12 min), penalty of 1 point per hand touch, and viva marks (out of 10) added directly. Maximum theoretical score is 730 points.
-                    </p>
+                          {/* Completion Time */}
+                          <tr>
+                            <td className="py-2 px-3 text-zinc-400">Completion Time</td>
+                            <td className="py-2 px-3 text-center text-white">
+                              {compMinutes} min &times; 60
+                            </td>
+                            <td className="py-2 px-3 text-right font-bold text-white">
+                              +{compSeconds} sec
+                            </td>
+                          </tr>
+
+                          {/* Skip Penalties */}
+                          <tr>
+                            <td className="py-2 px-3 text-zinc-400">Skip Penalties ({skipCost}s/skip)</td>
+                            <td className="py-2 px-3 text-center text-[#FF7A3D]">
+                              {skips} &times; {skipCost}s
+                            </td>
+                            <td className="py-2 px-3 text-right font-bold text-[#FF7A3D]">
+                              +{skipPenaltyTotal} sec
+                            </td>
+                          </tr>
+
+                          {/* Touch Penalties */}
+                          <tr>
+                            <td className="py-2 px-3 text-zinc-400">Touch Penalties ({touchCost}s/touch)</td>
+                            <td className="py-2 px-3 text-center text-[#FF7A3D]">
+                              {touches} &times; {touchCost}s
+                            </td>
+                            <td className="py-2 px-3 text-right font-bold text-[#FF7A3D]">
+                              +{touchPenaltyTotal} sec
+                            </td>
+                          </tr>
+
+                          {/* Total Penalty Time */}
+                          <tr className="bg-white/[0.02]">
+                            <td className="py-2 px-3 text-zinc-300 font-bold">Total Penalty Time</td>
+                            <td className="py-2 px-3 text-center text-red-400">
+                              {skipPenaltyTotal}s + {touchPenaltyTotal}s
+                            </td>
+                            <td className="py-2 px-3 text-right font-bold text-red-400">
+                              +{totalPenaltyTime} sec
+                            </td>
+                          </tr>
+
+                          {/* Final Overall Time */}
+                          <tr className="bg-gradient-to-r from-[#FF7A3D]/15 to-[#35D9FF]/15 font-bold">
+                            <td className="py-2.5 px-3 text-white">OVERALL TIME (SECONDS)</td>
+                            <td className="py-2.5 px-3 text-center text-zinc-300 text-[11px]">
+                              {compSeconds}s + {totalPenaltyTime}s &minus; {viva}s
+                            </td>
+                            <td className="py-2.5 px-3 text-right text-base text-transparent bg-clip-text bg-gradient-to-r from-[#FF7A3D] to-[#35D9FF]">
+                              {overallSeconds} SEC
+                            </td>
+                          </tr>
+                        </tbody>
+                      </table>
+                    </div>
+
+                    {/* Calculation Formula Note */}
+                    <div className="rounded-lg border border-[#35D9FF]/30 bg-[#35D9FF]/5 p-3 text-xs text-zinc-300 space-y-1">
+                      <span className="font-bold text-white block">Official Round 2 Evaluation Rule:</span>
+                      <p className="text-[11px] text-zinc-400 font-mono leading-relaxed">
+                        Overall Time = (Completion Time in Minutes &times; 60) + (Skip Penalties &times; Skip Cost) + (Touch Penalties &times; Touch Cost) &minus; Viva Marks.
+                        Rankings are sorted by lowest overall time in ascending order.
+                      </p>
+                      <p className="text-[10px] text-zinc-500 font-mono">
+                        Tie-breakers: 1) Lowest overall time, 2) Higher viva marks, 3) Lower actual completion time.
+                      </p>
+                    </div>
                   </div>
                 </div>
-              </div>
-            )}
+              );
+            })()}
 
             {/* TAB: ROUND 3 (SECOND ARENA - 3 STAGES) */}
             {modalActiveTab === "round3" && (

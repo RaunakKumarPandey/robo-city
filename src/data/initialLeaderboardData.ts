@@ -14,10 +14,19 @@ export interface InitialTeamSeed {
   round1_score: number;
   round2: {
     completion_time: string;
+    completion_time_minutes?: number;
+    completion_time_seconds?: number;
+    viva_marks: number;
+    skip_penalties?: number;
+    touch_penalties?: number;
+    skip_penalty_cost?: number;
+    touch_penalty_cost?: number;
+    total_penalty_time?: number;
+    overall_time_seconds?: number;
+    overall_time_formatted?: string;
     total_time?: number;
     time_taken_seconds?: number;
     time_score?: number;
-    viva_marks?: number;
     hand_touches?: number;
     penalty_rate?: number;
     penalty_total?: number;
@@ -58,11 +67,18 @@ export const initialTournamentTeams: InitialTeamSeed[] = [
     round1_status: "qualified",
     round1_score: 1,
     round2: {
-      completion_time: "03:20",
-      total_time: 720,
-      viva_marks: 9,
-      hand_touches: 1,
-      penalty_rate: 1,
+      completion_time: "150s",
+      completion_time_minutes: 2.5,
+      completion_time_seconds: 150,
+      viva_marks: 48,
+      skip_penalties: 1,
+      touch_penalties: 2,
+      skip_penalty_cost: 50,
+      touch_penalty_cost: 10,
+      total_penalty_time: 70,
+      overall_time_seconds: 172,
+      overall_time_formatted: "172 sec (2 min 52 sec)",
+      total_marks: 172,
     },
     round3: {
       stages: [
@@ -90,11 +106,18 @@ export const initialTournamentTeams: InitialTeamSeed[] = [
     round1_status: "qualified",
     round1_score: 1,
     round2: {
-      completion_time: "03:45",
-      total_time: 720,
-      viva_marks: 8,
-      hand_touches: 1,
-      penalty_rate: 1,
+      completion_time: "120s",
+      completion_time_minutes: 2,
+      completion_time_seconds: 120,
+      viva_marks: 40,
+      skip_penalties: 2,
+      touch_penalties: 3,
+      skip_penalty_cost: 50,
+      touch_penalty_cost: 10,
+      total_penalty_time: 130,
+      overall_time_seconds: 210,
+      overall_time_formatted: "210 sec (3 min 30 sec)",
+      total_marks: 210,
     },
     round3: {
       stages: [
@@ -123,11 +146,18 @@ export const initialTournamentTeams: InitialTeamSeed[] = [
     round1_status: "qualified",
     round1_score: 1,
     round2: {
-      completion_time: "04:10",
-      total_time: 720,
-      viva_marks: 8,
-      hand_touches: 1,
-      penalty_rate: 1,
+      completion_time: "180s",
+      completion_time_minutes: 3,
+      completion_time_seconds: 180,
+      viva_marks: 52,
+      skip_penalties: 1,
+      touch_penalties: 1,
+      skip_penalty_cost: 50,
+      touch_penalty_cost: 10,
+      total_penalty_time: 60,
+      overall_time_seconds: 188,
+      overall_time_formatted: "188 sec (3 min 8 sec)",
+      total_marks: 188,
     },
     round3: {
       stages: [
@@ -155,11 +185,18 @@ export const initialTournamentTeams: InitialTeamSeed[] = [
     round1_status: "qualified",
     round1_score: 1,
     round2: {
-      completion_time: "04:40",
-      total_time: 720,
-      viva_marks: 7,
-      hand_touches: 2,
-      penalty_rate: 1,
+      completion_time: "200s",
+      completion_time_minutes: 3.33,
+      completion_time_seconds: 200,
+      viva_marks: 38,
+      skip_penalties: 2,
+      touch_penalties: 2,
+      skip_penalty_cost: 50,
+      touch_penalty_cost: 10,
+      total_penalty_time: 120,
+      overall_time_seconds: 282,
+      overall_time_formatted: "282 sec (4 min 42 sec)",
+      total_marks: 282,
     },
     round3: {
       stages: [
@@ -187,11 +224,18 @@ export const initialTournamentTeams: InitialTeamSeed[] = [
     round1_status: "not_qualified",
     round1_score: 0,
     round2: {
-      completion_time: "00:00",
-      total_time: 720,
+      completion_time: "0s",
+      completion_time_minutes: 0,
+      completion_time_seconds: 0,
       viva_marks: 0,
-      hand_touches: 0,
-      penalty_rate: 1,
+      skip_penalties: 0,
+      touch_penalties: 0,
+      skip_penalty_cost: 50,
+      touch_penalty_cost: 10,
+      total_penalty_time: 0,
+      overall_time_seconds: 0,
+      overall_time_formatted: "0 sec (0 min 0 sec)",
+      total_marks: 0,
     },
     round3: {
       stages: [
@@ -219,11 +263,18 @@ export const initialTournamentTeams: InitialTeamSeed[] = [
     round1_status: "pending",
     round1_score: 0,
     round2: {
-      completion_time: "00:00",
-      total_time: 720,
+      completion_time: "0s",
+      completion_time_minutes: 0,
+      completion_time_seconds: 0,
       viva_marks: 0,
-      hand_touches: 0,
-      penalty_rate: 1,
+      skip_penalties: 0,
+      touch_penalties: 0,
+      skip_penalty_cost: 50,
+      touch_penalty_cost: 10,
+      total_penalty_time: 0,
+      overall_time_seconds: 0,
+      overall_time_formatted: "0 sec (0 min 0 sec)",
+      total_marks: 0,
     },
     round3: {
       stages: [
@@ -251,11 +302,18 @@ export const initialTournamentTeams: InitialTeamSeed[] = [
     round1_status: "pending",
     round1_score: 0,
     round2: {
-      completion_time: "00:00",
-      total_time: 720,
+      completion_time: "0s",
+      completion_time_minutes: 0,
+      completion_time_seconds: 0,
       viva_marks: 0,
-      hand_touches: 0,
-      penalty_rate: 1,
+      skip_penalties: 0,
+      touch_penalties: 0,
+      skip_penalty_cost: 50,
+      touch_penalty_cost: 10,
+      total_penalty_time: 0,
+      overall_time_seconds: 0,
+      overall_time_formatted: "0 sec (0 min 0 sec)",
+      total_marks: 0,
     },
     round3: {
       stages: [

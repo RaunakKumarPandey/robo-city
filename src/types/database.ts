@@ -18,10 +18,19 @@ export interface TeamMember {
 
 export interface Round2Details {
   completion_time: string;
+  completion_time_minutes?: number;
+  completion_time_seconds?: number;
+  viva_marks: number; // 0 to 60
+  skip_penalties?: number;
+  touch_penalties?: number;
+  skip_penalty_cost?: number; // default 50 sec/skip
+  touch_penalty_cost?: number; // default 10 sec/touch
+  total_penalty_time?: number;
+  overall_time_seconds?: number;
+  overall_time_formatted?: string;
   total_time?: number;
   time_taken_seconds?: number;
   time_score?: number;
-  viva_marks?: number;
   hand_touches?: number;
   penalty_rate?: number;
   penalty_total?: number;
@@ -29,6 +38,11 @@ export interface Round2Details {
   max_marks?: number;
   gain_marks?: number;
   penalty_count?: number;
+}
+
+export interface Round2Settings {
+  skip_penalty_cost: number;
+  touch_penalty_cost: number;
 }
 
 export interface StageDetails {

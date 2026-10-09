@@ -1,9 +1,10 @@
 "use client";
 
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useMemo } from "react";
 import { supabase, isSupabaseConfigured } from "@/lib/supabase";
 import { fetchLeaderboardData } from "@/lib/leaderboard";
 import { LeaderboardEntry } from "@/types/database";
+import { compareRound2ArenaTeams } from "@/lib/scoringUtils";
 import Podium from "./Podium";
 import LeaderboardTable from "./LeaderboardTable";
 import {
@@ -13,6 +14,9 @@ import {
   Loader2,
   WifiOff,
   Crosshair,
+  Flame,
+  Timer,
+  Layers,
 } from "lucide-react";
 
 export default function ChampionsHQ() {
@@ -21,6 +25,7 @@ export default function ChampionsHQ() {
   const [error, setError] = useState<string | null>(null);
   const [connectionStatus, setConnectionStatus] = useState<"CONNECTING" | "LIVE" | "OFFLINE">("LIVE");
   const [recentlyUpdatedId, setRecentlyUpdatedId] = useState<string | null>(null);
+  const [viewMode, setViewMode] = useState<"all_rounds" | "round2_arena">("all_rounds");
 
   // Load Leaderboard data
   const loadLeaderboard = useCallback(async (showLoading = true) => {
@@ -156,13 +161,64 @@ export default function ChampionsHQ() {
     };
   }, [loadLeaderboard]);
 
-  const topThree = teams.filter((t) => t.screening_status === "qualified").slice(0, 3);
+  // Derive ranked teams based on active view mode
+  const displayedTeams = useMemo(() => {
+    if (viewMode === "all_rounds") {
+      return teams;
+    }
+
+    // ROUND 2 ARENA RANKING
+    const qualified = teams.filter((t) => t.screening_status === "qualified");
+    const notQualified = teams.filter((t) => t.screening_status === "not_qualified");
+
+    const sortedQualified = [...qualified].sort((a, b) => {
+      const aR2 = a.round2_details;
+      const bR2 = b.round2_details;
+
+      return compareRound2ArenaTeams(
+        {
+          overall_time_seconds: aR2?.overall_time_seconds ?? a.round2_score,
+          viva_marks: aR2?.viva_marks ?? 0,
+          completion_time_seconds: aR2?.completion_time_seconds ?? (aR2?.time_taken_seconds ?? 0),
+          skip_penalties: aR2?.skip_penalties ?? 0,
+          touch_penalties: aR2?.touch_penalties ?? aR2?.hand_touches ?? 0,
+          team_name: a.team_name,
+          id: a.id,
+        },
+        {
+          overall_time_seconds: bR2?.overall_time_seconds ?? b.round2_score,
+          viva_marks: bR2?.viva_marks ?? 0,
+          completion_time_seconds: bR2?.completion_time_seconds ?? (bR2?.time_taken_seconds ?? 0),
+          skip_penalties: bR2?.skip_penalties ?? 0,
+          touch_penalties: bR2?.touch_penalties ?? bR2?.hand_touches ?? 0,
+          team_name: b.team_name,
+          id: b.id,
+        }
+      );
+    });
+
+    const rankedQualified = sortedQualified.map((t, idx) => ({
+      ...t,
+      rank: idx + 1,
+    }));
+
+    const rankedNotQualified = notQualified.map((t, idx) => ({
+      ...t,
+      rank: rankedQualified.length + idx + 1,
+    }));
+
+    return [...rankedQualified, ...rankedNotQualified];
+  }, [teams, viewMode]);
+
+  const topThree = useMemo(() => {
+    return displayedTeams.filter((t) => t.screening_status === "qualified").slice(0, 3);
+  }, [displayedTeams]);
 
   return (
     <section className="relative min-h-screen w-full overflow-hidden pt-24 pb-20 px-4 sm:px-6 lg:px-8">
       <div className="relative z-10 mx-auto max-w-6xl">
         {/* Section Header */}
-        <div className="mb-10 text-center">
+        <div className="mb-8 text-center">
           <div className="inline-flex items-center gap-2 rounded-full border border-[#35D9FF]/40 bg-[#120B20]/80 px-4 py-1.5 font-mono text-xs font-bold tracking-widest text-[#35D9FF] uppercase mb-4 shadow-[0_0_20px_rgba(53,217,255,0.25)] backdrop-blur-xl">
             <Crosshair className="h-3.5 w-3.5 text-[#FF2D8D]" />
             <span>GLOBAL RANKINGS // REAL-TIME XP</span>
@@ -214,6 +270,35 @@ export default function ChampionsHQ() {
               <span>REFRESH SCORES</span>
             </button>
           </div>
+
+          {/* View Mode Switcher Tabs */}
+          <div className="mt-8 flex justify-center">
+            <div className="inline-flex rounded-2xl border border-white/15 bg-[#0A0714]/90 p-1.5 backdrop-blur-xl shadow-[0_0_30px_rgba(0,0,0,0.8)] font-mono text-xs">
+              <button
+                onClick={() => setViewMode("all_rounds")}
+                className={`flex items-center gap-2 rounded-xl px-4 sm:px-6 py-2.5 font-bold transition-all cursor-pointer ${
+                  viewMode === "all_rounds"
+                    ? "bg-gradient-to-r from-[#FF2D8D] to-[#FF7A3D] text-white shadow-[0_0_20px_rgba(255,45,141,0.4)]"
+                    : "text-zinc-400 hover:text-white hover:bg-white/5"
+                }`}
+              >
+                <Layers className="h-4 w-4" />
+                <span>GLOBAL STANDINGS (ALL ROUNDS)</span>
+              </button>
+
+              <button
+                onClick={() => setViewMode("round2_arena")}
+                className={`flex items-center gap-2 rounded-xl px-4 sm:px-6 py-2.5 font-bold transition-all cursor-pointer ${
+                  viewMode === "round2_arena"
+                    ? "bg-gradient-to-r from-[#FF7A3D] to-[#35D9FF] text-white shadow-[0_0_20px_rgba(53,217,255,0.4)]"
+                    : "text-zinc-400 hover:text-white hover:bg-white/5"
+                }`}
+              >
+                <Timer className="h-4 w-4" />
+                <span>ROUND 2 – ARENA LEADERBOARD</span>
+              </button>
+            </div>
+          </div>
         </div>
 
         {/* Error Alert */}
@@ -233,7 +318,7 @@ export default function ChampionsHQ() {
         )}
 
         {/* Loading State */}
-        {loading && teams.length === 0 ? (
+        {loading && displayedTeams.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-20 space-y-4">
             <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-[#120B20] border border-[#FF2D8D]/40 text-[#FF2D8D] shadow-[0_0_30px_rgba(255,45,141,0.3)]">
               <Loader2 className="h-8 w-8 animate-spin" />
@@ -242,7 +327,7 @@ export default function ChampionsHQ() {
               ACQUIRING ROBOVERSE LEADERBOARD TELEMETRY...
             </p>
           </div>
-        ) : teams.length === 0 ? (
+        ) : displayedTeams.length === 0 ? (
           <div className="rounded-2xl border border-white/10 bg-[#120B20]/80 p-12 text-center backdrop-blur-md space-y-4">
             <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-white/5 text-zinc-500">
               <Trophy className="h-7 w-7" />
@@ -261,13 +346,15 @@ export default function ChampionsHQ() {
               <Podium
                 topTeams={topThree}
                 onSelectTeam={() => {}}
+                viewMode={viewMode}
               />
             )}
 
             {/* 2. FULL TOURNAMENT LEADERBOARD TABLE */}
             <LeaderboardTable
-              teams={teams}
+              teams={displayedTeams}
               recentlyUpdatedId={recentlyUpdatedId}
+              viewMode={viewMode}
             />
           </div>
         )}

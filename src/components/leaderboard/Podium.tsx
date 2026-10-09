@@ -1,19 +1,74 @@
 "use client";
 
 import { LeaderboardEntry } from "@/types/database";
-import { Trophy, Crown, Medal, Flame, Zap } from "lucide-react";
+import { Trophy, Crown, Medal, Timer } from "lucide-react";
 
 interface PodiumProps {
   topTeams: LeaderboardEntry[];
   onSelectTeam: (team: LeaderboardEntry) => void;
+  viewMode?: "all_rounds" | "round2_arena";
 }
 
-export default function Podium({ topTeams, onSelectTeam }: PodiumProps) {
+export default function Podium({ topTeams, onSelectTeam, viewMode = "all_rounds" }: PodiumProps) {
   if (!topTeams || topTeams.length === 0) return null;
 
   const first = topTeams[0];
   const second = topTeams.length > 1 ? topTeams[1] : null;
   const third = topTeams.length > 2 ? topTeams[2] : null;
+
+  const isArenaMode = viewMode === "round2_arena";
+
+  const renderScorePill = (team: LeaderboardEntry, rank: 1 | 2 | 3) => {
+    if (isArenaMode) {
+      const overallSeconds = team.round2_details?.overall_time_seconds ?? team.round2_score;
+      const formatted = team.round2_details?.overall_time_formatted || `${overallSeconds} sec`;
+
+      if (rank === 1) {
+        return (
+          <div className="mt-4 inline-flex flex-col items-center gap-0.5 rounded-2xl border border-[#35D9FF]/50 bg-[#35D9FF]/20 px-4 py-1.5 font-mono shadow-[0_0_20px_rgba(53,217,255,0.4)]">
+            <div className="flex items-center gap-1.5 text-sm font-black text-[#35D9FF]">
+              <Timer className="h-4 w-4" />
+              <span>{overallSeconds} SEC</span>
+            </div>
+            <span className="text-[10px] text-zinc-300 font-medium">{formatted.split("(")[1]?.replace(")", "") || "Fastest Arena Time"}</span>
+          </div>
+        );
+      }
+
+      const colorClasses = rank === 2 
+        ? "border-[#FF7A3D]/40 bg-[#FF7A3D]/15 text-[#FF7A3D]" 
+        : "border-[#35D9FF]/40 bg-[#35D9FF]/15 text-[#35D9FF]";
+
+      return (
+        <div className={`mt-4 inline-flex flex-col items-center rounded-xl border px-3.5 py-1 font-mono text-xs font-black shadow-sm ${colorClasses}`}>
+          <div className="flex items-center gap-1">
+            <Timer className="h-3 w-3" />
+            <span>{overallSeconds} SEC</span>
+          </div>
+        </div>
+      );
+    }
+
+    // Default All Rounds mode
+    if (rank === 1) {
+      return (
+        <div className="mt-4 inline-flex items-center gap-1.5 rounded-full border border-[#35D9FF]/50 bg-[#35D9FF]/20 px-4 py-1.5 font-mono text-sm font-black text-[#35D9FF] shadow-[0_0_20px_rgba(53,217,255,0.4)]">
+          <Trophy className="h-4 w-4" />
+          <span>XP {first.total_score}</span>
+        </div>
+      );
+    }
+
+    const colorClasses = rank === 2 
+      ? "border-[#FF7A3D]/40 bg-[#FF7A3D]/15 text-[#FF7A3D]" 
+      : "border-[#35D9FF]/40 bg-[#35D9FF]/15 text-[#35D9FF]";
+
+    return (
+      <div className={`mt-4 rounded-full border px-3.5 py-1 font-mono text-xs font-black shadow-sm ${colorClasses}`}>
+        XP {team.total_score}
+      </div>
+    );
+  };
 
   return (
     <div className="relative mx-auto my-8 max-w-4xl px-2 sm:px-4">
@@ -43,9 +98,7 @@ export default function Podium({ topTeams, onSelectTeam }: PodiumProps) {
                 Captain: <span className="text-zinc-200">{second.leader_name || second.members?.[0]?.name}</span>
               </span>
             )}
-            <div className="mt-4 rounded-full border border-[#FF7A3D]/40 bg-[#FF7A3D]/15 px-3.5 py-1 font-mono text-xs font-black text-[#FF7A3D] shadow-sm">
-              XP {second.total_score}
-            </div>
+            {renderScorePill(second, 2)}
           </div>
         )}
 
@@ -59,7 +112,7 @@ export default function Podium({ topTeams, onSelectTeam }: PodiumProps) {
               <Crown className="h-7 w-7 fill-current" />
             </div>
             <div className="inline-flex items-center gap-1 rounded-full bg-[#FFE8C7]/20 border border-[#FFE8C7]/60 px-3 py-0.5 text-[10px] font-mono font-black tracking-widest text-[#FFE8C7] uppercase mb-1 shadow-[0_0_10px_rgba(255,232,199,0.4)]">
-              ★ MOST WANTED
+              {isArenaMode ? "★ ARENA LEADER" : "★ MOST WANTED"}
             </div>
             <span className="font-mono text-sm font-black tracking-widest text-[#FFE8C7]">
               #01
@@ -72,10 +125,7 @@ export default function Podium({ topTeams, onSelectTeam }: PodiumProps) {
                 Captain: <span className="text-[#35D9FF] font-semibold">{first.leader_name || first.members?.[0]?.name}</span>
               </span>
             )}
-            <div className="mt-4 inline-flex items-center gap-1.5 rounded-full border border-[#35D9FF]/50 bg-[#35D9FF]/20 px-4 py-1.5 font-mono text-sm font-black text-[#35D9FF] shadow-[0_0_20px_rgba(53,217,255,0.4)]">
-              <Trophy className="h-4 w-4" />
-              <span>XP {first.total_score}</span>
-            </div>
+            {renderScorePill(first, 1)}
           </div>
         )}
 
@@ -99,9 +149,7 @@ export default function Podium({ topTeams, onSelectTeam }: PodiumProps) {
                 Captain: <span className="text-zinc-200">{third.leader_name || third.members?.[0]?.name}</span>
               </span>
             )}
-            <div className="mt-4 rounded-full border border-[#35D9FF]/40 bg-[#35D9FF]/15 px-3.5 py-1 font-mono text-xs font-black text-[#35D9FF] shadow-sm">
-              XP {third.total_score}
-            </div>
+            {renderScorePill(third, 3)}
           </div>
         )}
       </div>

@@ -15,15 +15,24 @@ import {
 } from "@/types/database";
 import {
   calculateRound2,
+  calculateRound2Arena,
   calculateStage,
   calculateRound3,
   calculateOverallCompletionTime,
-  DEFAULT_ROUND2_TOTAL_TIME,
-  DEFAULT_ROUND2_PENALTY_RATE,
+  compareRound2ArenaTeams,
+  formatSecondsToReadable,
+  parseTimeToSeconds,
+  DEFAULT_ROUND2_SKIP_PENALTY_COST,
+  DEFAULT_ROUND2_TOUCH_PENALTY_COST,
   DEFAULT_ROUND2_MAX_VIVA,
   DEFAULT_STAGE_MAX_MARKS,
   DEFAULT_STAGE_PENALTY_RATE,
 } from "@/lib/scoringUtils";
+import {
+  getRound2Settings,
+  saveRound2Settings,
+  fetchRound2Settings,
+} from "@/lib/round2Settings";
 import {
   Trophy,
   Search,
@@ -47,6 +56,8 @@ import {
   HelpCircle,
   Unlock,
   Lock,
+  Settings,
+  Sliders,
 } from "lucide-react";
 
 export default function AdminScoresPage() {
@@ -55,6 +66,20 @@ export default function AdminScoresPage() {
   const [searchQuery, setSearchQuery] = useState("");
   const [filterCategory, setFilterCategory] = useState<"all" | "qualified" | "not_qualified">("all");
   const [sortBy, setSortBy] = useState<"highest" | "lowest" | "name" | "updated">("highest");
+  const [viewMode, setViewMode] = useState<"all_rounds" | "round2_arena">("all_rounds");
+
+  // Round 2 Global Settings State
+  const [round2Settings, setRound2Settings] = useState<{
+    skip_penalty_cost: number;
+    touch_penalty_cost: number;
+  }>({
+    skip_penalty_cost: DEFAULT_ROUND2_SKIP_PENALTY_COST,
+    touch_penalty_cost: DEFAULT_ROUND2_TOUCH_PENALTY_COST,
+  });
+  const [showSettingsModal, setShowSettingsModal] = useState(false);
+  const [tempSkipCost, setTempSkipCost] = useState(String(DEFAULT_ROUND2_SKIP_PENALTY_COST));
+  const [tempTouchCost, setTempTouchCost] = useState(String(DEFAULT_ROUND2_TOUCH_PENALTY_COST));
+  const [savingSettings, setSavingSettings] = useState(false);
 
   // Notifications
   const [feedback, setFeedback] = useState<{
@@ -64,18 +89,20 @@ export default function AdminScoresPage() {
 
   // Edit Modal State
   const [selectedTeam, setSelectedTeam] = useState<TeamScoreItem | null>(null);
-  const [activeTab, setActiveTab] = useState<"screening" | "round1" | "round2" | "round3">("screening");
+  const [activeTab, setActiveTab] = useState<"screening" | "round1" | "round2" | "round3">("round2");
 
   // Form State for Selected Team
   const [screeningStatus, setScreeningStatus] = useState<"qualified" | "not_qualified">("qualified");
   const [round1Status, setRound1Status] = useState<"qualified" | "not_qualified" | "pending">("pending");
   
-  // Round 2 Form State (Formula: S = (720 - T) - H + V)
-  const [round2Time, setRound2Time] = useState<string>("00:00");
-  const [round2TotalTime, setRound2TotalTime] = useState<string>("720");
+  // Round 2 Arena Form State
+  // Formula: Overall Time = (Completion Time in Minutes * 60) + (Skips * Skip Cost) + (Touches * Touch Cost) - Viva Marks
   const [round2VivaMarks, setRound2VivaMarks] = useState<string>("0");
-  const [round2HandTouches, setRound2HandTouches] = useState<string>("0");
-  const [round2PenaltyRate, setRound2PenaltyRate] = useState<string>("1");
+  const [round2CompletionMinutes, setRound2CompletionMinutes] = useState<string>("0");
+  const [round2SkipPenalties, setRound2SkipPenalties] = useState<string>("0");
+  const [round2TouchPenalties, setRound2TouchPenalties] = useState<string>("0");
+  const [round2SkipCost, setRound2SkipCost] = useState<string>(String(DEFAULT_ROUND2_SKIP_PENALTY_COST));
+  const [round2TouchCost, setRound2TouchCost] = useState<string>(String(DEFAULT_ROUND2_TOUCH_PENALTY_COST));
 
   // Round 3 Form State (3 Stages)
   const [activeStageIndex, setActiveStageIndex] = useState<number>(0);
@@ -98,7 +125,23 @@ export default function AdminScoresPage() {
 
   useEffect(() => {
     loadScores();
+    loadPenaltySettings();
+
+    // Listen for cross-tab or storage settings updates
+    const handleSettingsUpdated = (e: any) => {
+      const s = e?.detail || getRound2Settings();
+      setRound2Settings(s);
+    };
+    window.addEventListener("round2_settings_updated", handleSettingsUpdated);
+    return () => {
+      window.removeEventListener("round2_settings_updated", handleSettingsUpdated);
+    };
   }, []);
+
+  const loadPenaltySettings = async () => {
+    const s = await fetchRound2Settings();
+    setRound2Settings(s);
+  };
 
   const [syncingPdf, setSyncingPdf] = useState(false);
 
@@ -143,13 +186,32 @@ export default function AdminScoresPage() {
     setScreeningStatus(team.screening_status || "qualified");
     setRound1Status(team.round1_status || "pending");
 
-    // Initialize Round 2 (Boat Race: S = (720 - T) - H + V)
+    // Initialize Round 2 Arena fields
     const r2 = team.round2_details || team.details?.round2;
-    setRound2Time(r2?.completion_time || "00:00");
-    setRound2TotalTime(String(r2?.total_time ?? DEFAULT_ROUND2_TOTAL_TIME));
     setRound2VivaMarks(String(r2?.viva_marks ?? 0));
-    setRound2HandTouches(String(r2?.hand_touches ?? r2?.penalty_count ?? 0));
-    setRound2PenaltyRate(String(r2?.penalty_rate ?? DEFAULT_ROUND2_PENALTY_RATE));
+
+    // Determine completion time in minutes
+    if (r2?.completion_time_minutes !== undefined && r2?.completion_time_minutes !== null) {
+      setRound2CompletionMinutes(String(r2.completion_time_minutes));
+    } else if (r2?.completion_time_seconds !== undefined && r2?.completion_time_seconds !== null) {
+      setRound2CompletionMinutes(String(Math.round((r2.completion_time_seconds / 60) * 100) / 100));
+    } else if (r2?.completion_time) {
+      const s = parseTimeToSeconds(r2.completion_time);
+      setRound2CompletionMinutes(String(Math.round((s / 60) * 100) / 100));
+    } else {
+      setRound2CompletionMinutes("0");
+    }
+
+    setRound2SkipPenalties(String(r2?.skip_penalties ?? 0));
+    setRound2TouchPenalties(
+      String(r2?.touch_penalties ?? r2?.hand_touches ?? r2?.penalty_count ?? 0)
+    );
+    setRound2SkipCost(
+      String(r2?.skip_penalty_cost ?? round2Settings.skip_penalty_cost)
+    );
+    setRound2TouchCost(
+      String(r2?.touch_penalty_cost ?? round2Settings.touch_penalty_cost)
+    );
 
     // Initialize Round 3 (3 Stages)
     const r3 = team.round3_details || team.details?.round3;
@@ -176,7 +238,16 @@ export default function AdminScoresPage() {
       teamId: team.id,
       screening_status: newStatus,
       round1_status: team.round1_status || "pending",
-      round2: team.round2_details || { total_time: 720, completion_time: "00:00", viva_marks: 0, hand_touches: 0, penalty_rate: 1 },
+      round2: team.round2_details || {
+        completion_time: "0s",
+        completion_time_minutes: 0,
+        completion_time_seconds: 0,
+        viva_marks: 0,
+        skip_penalties: 0,
+        touch_penalties: 0,
+        skip_penalty_cost: round2Settings.skip_penalty_cost,
+        touch_penalty_cost: round2Settings.touch_penalty_cost,
+      },
       round3: team.round3_details?.stages || [
         { stage_number: 1, max_marks: 50, gain_marks: team.score?.round3_score || 0 },
         { stage_number: 2, max_marks: 50, gain_marks: 0 },
@@ -195,21 +266,41 @@ export default function AdminScoresPage() {
     }
   };
 
-  // Live Calculations for Modal Preview (Round 2: S = (720 - T) - H + V)
+  // Live Calculations for Modal Preview (Round 2 Arena Official Formula)
   const computedRound2 = useMemo(() => {
-    const totalTime = Math.max(0, parseFloat(round2TotalTime) || DEFAULT_ROUND2_TOTAL_TIME);
-    const vivaMarks = Math.max(0, parseFloat(round2VivaMarks) || 0);
-    const handTouches = Math.max(0, parseFloat(round2HandTouches) || 0);
-    const penaltyRate = Math.max(0, parseFloat(round2PenaltyRate) || DEFAULT_ROUND2_PENALTY_RATE);
+    const vivaMarks = Math.min(
+      DEFAULT_ROUND2_MAX_VIVA,
+      Math.max(0, parseFloat(round2VivaMarks) || 0)
+    );
+    const completionMinutes = Math.max(0, parseFloat(round2CompletionMinutes) || 0);
+    const skipPenalties = Math.max(0, Math.floor(parseFloat(round2SkipPenalties) || 0));
+    const touchPenalties = Math.max(0, Math.floor(parseFloat(round2TouchPenalties) || 0));
+    const skipCost = Math.max(
+      0,
+      parseFloat(round2SkipCost) || round2Settings.skip_penalty_cost
+    );
+    const touchCost = Math.max(
+      0,
+      parseFloat(round2TouchCost) || round2Settings.touch_penalty_cost
+    );
 
-    return calculateRound2({
-      completion_time: round2Time || "00:00",
-      total_time: totalTime,
+    return calculateRound2Arena({
       viva_marks: vivaMarks,
-      hand_touches: handTouches,
-      penalty_rate: penaltyRate,
+      completion_time_minutes: completionMinutes,
+      skip_penalties: skipPenalties,
+      touch_penalties: touchPenalties,
+      skip_penalty_cost: skipCost,
+      touch_penalty_cost: touchCost,
     });
-  }, [round2Time, round2TotalTime, round2VivaMarks, round2HandTouches, round2PenaltyRate]);
+  }, [
+    round2VivaMarks,
+    round2CompletionMinutes,
+    round2SkipPenalties,
+    round2TouchPenalties,
+    round2SkipCost,
+    round2TouchCost,
+    round2Settings,
+  ]);
 
   const computedStages = useMemo(() => {
     return stagesState.map((st, idx) => {
@@ -236,8 +327,8 @@ export default function AdminScoresPage() {
   }, [computedStages]);
 
   const computedOverallTime = useMemo(() => {
-    return calculateOverallCompletionTime(round2Time, computedStages);
-  }, [round2Time, computedStages]);
+    return calculateOverallCompletionTime(computedRound2.completion_time, computedStages);
+  }, [computedRound2.completion_time, computedStages]);
 
   const computedGrandTotal = useMemo(() => {
     if (screeningStatus === "not_qualified") return 0;
@@ -256,13 +347,75 @@ export default function AdminScoresPage() {
     });
   };
 
-  // Submit Modal Update
-  const handleSaveScore = async (e: React.FormEvent) => {
+  // Open Global Settings Modal
+  const handleOpenSettingsModal = () => {
+    setTempSkipCost(String(round2Settings.skip_penalty_cost));
+    setTempTouchCost(String(round2Settings.touch_penalty_cost));
+    setShowSettingsModal(true);
+  };
+
+  // Save Global Settings
+  const handleSaveSettings = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const skip = Math.max(0, parseFloat(tempSkipCost) || 0);
+    const touch = Math.max(0, parseFloat(tempTouchCost) || 0);
+
+    setSavingSettings(true);
+    const res = await saveRound2Settings({
+      skip_penalty_cost: skip,
+      touch_penalty_cost: touch,
+    });
+    setSavingSettings(false);
+
+    if (res.success) {
+      setRound2Settings(res.settings);
+      setShowSettingsModal(false);
+      showFeedback(
+        "success",
+        `ROUND 2 ARENA PENALTY COSTS SAVED: ${skip}s/skip, ${touch}s/touch`
+      );
+      await loadScores();
+    } else {
+      showFeedback("error", res.error || "FAILED TO SAVE PENALTY SETTINGS");
+    }
+  };
+
+  // Submit Updated Scores
+  const handleSubmitScores = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!selectedTeam) return;
-    setFormError(null);
 
     setSubmitting(true);
+    setFormError(null);
+
+    // Validation for Round 2 Arena
+    const vMarks = parseFloat(round2VivaMarks);
+    if (isNaN(vMarks) || vMarks < 0 || vMarks > 60) {
+      setFormError("Viva Marks must be a valid number between 0 and 60.");
+      setSubmitting(false);
+      return;
+    }
+
+    const cMinutes = parseFloat(round2CompletionMinutes);
+    if (isNaN(cMinutes) || cMinutes < 0) {
+      setFormError("Completion Time must be a valid non-negative number.");
+      setSubmitting(false);
+      return;
+    }
+
+    const sPenalties = parseFloat(round2SkipPenalties);
+    if (isNaN(sPenalties) || sPenalties < 0) {
+      setFormError("Skip Penalties must be a valid non-negative whole number.");
+      setSubmitting(false);
+      return;
+    }
+
+    const tPenalties = parseFloat(round2TouchPenalties);
+    if (isNaN(tPenalties) || tPenalties < 0) {
+      setFormError("Touch Penalties must be a valid non-negative whole number.");
+      setSubmitting(false);
+      return;
+    }
 
     const payload = {
       teamId: selectedTeam.id,
@@ -286,7 +439,7 @@ export default function AdminScoresPage() {
 
     showFeedback(
       "success",
-      `SCORES UPDATED FOR ${selectedTeam.team_name} (TOTAL: ${computedGrandTotal} PTS)`
+      `SCORES UPDATED FOR ${selectedTeam.team_name} (R2 OVERALL TIME: ${computedRound2.overall_time_seconds}s)`
     );
 
     setSubmitting(false);
@@ -313,27 +466,55 @@ export default function AdminScoresPage() {
       return true;
     });
 
-    if (sortBy === "highest") {
+    if (viewMode === "round2_arena") {
+      // In Round 2 Arena view, rank qualified teams by Overall Time ASC, tiebreak by higher viva marks, then lower completion time
       result.sort((a, b) => {
         if (a.screening_status !== b.screening_status) {
           return a.screening_status === "qualified" ? -1 : 1;
         }
-        return (b.score?.total_score ?? 0) - (a.score?.total_score ?? 0);
+        const aR2 = a.round2_details || (a.score?.round2_details as Round2Details) || {};
+        const bR2 = b.round2_details || (b.score?.round2_details as Round2Details) || {};
+        return compareRound2ArenaTeams(
+          {
+            overall_time_seconds: aR2.overall_time_seconds ?? a.score?.round2_score ?? 999999,
+            viva_marks: aR2.viva_marks ?? 0,
+            completion_time_seconds: aR2.completion_time_seconds ?? 999999,
+            team_name: a.team_name,
+            id: a.id,
+          },
+          {
+            overall_time_seconds: bR2.overall_time_seconds ?? b.score?.round2_score ?? 999999,
+            viva_marks: bR2.viva_marks ?? 0,
+            completion_time_seconds: bR2.completion_time_seconds ?? 999999,
+            team_name: b.team_name,
+            id: b.id,
+          }
+        );
       });
-    } else if (sortBy === "lowest") {
-      result.sort((a, b) => (a.score?.total_score ?? 0) - (b.score?.total_score ?? 0));
-    } else if (sortBy === "name") {
-      result.sort((a, b) => a.team_name.localeCompare(b.team_name));
-    } else if (sortBy === "updated") {
-      result.sort(
-        (a, b) =>
-          new Date(b.score?.updated_at || b.updated_at).getTime() -
-          new Date(a.score?.updated_at || a.updated_at).getTime()
-      );
+    } else {
+      // Standard Overall Ranking
+      if (sortBy === "highest") {
+        result.sort((a, b) => {
+          if (a.screening_status !== b.screening_status) {
+            return a.screening_status === "qualified" ? -1 : 1;
+          }
+          return (b.score?.total_score ?? 0) - (a.score?.total_score ?? 0);
+        });
+      } else if (sortBy === "lowest") {
+        result.sort((a, b) => (a.score?.total_score ?? 0) - (b.score?.total_score ?? 0));
+      } else if (sortBy === "name") {
+        result.sort((a, b) => a.team_name.localeCompare(b.team_name));
+      } else if (sortBy === "updated") {
+        result.sort(
+          (a, b) =>
+            new Date(b.score?.updated_at || b.updated_at).getTime() -
+            new Date(a.score?.updated_at || a.updated_at).getTime()
+        );
+      }
     }
 
     return result;
-  }, [teams, searchQuery, filterCategory, sortBy]);
+  }, [teams, searchQuery, filterCategory, sortBy, viewMode]);
 
   const qualifiedCount = useMemo(
     () => teams.filter((t) => t.screening_status === "qualified").length,
@@ -357,11 +538,19 @@ export default function AdminScoresPage() {
               SCORE &amp; ROUND CONTROL
             </h1>
             <p className="mt-1 text-xs text-zinc-400 font-mono">
-              MANAGE QUIZ/KIT SCREENING, VIVA &amp; BOT ASSEMBLY, FIRST ARENA &amp; SECOND ARENA (3 STAGES)
+              MANAGE QUIZ/KIT SCREENING, VIVA &amp; BOT ASSEMBLY, ROUND 2 ARENA &amp; ROUND 3 ARENA (3 STAGES)
             </p>
           </div>
 
           <div className="flex flex-wrap items-center gap-2.5 self-start">
+            <button
+              onClick={handleOpenSettingsModal}
+              className="inline-flex items-center gap-2 rounded-lg border border-[#FF7A3D]/40 bg-[#FF7A3D]/10 px-4 py-2 text-xs font-mono font-bold tracking-wider text-[#FF7A3D] uppercase transition-all hover:bg-[#FF7A3D]/20 cursor-pointer shadow-[0_0_12px_rgba(255,122,61,0.2)]"
+            >
+              <Settings className="h-3.5 w-3.5" />
+              <span>R2 PENALTY SETTINGS ({round2Settings.skip_penalty_cost}s / {round2Settings.touch_penalty_cost}s)</span>
+            </button>
+
             <button
               onClick={handleSyncPdfQualification}
               disabled={syncingPdf || loading}
@@ -433,11 +622,39 @@ export default function AdminScoresPage() {
         {/* Grand XP */}
         <div className="rounded-xl border border-[#FF6B35]/30 bg-[#FF6B35]/5 p-4 backdrop-blur-md">
           <div className="flex items-center justify-between text-[#FF6B35] text-xs font-mono">
-            <span>ACTIVE ARENAS</span>
+            <span>R2 PENALTY RATES</span>
             <Trophy className="h-4 w-4 text-[#FF6B35]" />
           </div>
-          <div className="mt-1 text-2xl font-black font-mono text-white">R1, R2, R3</div>
+          <div className="mt-1 text-sm font-black font-mono text-white">
+            Skip: {round2Settings.skip_penalty_cost}s &bull; Touch: {round2Settings.touch_penalty_cost}s
+          </div>
         </div>
+      </div>
+
+      {/* VIEW SELECTOR: ALL ROUNDS vs ROUND 2 ARENA ONLY */}
+      <div className="flex items-center gap-2 border-b border-white/10 pb-3 font-mono text-xs">
+        <button
+          onClick={() => setViewMode("all_rounds")}
+          className={`rounded-xl px-4 py-2 font-bold uppercase transition-all cursor-pointer ${
+            viewMode === "all_rounds"
+              ? "bg-[#35D9FF] text-black shadow-[0_0_15px_rgba(53,217,255,0.3)]"
+              : "border border-white/10 bg-white/5 text-zinc-400 hover:text-white"
+          }`}
+        >
+          ALL ROUNDS OVERVIEW
+        </button>
+
+        <button
+          onClick={() => setViewMode("round2_arena")}
+          className={`inline-flex items-center gap-2 rounded-xl px-4 py-2 font-bold uppercase transition-all cursor-pointer ${
+            viewMode === "round2_arena"
+              ? "bg-[#FF7A3D] text-black shadow-[0_0_15px_rgba(255,122,61,0.3)]"
+              : "border border-[#FF7A3D]/40 bg-[#FF7A3D]/10 text-[#FF7A3D] hover:bg-[#FF7A3D]/20"
+          }`}
+        >
+          <Timer className="h-3.5 w-3.5" />
+          <span>ROUND 2 – ARENA (EVALUATION &amp; LEADERBOARD)</span>
+        </button>
       </div>
 
       {/* 3. SEARCH & FILTER TOOLBAR */}
@@ -493,19 +710,21 @@ export default function AdminScoresPage() {
             />
           </div>
 
-          <div className="flex items-center gap-2 self-start sm:self-auto">
-            <ArrowUpDown className="h-3.5 w-3.5 text-zinc-500" />
-            <select
-              value={sortBy}
-              onChange={(e) => setSortBy(e.target.value as any)}
-              className="rounded-lg border border-white/10 bg-[#0A0718] py-1.5 px-3 text-xs text-zinc-300 focus:border-[#FF6B35] focus:outline-none"
-            >
-              <option value="highest">Highest Score (Ranked)</option>
-              <option value="lowest">Lowest Score</option>
-              <option value="name">Team Name (A-Z)</option>
-              <option value="updated">Recently Updated</option>
-            </select>
-          </div>
+          {viewMode === "all_rounds" && (
+            <div className="flex items-center gap-2 self-start sm:self-auto">
+              <ArrowUpDown className="h-3.5 w-3.5 text-zinc-500" />
+              <select
+                value={sortBy}
+                onChange={(e) => setSortBy(e.target.value as any)}
+                className="rounded-lg border border-white/10 bg-[#0A0718] py-1.5 px-3 text-xs text-zinc-300 focus:border-[#FF6B35] focus:outline-none"
+              >
+                <option value="highest">Highest Score (Ranked)</option>
+                <option value="lowest">Lowest Score</option>
+                <option value="name">Team Name (A-Z)</option>
+                <option value="updated">Recently Updated</option>
+              </select>
+            </div>
+          )}
         </div>
       </div>
 
@@ -531,322 +750,496 @@ export default function AdminScoresPage() {
               : "Register teams in Team Garage to begin entering tournament round scores."}
           </p>
         </div>
-      ) : (
-        <>
-          {/* Desktop Table View */}
-          <div className="hidden overflow-hidden rounded-xl border border-white/10 bg-[#0A0718]/80 backdrop-blur-md md:block">
-            <table className="w-full text-left text-xs font-mono">
-              <thead className="border-b border-white/10 bg-white/5 text-zinc-400 uppercase tracking-widest text-[11px]">
-                <tr>
-                  <th className="py-3.5 px-3 font-bold">CREW &amp; CAPTAIN</th>
-                  <th className="py-3.5 px-3 font-bold text-center">SCREENING</th>
-                  <th className="py-3.5 px-3 font-bold text-center">R1 VIVA</th>
-                  <th className="py-3.5 px-3 font-bold text-center">R2 ARENA 1</th>
-                  <th className="py-3.5 px-3 font-bold text-center">R3 ARENA 2</th>
-                  <th className="py-3.5 px-3 font-bold text-center text-[#FF6B35]">OVERALL C.T</th>
-                  <th className="py-3.5 px-3 font-bold text-center text-[#00F0FF]">TOTAL XP</th>
-                  <th className="py-3.5 px-3 text-right font-bold">ACTION</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-white/5 text-zinc-300">
-                {filteredTeams.map((team) => {
-                  const isQualified = team.screening_status === "qualified";
-                  const r1Status = team.round1_status || "pending";
-                  const r2 = team.round2_details;
-                  const r3 = team.round3_details;
-                  const total = team.score?.total_score ?? 0;
-                  const overallTime = team.overall_time || "00:00";
+      ) : viewMode === "round2_arena" ? (
+        /* DEDICATED ROUND 2 ARENA TABLE */
+        <div className="overflow-hidden rounded-xl border border-white/10 bg-[#0A0718]/80 backdrop-blur-md">
+          <table className="w-full text-left text-xs font-mono">
+            <thead className="border-b border-white/10 bg-white/5 text-zinc-400 uppercase tracking-widest text-[11px]">
+              <tr>
+                <th className="py-3.5 px-3 font-bold w-14">RANK</th>
+                <th className="py-3.5 px-3 font-bold">CREW / TEAM NAME</th>
+                <th className="py-3.5 px-3 font-bold text-center">STATUS</th>
+                <th className="py-3.5 px-3 font-bold text-center text-emerald-400">VIVA MARKS / 60</th>
+                <th className="py-3.5 px-3 font-bold text-center">COMPLETION TIME (S)</th>
+                <th className="py-3.5 px-3 font-bold text-center text-red-400">SKIP PENALTIES</th>
+                <th className="py-3.5 px-3 font-bold text-center text-red-400">TOUCH PENALTIES</th>
+                <th className="py-3.5 px-3 font-bold text-center text-red-400">TOTAL PENALTY TIME (S)</th>
+                <th className="py-3.5 px-3 font-bold text-center text-[#FF7A3D]">OVERALL TIME (S)</th>
+                <th className="py-3.5 px-3 text-right font-bold">ACTION</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-white/5 text-zinc-300">
+              {filteredTeams.map((team, index) => {
+                const isQualified = team.screening_status === "qualified";
+                const r2 = team.round2_details || (team.score?.round2_details as Round2Details) || {};
+                const viva = r2.viva_marks ?? 0;
+                const compSeconds = r2.completion_time_seconds ?? parseTimeToSeconds(r2.completion_time);
+                const skips = r2.skip_penalties ?? 0;
+                const touches = r2.touch_penalties ?? r2.hand_touches ?? r2.penalty_count ?? 0;
+                const skipCost = r2.skip_penalty_cost ?? round2Settings.skip_penalty_cost;
+                const touchCost = r2.touch_penalty_cost ?? round2Settings.touch_penalty_cost;
+                const totalPenTime = r2.total_penalty_time ?? (skips * skipCost + touches * touchCost);
+                const overallTimeSec = r2.overall_time_seconds ?? (compSeconds + totalPenTime - viva);
+                const overallFormatted = r2.overall_time_formatted || formatSecondsToReadable(overallTimeSec);
 
-                  return (
-                    <tr
-                      key={team.id}
-                      className={`transition-colors hover:bg-white/[0.02] ${
-                        !isQualified ? "opacity-75 bg-red-950/10" : ""
-                      }`}
-                    >
-                      {/* Crew Name */}
-                      <td className="py-4 px-3 font-bold text-white font-sans text-sm">
-                        <div className="flex items-center gap-2.5">
-                          <div
-                            className={`flex h-8 w-8 items-center justify-center rounded-lg text-xs font-mono font-black shrink-0 ${
-                              isQualified
-                                ? "bg-gradient-to-br from-[#FF2A85] to-[#FF6B35] text-white shadow-sm"
-                                : "bg-zinc-800 text-zinc-400 border border-white/10"
-                            }`}
-                          >
-                            {team.team_name.charAt(0).toUpperCase()}
-                          </div>
-                          <div>
-                            <div className="font-bold text-white text-sm flex items-center gap-2">
-                              <span>{team.team_name}</span>
-                              {!isQualified && (
-                                <span className="rounded bg-red-500/20 border border-red-500/40 px-1.5 py-0.2 text-[10px] font-mono font-bold text-red-400 uppercase">
-                                  NOT QUALIFIED
-                                </span>
-                              )}
-                            </div>
-                            {(team.captain_name || team.leader_name || team.members?.[0]?.name) && (
-                              <div className="text-[11px] font-mono text-zinc-400 mt-0.5 font-normal">
-                                Cap:{" "}
-                                <span className="text-zinc-300 font-semibold">
-                                  {team.captain_name || team.leader_name || team.members?.[0]?.name}
-                                </span>
-                              </div>
-                            )}
-                          </div>
+                return (
+                  <tr
+                    key={team.id}
+                    className={`transition-colors hover:bg-white/[0.02] ${
+                      !isQualified ? "opacity-75 bg-red-950/10" : ""
+                    }`}
+                  >
+                    {/* Rank */}
+                    <td className="py-4 px-3 font-bold">
+                      {isQualified ? (
+                        <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-black ${
+                          index === 0
+                            ? "bg-[#FFE8C7]/20 border border-[#FFE8C7]/60 text-[#FFE8C7]"
+                            : index === 1
+                            ? "bg-[#FF7A3D]/20 border border-[#FF7A3D]/60 text-[#FF7A3D]"
+                            : index === 2
+                            ? "bg-[#35D9FF]/20 border border-[#35D9FF]/60 text-[#35D9FF]"
+                            : "bg-white/5 text-zinc-400"
+                        }`}>
+                          #{String(index + 1).padStart(2, "0")}
+                        </span>
+                      ) : (
+                        <span className="rounded bg-red-500/10 text-red-400 px-1.5 py-0.5 text-[10px] font-bold">
+                          NQ
+                        </span>
+                      )}
+                    </td>
+
+                    {/* Crew Name */}
+                    <td className="py-4 px-3 font-bold text-white font-sans text-sm">
+                      <div className="font-bold text-white text-sm">{team.team_name}</div>
+                      {(team.captain_name || team.leader_name || team.members?.[0]?.name) && (
+                        <div className="text-[11px] font-mono text-zinc-400 font-normal">
+                          Cap: {team.captain_name || team.leader_name || team.members?.[0]?.name}
                         </div>
-                      </td>
+                      )}
+                    </td>
 
-                      {/* Screening Status (Quiz & Kit) + Quick Toggle */}
-                      <td className="py-4 px-3 text-center">
-                        {isQualified ? (
-                          <div className="inline-flex flex-col items-center gap-1">
-                            <span className="inline-flex items-center gap-1 rounded-full border border-emerald-500/40 bg-emerald-500/10 px-2.5 py-0.5 text-[11px] font-bold text-emerald-400 font-mono shadow-[0_0_10px_rgba(16,185,129,0.2)]">
-                              <ShieldCheck className="h-3 w-3" />
-                              <span>QUALIFIED</span>
-                            </span>
-                            <button
-                              onClick={() => handleQuickScreeningToggle(team, "not_qualified")}
-                              className="text-[10px] text-zinc-500 hover:text-red-400 underline cursor-pointer"
-                            >
-                              Set Not Qualified
-                            </button>
-                          </div>
-                        ) : (
-                          <div className="inline-flex flex-col items-center gap-1.5">
-                            <span className="inline-flex items-center gap-1 rounded-full border border-red-500/40 bg-red-500/10 px-2.5 py-0.5 text-[11px] font-bold text-red-400 font-mono">
-                              <ShieldAlert className="h-3 w-3" />
-                              <span>NOT QUALIFIED</span>
-                            </span>
-                            <button
-                              onClick={() => handleQuickScreeningToggle(team, "qualified")}
-                              className="inline-flex items-center gap-1 rounded border border-emerald-500/40 bg-emerald-500/20 px-2 py-0.5 text-[10px] font-bold text-emerald-300 hover:bg-emerald-500 hover:text-black transition-all cursor-pointer uppercase shadow-sm"
-                            >
-                              <Unlock className="h-2.5 w-2.5" />
-                              <span>QUALIFY TEAM</span>
-                            </button>
-                          </div>
-                        )}
-                      </td>
+                    {/* Status */}
+                    <td className="py-4 px-3 text-center">
+                      {isQualified ? (
+                        <span className="inline-flex items-center gap-1 rounded-full border border-emerald-500/40 bg-emerald-500/10 px-2.5 py-0.5 text-[10px] font-bold text-emerald-400 font-mono">
+                          <ShieldCheck className="h-3 w-3" />
+                          <span>QUALIFIED</span>
+                        </span>
+                      ) : (
+                        <span className="inline-flex items-center gap-1 rounded-full border border-red-500/40 bg-red-500/10 px-2.5 py-0.5 text-[10px] font-bold text-red-400 font-mono">
+                          <ShieldAlert className="h-3 w-3" />
+                          <span>NOT QUALIFIED</span>
+                        </span>
+                      )}
+                    </td>
 
-                      {/* R1 Viva & Bot Assembly */}
-                      <td className="py-4 px-3 text-center">
-                        {!isQualified ? (
-                          <span className="text-zinc-600 text-[11px] font-mono flex items-center justify-center gap-1">
-                            <Lock className="h-3 w-3" /> LOCKED
-                          </span>
-                        ) : r1Status === "qualified" ? (
-                          <span className="inline-flex items-center gap-1 rounded bg-emerald-500/20 border border-emerald-500/40 px-2 py-0.5 text-[11px] font-bold text-emerald-400">
-                            QUALIFIED
-                          </span>
-                        ) : r1Status === "not_qualified" ? (
-                          <span className="inline-flex items-center gap-1 rounded bg-red-500/20 border border-red-500/40 px-2 py-0.5 text-[11px] font-bold text-red-400">
-                            NOT QUALIFIED
-                          </span>
-                        ) : (
-                          <span className="rounded bg-white/5 px-2 py-0.5 text-[11px] text-zinc-400">
-                            PENDING
-                          </span>
-                        )}
-                      </td>
+                    {/* Viva Marks / 60 */}
+                    <td className="py-4 px-3 text-center font-bold text-emerald-400">
+                      {isQualified ? `${viva} / 60` : "—"}
+                    </td>
 
-                      {/* R2 Arena 1 */}
-                      <td className="py-4 px-3 text-center">
-                        {!isQualified ? (
-                          <span className="text-zinc-600 text-[11px] font-mono flex items-center justify-center gap-1">
-                            <Lock className="h-3 w-3" /> LOCKED
-                          </span>
-                        ) : (
-                          <div className="inline-flex flex-col items-center">
-                            <span className="font-bold text-white text-sm">
-                              {r2?.total_marks ?? team.score?.round2_score ?? 0} pts
+                    {/* Completion Time (seconds) */}
+                    <td className="py-4 px-3 text-center font-mono">
+                      {isQualified ? (
+                        <div>
+                          <span className="font-bold text-white">{compSeconds}s</span>
+                          {r2.completion_time_minutes !== undefined && (
+                            <span className="text-[10px] text-zinc-400 block">
+                              ({r2.completion_time_minutes} min)
                             </span>
-                            {r2 && (
-                              <span className="text-[10px] text-zinc-400 font-mono">
-                                {r2.completion_time !== "00:00" ? r2.completion_time : "—"} &bull; H:{r2.hand_touches ?? r2.penalty_count ?? 0} &bull; V:+{r2.viva_marks ?? 0}
+                          )}
+                        </div>
+                      ) : (
+                        "—"
+                      )}
+                    </td>
+
+                    {/* Number of Skip Penalties */}
+                    <td className="py-4 px-3 text-center font-mono text-red-400">
+                      {isQualified ? (
+                        <div>
+                          <span className="font-bold">{skips} skips</span>
+                          <span className="text-[10px] text-zinc-400 block">
+                            (+{skips * skipCost}s)
+                          </span>
+                        </div>
+                      ) : (
+                        "—"
+                      )}
+                    </td>
+
+                    {/* Number of Touch Penalties */}
+                    <td className="py-4 px-3 text-center font-mono text-red-400">
+                      {isQualified ? (
+                        <div>
+                          <span className="font-bold">{touches} touches</span>
+                          <span className="text-[10px] text-zinc-400 block">
+                            (+{touches * touchCost}s)
+                          </span>
+                        </div>
+                      ) : (
+                        "—"
+                      )}
+                    </td>
+
+                    {/* Total Penalty Time (seconds) */}
+                    <td className="py-4 px-3 text-center font-bold font-mono text-red-400">
+                      {isQualified ? `+${totalPenTime}s` : "—"}
+                    </td>
+
+                    {/* Overall Time (seconds) */}
+                    <td className="py-4 px-3 text-center font-mono">
+                      {isQualified ? (
+                        <div className="inline-flex flex-col items-center">
+                          <span className="font-black text-sm text-[#FF7A3D]">
+                            {overallTimeSec}s
+                          </span>
+                          <span className="text-[10px] text-zinc-400 font-mono">
+                            {overallFormatted}
+                          </span>
+                        </div>
+                      ) : (
+                        "—"
+                      )}
+                    </td>
+
+                    {/* Action */}
+                    <td className="py-4 px-3 text-right">
+                      <button
+                        onClick={() => handleOpenEditModal(team)}
+                        className="inline-flex items-center gap-1.5 rounded-lg border border-[#FF7A3D]/40 bg-[#FF7A3D]/10 px-3 py-1.5 text-xs font-mono font-bold text-[#FF7A3D] transition-all hover:bg-[#FF7A3D] hover:text-white cursor-pointer uppercase shadow-sm"
+                      >
+                        <Edit3 className="h-3.5 w-3.5" />
+                        <span>EVALUATE R2</span>
+                      </button>
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+      ) : (
+        /* STANDARD ALL ROUNDS VIEW */
+        <div className="overflow-hidden rounded-xl border border-white/10 bg-[#0A0718]/80 backdrop-blur-md">
+          <table className="w-full text-left text-xs font-mono">
+            <thead className="border-b border-white/10 bg-white/5 text-zinc-400 uppercase tracking-widest text-[11px]">
+              <tr>
+                <th className="py-3.5 px-3 font-bold">CREW &amp; CAPTAIN</th>
+                <th className="py-3.5 px-3 font-bold text-center">SCREENING</th>
+                <th className="py-3.5 px-3 font-bold text-center">R1 VIVA</th>
+                <th className="py-3.5 px-3 font-bold text-center text-[#FF7A3D]">R2 ARENA (OVERALL TIME)</th>
+                <th className="py-3.5 px-3 font-bold text-center">R3 ARENA 2</th>
+                <th className="py-3.5 px-3 font-bold text-center text-[#FF6B35]">OVERALL C.T</th>
+                <th className="py-3.5 px-3 font-bold text-center text-[#00F0FF]">TOTAL XP</th>
+                <th className="py-3.5 px-3 text-right font-bold">ACTION</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-white/5 text-zinc-300">
+              {filteredTeams.map((team) => {
+                const isQualified = team.screening_status === "qualified";
+                const r1Status = team.round1_status || "pending";
+                const r2 = team.round2_details;
+                const r3 = team.round3_details;
+                const total = team.score?.total_score ?? 0;
+                const overallTime = team.overall_time || "00:00";
+
+                return (
+                  <tr
+                    key={team.id}
+                    className={`transition-colors hover:bg-white/[0.02] ${
+                      !isQualified ? "opacity-75 bg-red-950/10" : ""
+                    }`}
+                  >
+                    {/* Crew Name */}
+                    <td className="py-4 px-3 font-bold text-white font-sans text-sm">
+                      <div className="flex items-center gap-2.5">
+                        <div
+                          className={`flex h-8 w-8 items-center justify-center rounded-lg text-xs font-mono font-black shrink-0 ${
+                            isQualified
+                              ? "bg-gradient-to-br from-[#FF2A85] to-[#FF6B35] text-white shadow-sm"
+                              : "bg-zinc-800 text-zinc-400 border border-white/10"
+                          }`}
+                        >
+                          {team.team_name.charAt(0).toUpperCase()}
+                        </div>
+                        <div>
+                          <div className="font-bold text-white text-sm flex items-center gap-2">
+                            <span>{team.team_name}</span>
+                            {!isQualified && (
+                              <span className="rounded bg-red-500/20 border border-red-500/40 px-1.5 py-0.2 text-[10px] font-mono font-bold text-red-400 uppercase">
+                                NOT QUALIFIED
                               </span>
                             )}
                           </div>
-                        )}
-                      </td>
+                          {(team.captain_name || team.leader_name || team.members?.[0]?.name) && (
+                            <div className="text-[11px] font-mono text-zinc-400 mt-0.5 font-normal">
+                              Cap:{" "}
+                              <span className="text-zinc-300 font-semibold">
+                                {team.captain_name || team.leader_name || team.members?.[0]?.name}
+                              </span>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    </td>
 
-                      {/* R3 Arena 2 (3 Stages) */}
-                      <td className="py-4 px-3 text-center">
-                        {!isQualified ? (
-                          <span className="text-zinc-600 text-[11px] font-mono flex items-center justify-center gap-1">
-                            <Lock className="h-3 w-3" /> LOCKED
+                    {/* Screening Status (Quiz & Kit) + Quick Toggle */}
+                    <td className="py-4 px-3 text-center">
+                      {isQualified ? (
+                        <div className="inline-flex flex-col items-center gap-1">
+                          <span className="inline-flex items-center gap-1 rounded-full border border-emerald-500/40 bg-emerald-500/10 px-2.5 py-0.5 text-[11px] font-bold text-emerald-400 font-mono shadow-[0_0_10px_rgba(16,185,129,0.2)]">
+                            <ShieldCheck className="h-3 w-3" />
+                            <span>QUALIFIED</span>
                           </span>
-                        ) : (
-                          <div className="inline-flex flex-col items-center">
-                            <span className="font-bold text-white text-sm">
-                              {r3?.total_marks ?? team.score?.round3_score ?? 0} pts
-                            </span>
-                            {r3?.stages && (
-                              <div className="flex items-center gap-1 mt-0.5">
-                                {r3.stages.map((st, i) => (
-                                  <span
-                                    key={i}
-                                    title={`Stage ${st.stage_number}: ${st.total_marks} pts (${st.completion_time})`}
-                                    className="rounded bg-white/10 px-1 py-0.2 text-[9px] text-zinc-300 font-mono"
-                                  >
-                                    S{st.stage_number}:{st.total_marks}
-                                  </span>
-                                ))}
-                              </div>
-                            )}
-                          </div>
-                        )}
-                      </td>
-
-                      {/* Overall C.T */}
-                      <td className="py-4 px-3 text-center">
-                        {isQualified ? (
-                          <span className="inline-flex items-center gap-1 rounded bg-black/40 border border-white/10 px-2 py-0.5 text-xs text-zinc-300 font-mono font-bold">
-                            <Timer className="h-3 w-3 text-[#FF6B35]" />
-                            <span>{overallTime}</span>
+                          <button
+                            onClick={() => handleQuickScreeningToggle(team, "not_qualified")}
+                            className="text-[10px] text-zinc-500 hover:text-red-400 underline cursor-pointer"
+                          >
+                            Set Not Qualified
+                          </button>
+                        </div>
+                      ) : (
+                        <div className="inline-flex flex-col items-center gap-1.5">
+                          <span className="inline-flex items-center gap-1 rounded-full border border-red-500/40 bg-red-500/10 px-2.5 py-0.5 text-[11px] font-bold text-red-400 font-mono">
+                            <ShieldAlert className="h-3 w-3" />
+                            <span>NOT QUALIFIED</span>
                           </span>
-                        ) : (
-                          <span className="text-zinc-600 font-mono">—</span>
-                        )}
-                      </td>
+                          <button
+                            onClick={() => handleQuickScreeningToggle(team, "qualified")}
+                            className="inline-flex items-center gap-1 rounded border border-emerald-500/40 bg-emerald-500/20 px-2 py-0.5 text-[10px] font-bold text-emerald-300 hover:bg-emerald-500 hover:text-black transition-all cursor-pointer uppercase shadow-sm"
+                          >
+                            <Unlock className="h-2.5 w-2.5" />
+                            <span>QUALIFY TEAM</span>
+                          </button>
+                        </div>
+                      )}
+                    </td>
 
-                      {/* Total Score */}
-                      <td className="py-4 px-3 text-center font-bold">
-                        {isQualified ? (
-                          <span className="inline-flex items-center gap-1 rounded-full border border-[#00F0FF]/40 bg-[#00F0FF]/10 px-3 py-1 font-mono text-sm text-[#00F0FF] shadow-[0_0_12px_rgba(0,240,255,0.25)]">
-                            <Trophy className="h-3 w-3" />
-                            <span>{total} pts</span>
+                    {/* R1 Viva & Bot Assembly */}
+                    <td className="py-4 px-3 text-center">
+                      {!isQualified ? (
+                        <span className="text-zinc-600 text-[11px] font-mono flex items-center justify-center gap-1">
+                          <Lock className="h-3 w-3" /> LOCKED
+                        </span>
+                      ) : r1Status === "qualified" ? (
+                        <span className="inline-flex items-center gap-1 rounded bg-emerald-500/20 border border-emerald-500/40 px-2 py-0.5 text-[11px] font-bold text-emerald-400">
+                          QUALIFIED
+                        </span>
+                      ) : r1Status === "not_qualified" ? (
+                        <span className="inline-flex items-center gap-1 rounded bg-red-500/20 border border-red-500/40 px-2 py-0.5 text-[11px] font-bold text-red-400">
+                          NOT QUALIFIED
+                        </span>
+                      ) : (
+                        <span className="rounded bg-white/5 px-2 py-0.5 text-[11px] text-zinc-400">
+                          PENDING
+                        </span>
+                      )}
+                    </td>
+
+                    {/* R2 Arena */}
+                    <td className="py-4 px-3 text-center">
+                      {!isQualified ? (
+                        <span className="text-zinc-600 text-[11px] font-mono flex items-center justify-center gap-1">
+                          <Lock className="h-3 w-3" /> LOCKED
+                        </span>
+                      ) : (
+                        <div className="inline-flex flex-col items-center">
+                          <span className="font-bold text-[#FF7A3D] text-sm">
+                            {r2?.overall_time_seconds ?? r2?.total_marks ?? team.score?.round2_score ?? 0}s
                           </span>
-                        ) : (
-                          <span className="text-zinc-500 font-mono text-xs">0 pts (NQ)</span>
-                        )}
-                      </td>
-
-                      {/* Action */}
-                      <td className="py-4 px-3 text-right">
-                        <button
-                          onClick={() => handleOpenEditModal(team)}
-                          className="inline-flex items-center gap-1.5 rounded-lg border border-[#FF6B35]/40 bg-[#FF6B35]/10 px-3 py-1.5 text-xs font-mono font-bold text-[#FF6B35] transition-all hover:bg-[#FF6B35] hover:text-white cursor-pointer uppercase shadow-sm"
-                        >
-                          <Edit3 className="h-3.5 w-3.5" />
-                          <span>UPDATE</span>
-                        </button>
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
-
-          {/* Mobile Cards View */}
-          <div className="grid grid-cols-1 gap-3 md:hidden">
-            {filteredTeams.map((team) => {
-              const isQualified = team.screening_status === "qualified";
-              const total = team.score?.total_score ?? 0;
-
-              return (
-                <div
-                  key={team.id}
-                  className={`rounded-xl border border-white/10 bg-[#0A0718]/90 p-4 backdrop-blur-md space-y-3 ${
-                    !isQualified ? "border-red-500/20 bg-red-950/10" : ""
-                  }`}
-                >
-                  <div className="flex items-start justify-between">
-                    <div>
-                      <h3 className="font-black text-white text-base flex items-center gap-2">
-                        <span>{team.team_name}</span>
-                        {!isQualified && (
-                          <span className="rounded bg-red-500/20 px-1.5 py-0.5 text-[9px] font-bold text-red-400">
-                            NOT QUALIFIED
-                          </span>
-                        )}
-                      </h3>
-                      {(team.captain_name || team.leader_name || team.members?.[0]?.name) && (
-                        <div className="text-[11px] font-mono text-zinc-400 mt-0.5">
-                          Cap:{" "}
-                          <span className="text-zinc-300 font-semibold">
-                            {team.captain_name || team.leader_name || team.members?.[0]?.name}
+                          <span className="text-[10px] text-zinc-400 font-mono">
+                            Time: {r2?.completion_time_seconds ?? parseTimeToSeconds(r2?.completion_time)}s &bull; V:+{r2?.viva_marks ?? 0} &bull; Pen:+{r2?.total_penalty_time ?? r2?.penalty_total ?? 0}s
                           </span>
                         </div>
                       )}
-                    </div>
-                    <div className="text-right">
-                      <span className="font-mono text-xs font-black text-[#00F0FF]">
-                        {isQualified ? `${total} pts` : "NQ"}
-                      </span>
-                      {isQualified && (
-                        <div className="text-[10px] text-zinc-400 font-mono flex items-center justify-end gap-1 mt-0.5">
-                          <Timer className="h-2.5 w-2.5 text-[#FF6B35]" />
-                          <span>C.T: {team.overall_time || "00:00"}</span>
+                    </td>
+
+                    {/* R3 Arena 2 (3 Stages) */}
+                    <td className="py-4 px-3 text-center">
+                      {!isQualified ? (
+                        <span className="text-zinc-600 text-[11px] font-mono flex items-center justify-center gap-1">
+                          <Lock className="h-3 w-3" /> LOCKED
+                        </span>
+                      ) : (
+                        <div className="inline-flex flex-col items-center">
+                          <span className="font-bold text-white text-sm">
+                            {r3?.total_marks ?? team.score?.round3_score ?? 0} pts
+                          </span>
+                          {r3?.stages && (
+                            <div className="flex items-center gap-1 mt-0.5">
+                              {r3.stages.map((st, i) => (
+                                <span
+                                  key={i}
+                                  title={`Stage ${st.stage_number}: ${st.total_marks} pts (${st.completion_time})`}
+                                  className="rounded bg-white/10 px-1 py-0.2 text-[9px] text-zinc-300 font-mono"
+                                >
+                                  S{st.stage_number}:{st.total_marks}
+                                </span>
+                              ))}
+                            </div>
+                          )}
                         </div>
                       )}
-                    </div>
-                  </div>
+                    </td>
 
-                  {/* Screening pill */}
-                  <div className="flex items-center justify-between border-y border-white/5 py-2 font-mono text-xs">
-                    <span className="text-zinc-400">Screening:</span>
-                    {isQualified ? (
-                      <span className="text-emerald-400 font-bold flex items-center gap-1">
-                        <ShieldCheck className="h-3.5 w-3.5" /> QUALIFIED
-                      </span>
-                    ) : (
-                      <div className="flex items-center gap-2">
-                        <span className="text-red-400 font-bold">NOT QUALIFIED</span>
-                        <button
-                          onClick={() => handleQuickScreeningToggle(team, "qualified")}
-                          className="rounded bg-emerald-500/20 border border-emerald-500/40 px-2 py-0.5 text-[10px] text-emerald-300 font-bold"
-                        >
-                          QUALIFY
-                        </button>
-                      </div>
-                    )}
-                  </div>
+                    {/* Overall C.T */}
+                    <td className="py-4 px-3 text-center">
+                      {isQualified ? (
+                        <span className="inline-flex items-center gap-1 rounded bg-black/40 border border-white/10 px-2 py-0.5 text-xs text-zinc-300 font-mono font-bold">
+                          <Timer className="h-3 w-3 text-[#FF6B35]" />
+                          <span>{overallTime}</span>
+                        </span>
+                      ) : (
+                        <span className="text-zinc-600 font-mono">—</span>
+                      )}
+                    </td>
 
-                  {isQualified ? (
-                    <div className="grid grid-cols-3 gap-2 text-center font-mono text-xs">
-                      <div className="rounded border border-white/5 bg-black/40 p-2">
-                        <span className="text-[10px] text-zinc-400 block">R1 VIVA</span>
-                        <span className="font-bold text-white text-[11px] uppercase">
-                          {team.round1_status || "PENDING"}
+                    {/* Total Score */}
+                    <td className="py-4 px-3 text-center font-bold">
+                      {isQualified ? (
+                        <span className="inline-flex items-center gap-1 rounded-full border border-[#00F0FF]/40 bg-[#00F0FF]/10 px-3 py-1 font-mono text-sm text-[#00F0FF] shadow-[0_0_12px_rgba(0,240,255,0.25)]">
+                          <Trophy className="h-3 w-3" />
+                          <span>{total} pts</span>
                         </span>
-                      </div>
-                      <div className="rounded border border-white/5 bg-black/40 p-2">
-                        <span className="text-[10px] text-zinc-400 block">R2 ARENA 1</span>
-                        <span className="font-bold text-white">
-                          {team.round2_details?.total_marks ?? team.score?.round2_score ?? 0}
-                        </span>
-                      </div>
-                      <div className="rounded border border-white/5 bg-black/40 p-2">
-                        <span className="text-[10px] text-zinc-400 block">R3 ARENA 2</span>
-                        <span className="font-bold text-white">
-                          {team.round3_details?.total_marks ?? team.score?.round3_score ?? 0}
-                        </span>
-                      </div>
-                    </div>
-                  ) : (
-                    <div className="rounded border border-dashed border-red-500/20 p-2 text-center font-mono text-[11px] text-zinc-400">
-                      Tournament rounds 1-3 are locked until crew is marked Qualified.
-                    </div>
-                  )}
+                      ) : (
+                        <span className="text-zinc-500 font-mono text-xs">0 pts (NQ)</span>
+                      )}
+                    </td>
 
-                  <button
-                    onClick={() => handleOpenEditModal(team)}
-                    className="flex w-full items-center justify-center gap-1.5 rounded-lg border border-[#FF6B35]/40 bg-[#FF6B35]/10 py-2 text-xs font-mono font-bold text-[#FF6B35] uppercase hover:bg-[#FF6B35] hover:text-white"
-                  >
-                    <Edit3 className="h-3.5 w-3.5" />
-                    <span>EVALUATE &amp; UPDATE SCORE</span>
-                  </button>
-                </div>
-              );
-            })}
-          </div>
-        </>
+                    {/* Action */}
+                    <td className="py-4 px-3 text-right">
+                      <button
+                        onClick={() => handleOpenEditModal(team)}
+                        className="inline-flex items-center gap-1.5 rounded-lg border border-[#FF6B35]/40 bg-[#FF6B35]/10 px-3 py-1.5 text-xs font-mono font-bold text-[#FF6B35] transition-all hover:bg-[#FF6B35] hover:text-white cursor-pointer uppercase shadow-sm"
+                      >
+                        <Edit3 className="h-3.5 w-3.5" />
+                        <span>UPDATE</span>
+                      </button>
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
       )}
 
       {/* ========================================================================= */}
-      {/* 5. COMPREHENSIVE SCORE EVALUATION MODAL */}
+      {/* 5. GLOBAL ROUND 2 PENALTY COSTS SETTINGS MODAL */}
+      {/* ========================================================================= */}
+      {showSettingsModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/85 p-4 backdrop-blur-md overflow-y-auto">
+          <div className="relative w-full max-w-lg rounded-2xl border border-white/15 bg-[#0A0718] p-6 sm:p-8 shadow-[0_0_60px_rgba(0,0,0,0.95)]">
+            <div className="flex items-center justify-between border-b border-white/10 pb-4 mb-6">
+              <div>
+                <span className="font-mono text-xs font-bold text-[#FF7A3D] uppercase flex items-center gap-1.5">
+                  <Settings className="h-4 w-4" />
+                  <span>ROUND 2 ARENA // CONFIGURATION</span>
+                </span>
+                <h2 className="text-xl font-black uppercase text-white tracking-tight mt-1">
+                  PENALTY COSTS SETTINGS
+                </h2>
+                <p className="text-xs font-mono text-zinc-400 mt-1">
+                  Configure default penalty costs in seconds per penalty.
+                </p>
+              </div>
+              <button
+                onClick={() => setShowSettingsModal(false)}
+                className="rounded-lg p-1.5 text-zinc-400 hover:bg-white/10 hover:text-white cursor-pointer"
+              >
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+
+            <form onSubmit={handleSaveSettings} className="space-y-5 font-mono">
+              {/* Skip Penalty Cost */}
+              <div>
+                <label className="block text-xs font-bold tracking-wider text-zinc-300 uppercase mb-1">
+                  SKIP PENALTY COST (SECONDS PER SKIP)
+                </label>
+                <div className="relative">
+                  <input
+                    type="number"
+                    min="0"
+                    step="1"
+                    value={tempSkipCost}
+                    onChange={(e) => setTempSkipCost(e.target.value)}
+                    placeholder="50"
+                    className="w-full rounded-lg border border-white/10 bg-black/40 py-2.5 px-3 text-xs font-bold text-white focus:border-[#FF7A3D] focus:outline-none"
+                    required
+                  />
+                  <span className="absolute right-3 top-2.5 text-xs text-zinc-400 font-bold">
+                    sec / skip
+                  </span>
+                </div>
+                <p className="mt-1 text-[11px] text-zinc-400">
+                  Default: 50 seconds. Applied to every skip obstacle penalty.
+                </p>
+              </div>
+
+              {/* Touch Penalty Cost */}
+              <div>
+                <label className="block text-xs font-bold tracking-wider text-zinc-300 uppercase mb-1">
+                  TOUCH PENALTY COST (SECONDS PER TOUCH)
+                </label>
+                <div className="relative">
+                  <input
+                    type="number"
+                    min="0"
+                    step="1"
+                    value={tempTouchCost}
+                    onChange={(e) => setTempTouchCost(e.target.value)}
+                    placeholder="10"
+                    className="w-full rounded-lg border border-white/10 bg-black/40 py-2.5 px-3 text-xs font-bold text-white focus:border-[#FF7A3D] focus:outline-none"
+                    required
+                  />
+                  <span className="absolute right-3 top-2.5 text-xs text-zinc-400 font-bold">
+                    sec / touch
+                  </span>
+                </div>
+                <p className="mt-1 text-[11px] text-zinc-400">
+                  Default: 10 seconds. Applied to every arena/track touch penalty.
+                </p>
+              </div>
+
+              <div className="rounded-lg border border-[#FF7A3D]/30 bg-[#FF7A3D]/10 p-3 text-[11px] text-zinc-300">
+                <span className="font-bold text-white block mb-0.5">Formula Integration:</span>
+                Overall Time (s) = Completion Time (s) + (Skips &times; {tempSkipCost || 0}s) + (Touches &times; {tempTouchCost || 0}s) &minus; Viva Marks
+              </div>
+
+              <div className="flex items-center justify-end gap-3 border-t border-white/10 pt-4 mt-6">
+                <button
+                  type="button"
+                  onClick={() => setShowSettingsModal(false)}
+                  className="rounded-lg border border-white/10 px-4 py-2 text-xs font-bold uppercase text-zinc-400 hover:bg-white/5 cursor-pointer"
+                >
+                  CANCEL
+                </button>
+                <button
+                  type="submit"
+                  disabled={savingSettings}
+                  className="inline-flex items-center gap-2 rounded-lg bg-gradient-to-r from-[#FF7A3D] to-[#FF2D8D] px-5 py-2.5 text-xs font-black tracking-widest text-white uppercase shadow-[0_0_15px_rgba(255,122,61,0.3)] disabled:opacity-50 cursor-pointer"
+                >
+                  {savingSettings ? (
+                    <>
+                      <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                      <span>SAVING...</span>
+                    </>
+                  ) : (
+                    <span>SAVE PENALTY SETTINGS</span>
+                  )}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* ========================================================================= */}
+      {/* 6. COMPREHENSIVE SCORE EVALUATION MODAL */}
       {/* ========================================================================= */}
       {selectedTeam && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/85 p-4 backdrop-blur-md overflow-y-auto">
@@ -915,13 +1308,13 @@ export default function AdminScoresPage() {
                 disabled={screeningStatus === "not_qualified"}
                 className={`rounded-lg px-3 py-1.5 font-bold uppercase transition-all cursor-pointer ${
                   activeTab === "round2"
-                    ? "bg-[#00F0FF] text-black shadow-[0_0_15px_rgba(0,240,255,0.3)]"
+                    ? "bg-[#FF7A3D] text-black shadow-[0_0_15px_rgba(255,122,61,0.3)]"
                     : screeningStatus === "not_qualified"
                     ? "bg-white/5 text-zinc-600 cursor-not-allowed opacity-50"
                     : "bg-white/5 text-zinc-400 hover:text-white"
                 }`}
               >
-                3. R2 ARENA 1 ({computedRound2.total_marks} PTS)
+                3. R2 ARENA ({computedRound2.overall_time_seconds}s)
               </button>
 
               <button
@@ -941,7 +1334,7 @@ export default function AdminScoresPage() {
             </div>
 
             {/* Evaluation Form */}
-            <form onSubmit={handleSaveScore} className="space-y-6 font-mono">
+            <form onSubmit={handleSubmitScores} className="space-y-6 font-mono">
               {/* TAB 1: SCREENING */}
               {activeTab === "screening" && (
                 <div className="space-y-4">
@@ -1053,159 +1446,202 @@ export default function AdminScoresPage() {
                 </div>
               )}
 
-              {/* TAB 3: ROUND 2 (FIRST ARENA / BOAT RACE & VIVA) */}
+              {/* TAB 3: ROUND 2 (ARENA EVALUATION FORM) */}
               {activeTab === "round2" && (
                 <div className="space-y-4">
                   <div className="rounded-xl border border-white/10 bg-white/[0.02] p-4 space-y-4">
                     <div className="flex flex-col sm:flex-row sm:items-center justify-between border-b border-white/10 pb-3 gap-2">
                       <div>
-                        <span className="text-xs font-bold text-[#00F0FF] uppercase tracking-wider block">
-                          ROUND 2: FIRST ARENA SCORING (BOAT RACE &amp; VIVA)
+                        <span className="text-xs font-bold text-[#FF7A3D] uppercase tracking-wider block">
+                          ROUND 2: ARENA EVALUATION
                         </span>
                         <span className="text-[11px] text-zinc-400 font-mono">
-                          Formula: S = (720 &minus; T) &minus; H + V
+                          Overall Time = (Completion Time in Minutes &times; 60) + (Skips &times; Cost) + (Touches &times; Cost) &minus; Viva Marks
                         </span>
                       </div>
-                      <span className="inline-flex items-center gap-1.5 rounded-full bg-[#00F0FF]/10 border border-[#00F0FF]/30 px-3 py-1 text-[11px] font-mono font-bold text-[#00F0FF]">
+                      <span className="inline-flex items-center gap-1.5 rounded-full bg-[#FF7A3D]/10 border border-[#FF7A3D]/30 px-3 py-1 text-[11px] font-mono font-bold text-[#FF7A3D]">
                         <Timer className="h-3.5 w-3.5" />
-                        <span>BASE TIME: {computedRound2.total_time}s (12 MIN)</span>
+                        <span>OVERALL: {computedRound2.overall_time_seconds}s</span>
                       </span>
                     </div>
 
-                    {/* Completion Time */}
+                    {/* 1. Viva Marks (0 to 60) */}
                     <div>
                       <div className="flex items-center justify-between mb-1">
                         <label className="block text-xs font-bold tracking-wider text-zinc-300 uppercase">
-                          1. COMPLETION TIME (MM:SS or SECONDS)
+                          1. VIVA MARKS (MAX: 60 MARKS)
                         </label>
-                        <span className="text-[11px] text-[#00F0FF] font-mono">
-                          T = {computedRound2.time_taken_seconds || 0}s &bull; Time Score: {computedRound2.time_score} pts
+                        <span className="text-[11px] text-emerald-400 font-mono font-bold">
+                          Deduction: -{computedRound2.viva_marks}s (-1s per mark)
                         </span>
                       </div>
                       <input
-                        type="text"
-                        value={round2Time}
-                        onChange={(e) => setRound2Time(e.target.value)}
-                        placeholder="e.g. 09:20 or 560"
-                        className="w-full rounded-lg border border-white/10 bg-black/40 py-2.5 px-3 text-xs font-bold text-white focus:border-[#00F0FF] focus:outline-none font-mono"
+                        type="number"
+                        min="0"
+                        max="60"
+                        step="0.5"
+                        value={round2VivaMarks}
+                        onChange={(e) => {
+                          const val = e.target.value;
+                          setRound2VivaMarks(val);
+                        }}
+                        placeholder="e.g. 40 (0 to 60)"
+                        className="w-full rounded-lg border border-white/10 bg-black/40 py-2.5 px-3 text-xs font-bold text-emerald-400 focus:border-emerald-400 focus:outline-none font-mono"
+                        required
                       />
                       <p className="mt-1 text-[10px] text-zinc-400 font-mono">
-                        Remaining time gives base score: ({computedRound2.total_time} &minus; {computedRound2.time_taken_seconds || 0}) = <strong className="text-white">{computedRound2.time_score} pts</strong>
+                        Admin/judge score from 0 to 60. Each viva mark acts as a 1-second reduction in overall time.
                       </p>
                     </div>
 
-                    {/* Viva Marks & Hand Touches */}
+                    {/* 2. Completion Time in Minutes (Converted to Seconds) */}
+                    <div>
+                      <div className="flex items-center justify-between mb-1">
+                        <label className="block text-xs font-bold tracking-wider text-zinc-300 uppercase">
+                          2. COMPLETION TIME (MINUTES)
+                        </label>
+                        <span className="text-[11px] text-[#00F0FF] font-mono font-bold">
+                          Calculated: {computedRound2.completion_time_seconds} seconds
+                        </span>
+                      </div>
+                      <input
+                        type="number"
+                        min="0"
+                        step="0.01"
+                        value={round2CompletionMinutes}
+                        onChange={(e) => setRound2CompletionMinutes(e.target.value)}
+                        placeholder="e.g. 2.5 (minutes)"
+                        className="w-full rounded-lg border border-white/10 bg-black/40 py-2.5 px-3 text-xs font-bold text-white focus:border-[#00F0FF] focus:outline-none font-mono"
+                        required
+                      />
+                      <p className="mt-1 text-[10px] text-zinc-400 font-mono">
+                        Enter completion time in minutes (supports decimals e.g. 2.5 min = 150s). Converted to seconds for scoring.
+                      </p>
+                    </div>
+
+                    {/* 3 & 4. Skip Penalties & Touch Penalties */}
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                       <div>
-                        <label className="block text-xs font-bold tracking-wider text-zinc-300 uppercase mb-1">
-                          2. VIVA MARKS (V - OUT OF 10)
-                        </label>
-                        <input
-                          type="number"
-                          min="0"
-                          max="10"
-                          step="0.5"
-                          value={round2VivaMarks}
-                          onChange={(e) => setRound2VivaMarks(e.target.value)}
-                          placeholder="8"
-                          className="w-full rounded-lg border border-white/10 bg-black/40 py-2.5 px-3 text-xs font-bold text-emerald-400 focus:border-emerald-400 focus:outline-none font-mono"
-                        />
-                        <p className="mt-1 text-[10px] text-zinc-400 font-mono">
-                          Viva marks added directly to round score (+{computedRound2.viva_marks})
-                        </p>
-                      </div>
-
-                      <div>
-                        <label className="block text-xs font-bold tracking-wider text-zinc-300 uppercase mb-1">
-                          3. NO. OF HAND TOUCHES (H - PENALTIES)
-                        </label>
+                        <div className="flex items-center justify-between mb-1">
+                          <label className="block text-xs font-bold tracking-wider text-zinc-300 uppercase">
+                            3. NUMBER OF SKIP PENALTIES
+                          </label>
+                          <span className="text-[10px] text-red-400 font-bold">
+                            +{(computedRound2.skip_penalties ?? 0) * (computedRound2.skip_penalty_cost ?? 50)}s
+                          </span>
+                        </div>
                         <input
                           type="number"
                           min="0"
                           step="1"
-                          value={round2HandTouches}
-                          onChange={(e) => setRound2HandTouches(e.target.value)}
-                          placeholder="3"
+                          value={round2SkipPenalties}
+                          onChange={(e) => setRound2SkipPenalties(e.target.value)}
+                          placeholder="2"
                           className="w-full rounded-lg border border-white/10 bg-black/40 py-2.5 px-3 text-xs font-bold text-red-400 focus:border-red-400 focus:outline-none font-mono"
+                          required
                         />
                         <p className="mt-1 text-[10px] text-zinc-400 font-mono">
-                          Penalties: {computedRound2.hand_touches} &times; (-{computedRound2.penalty_rate}) = <strong className="text-red-400">-{computedRound2.penalty_total} pts</strong>
+                          Non-negative whole number. Cost: {computedRound2.skip_penalty_cost ?? 50}s per skip.
+                        </p>
+                      </div>
+
+                      <div>
+                        <div className="flex items-center justify-between mb-1">
+                          <label className="block text-xs font-bold tracking-wider text-zinc-300 uppercase">
+                            4. NUMBER OF TOUCH PENALTIES
+                          </label>
+                          <span className="text-[10px] text-red-400 font-bold">
+                            +{(computedRound2.touch_penalties ?? 0) * (computedRound2.touch_penalty_cost ?? 10)}s
+                          </span>
+                        </div>
+                        <input
+                          type="number"
+                          min="0"
+                          step="1"
+                          value={round2TouchPenalties}
+                          onChange={(e) => setRound2TouchPenalties(e.target.value)}
+                          placeholder="3"
+                          className="w-full rounded-lg border border-white/10 bg-black/40 py-2.5 px-3 text-xs font-bold text-red-400 focus:border-red-400 focus:outline-none font-mono"
+                          required
+                        />
+                        <p className="mt-1 text-[10px] text-zinc-400 font-mono">
+                          Non-negative whole number. Cost: {computedRound2.touch_penalty_cost}s per touch.
                         </p>
                       </div>
                     </div>
 
-                    {/* Advanced Parameters: Total Time Limit & Deduction per Touch */}
+                    {/* 5. Configurable Penalty Costs for this Evaluation */}
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-2 border-t border-white/5">
                       <div>
                         <label className="block text-[11px] font-bold tracking-wider text-zinc-400 uppercase mb-1">
-                          4. TRACK TIME LIMIT (SECONDS)
+                          SKIP PENALTY COST (SECONDS / SKIP)
                         </label>
                         <input
                           type="number"
                           min="0"
                           step="1"
-                          value={round2TotalTime}
-                          onChange={(e) => setRound2TotalTime(e.target.value)}
-                          placeholder="720"
-                          className="w-full rounded-lg border border-white/10 bg-black/40 py-2 px-3 text-xs font-bold text-zinc-300 focus:border-[#00F0FF] focus:outline-none font-mono"
+                          value={round2SkipCost}
+                          onChange={(e) => setRound2SkipCost(e.target.value)}
+                          placeholder="50"
+                          className="w-full rounded-lg border border-white/10 bg-black/40 py-2 px-3 text-xs font-bold text-zinc-300 focus:border-[#FF7A3D] focus:outline-none font-mono"
                         />
                       </div>
 
                       <div>
                         <label className="block text-[11px] font-bold tracking-wider text-zinc-400 uppercase mb-1">
-                          5. DEDUCTION PER HAND TOUCH (PTS)
+                          TOUCH PENALTY COST (SECONDS / TOUCH)
                         </label>
                         <input
                           type="number"
                           min="0"
                           step="1"
-                          value={round2PenaltyRate}
-                          onChange={(e) => setRound2PenaltyRate(e.target.value)}
-                          placeholder="1"
-                          className="w-full rounded-lg border border-white/10 bg-black/40 py-2 px-3 text-xs font-bold text-zinc-300 focus:border-[#FF2A85] focus:outline-none font-mono"
+                          value={round2TouchCost}
+                          onChange={(e) => setRound2TouchCost(e.target.value)}
+                          placeholder="10"
+                          className="w-full rounded-lg border border-white/10 bg-black/40 py-2 px-3 text-xs font-bold text-zinc-300 focus:border-[#FF7A3D] focus:outline-none font-mono"
                         />
                       </div>
                     </div>
 
-                    {/* Live Calculation Preview Cards */}
-                    <div className="rounded-xl border border-[#00F0FF]/30 bg-[#00F0FF]/5 p-4 space-y-3 font-mono">
-                      <div className="text-[11px] font-bold uppercase tracking-wider text-[#00F0FF]">
+                    {/* Live Calculation Preview Breakdown Cards */}
+                    <div className="rounded-xl border border-[#FF7A3D]/30 bg-[#FF7A3D]/5 p-4 space-y-3 font-mono">
+                      <div className="text-[11px] font-bold uppercase tracking-wider text-[#FF7A3D]">
                         LIVE SCORE CALCULATION BREAKDOWN
                       </div>
                       
                       <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-center text-xs">
                         <div className="rounded-lg bg-black/50 border border-white/5 p-2.5">
-                          <span className="text-[10px] text-zinc-400 uppercase block">Time Score (720-T)</span>
+                          <span className="text-[10px] text-zinc-400 uppercase block">Comp Time</span>
                           <span className="font-bold text-sm text-[#00F0FF]">
-                            {computedRound2.time_score} pts
+                            {computedRound2.completion_time_seconds}s
                           </span>
                         </div>
                         <div className="rounded-lg bg-black/50 border border-white/5 p-2.5">
-                          <span className="text-[10px] text-zinc-400 uppercase block">Hand Touch (-H)</span>
+                          <span className="text-[10px] text-zinc-400 uppercase block">Total Penalties</span>
                           <span className="font-bold text-sm text-red-400">
-                            -{computedRound2.penalty_total} pts
+                            +{computedRound2.total_penalty_time}s
                           </span>
                         </div>
                         <div className="rounded-lg bg-black/50 border border-white/5 p-2.5">
-                          <span className="text-[10px] text-zinc-400 uppercase block">Viva Marks (+V)</span>
+                          <span className="text-[10px] text-zinc-400 uppercase block">Viva Marks</span>
                           <span className="font-bold text-sm text-emerald-400">
-                            +{computedRound2.viva_marks} pts
+                            -{computedRound2.viva_marks}s
                           </span>
                         </div>
-                        <div className="rounded-lg bg-[#00F0FF]/15 border border-[#00F0FF]/40 p-2.5 shadow-[0_0_15px_rgba(0,240,255,0.2)]">
-                          <span className="text-[10px] text-[#00F0FF] uppercase block font-bold">ROUND 2 TOTAL</span>
+                        <div className="rounded-lg bg-[#FF7A3D]/15 border border-[#FF7A3D]/40 p-2.5 shadow-[0_0_15px_rgba(255,122,61,0.2)]">
+                          <span className="text-[10px] text-[#FF7A3D] uppercase block font-bold">OVERALL TIME</span>
                           <span className="font-black text-base text-white">
-                            {computedRound2.total_marks} PTS
+                            {computedRound2.overall_time_seconds}s
                           </span>
                         </div>
                       </div>
 
-                      <div className="flex items-center justify-between text-xs border-t border-white/10 pt-2 text-zinc-300">
-                        <span className="text-zinc-400">
-                          Formula: ({(computedRound2.total_time ?? DEFAULT_ROUND2_TOTAL_TIME)} &minus; {computedRound2.time_taken_seconds || 0}) &minus; {computedRound2.penalty_total} + {computedRound2.viva_marks}
+                      <div className="flex flex-col sm:flex-row sm:items-center justify-between text-xs border-t border-white/10 pt-2 text-zinc-300 gap-1">
+                        <span className="text-zinc-400 text-[11px]">
+                          Calculation: {computedRound2.completion_time_seconds}s + ({computedRound2.skip_penalties}&times;{computedRound2.skip_penalty_cost}s) + ({computedRound2.touch_penalties}&times;{computedRound2.touch_penalty_cost}s) &minus; {computedRound2.viva_marks}s
                         </span>
-                        <span className="font-black text-sm text-[#00F0FF]">
-                          = {computedRound2.total_marks} / {(computedRound2.total_time ?? DEFAULT_ROUND2_TOTAL_TIME) + 10} PTS
+                        <span className="font-black text-xs text-[#FF7A3D]">
+                          = {computedRound2.overall_time_seconds} sec ({computedRound2.overall_time_formatted})
                         </span>
                       </div>
                     </div>
@@ -1408,7 +1844,7 @@ export default function AdminScoresPage() {
                     </div>
 
                     <div className="text-right border-l border-white/10 pl-3">
-                      <div>R2: <span className="text-white font-bold">{computedRound2.total_marks} pts</span></div>
+                      <div>R2: <span className="text-[#FF7A3D] font-bold">{computedRound2.overall_time_seconds}s</span></div>
                       <div>R3: <span className="text-white font-bold">{computedRound3Total} pts</span></div>
                     </div>
                   </div>
