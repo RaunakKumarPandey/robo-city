@@ -1,5 +1,5 @@
 import { LeaderboardEntry } from "@/types/database";
-import { normalizeScoreData } from "@/lib/scoringUtils";
+import { normalizeScoreData, compareRound2ArenaTeams } from "@/lib/scoringUtils";
 
 export interface InitialTeamSeed {
   id: string;
@@ -365,9 +365,31 @@ export function getInitialLeaderboardEntries(): LeaderboardEntry[] {
   const qualified = normalized.filter((t) => t.screening_status === "qualified");
   const notQualified = normalized.filter((t) => t.screening_status === "not_qualified");
 
+  // Sort qualified teams by Round 2 Arena Overall Time ASC (lowest time ranks #1)
   qualified.sort((a, b) => {
-    if (b.total_score !== a.total_score) return b.total_score - a.total_score;
-    return a.team_name.localeCompare(b.team_name);
+    const aR2 = a.round2_details;
+    const bR2 = b.round2_details;
+
+    return compareRound2ArenaTeams(
+      {
+        overall_time_seconds: aR2?.overall_time_seconds ?? a.round2_score,
+        viva_marks: aR2?.viva_marks ?? 0,
+        completion_time_seconds: aR2?.completion_time_seconds ?? (aR2?.time_taken_seconds ?? 0),
+        skip_penalties: aR2?.skip_penalties ?? 0,
+        touch_penalties: aR2?.touch_penalties ?? aR2?.hand_touches ?? 0,
+        team_name: a.team_name,
+        id: a.id,
+      },
+      {
+        overall_time_seconds: bR2?.overall_time_seconds ?? b.round2_score,
+        viva_marks: bR2?.viva_marks ?? 0,
+        completion_time_seconds: bR2?.completion_time_seconds ?? (bR2?.time_taken_seconds ?? 0),
+        skip_penalties: bR2?.skip_penalties ?? 0,
+        touch_penalties: bR2?.touch_penalties ?? bR2?.hand_touches ?? 0,
+        team_name: b.team_name,
+        id: b.id,
+      }
+    );
   });
 
   notQualified.sort((a, b) => a.team_name.localeCompare(b.team_name));
