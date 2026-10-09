@@ -7,8 +7,10 @@ import {
 } from "@/types/database";
 import { getDefaultScreeningStatus } from "@/data/qualifiedTeamsSeed";
 
-export const DEFAULT_ROUND2_MAX_MARKS = 100;
-export const DEFAULT_ROUND2_PENALTY_RATE = 5;
+export const DEFAULT_ROUND2_TOTAL_TIME = 720; // 12 minutes (720 seconds)
+export const DEFAULT_ROUND2_PENALTY_RATE = 1; // 1 point per hand touch
+export const DEFAULT_ROUND2_MAX_VIVA = 10; // Viva out of 10
+export const DEFAULT_ROUND2_MAX_MARKS = 720;
 export const DEFAULT_STAGE_MAX_MARKS = 50;
 export const DEFAULT_STAGE_PENALTY_RATE = 5;
 
@@ -68,12 +70,17 @@ export function calculateOverallCompletionTime(
 export function createDefaultRound2(): Round2Details {
   return {
     completion_time: "00:00",
-    max_marks: DEFAULT_ROUND2_MAX_MARKS,
-    gain_marks: 0,
+    total_time: DEFAULT_ROUND2_TOTAL_TIME,
+    time_taken_seconds: 0,
+    time_score: 0,
+    viva_marks: 0,
+    hand_touches: 0,
     penalty_rate: DEFAULT_ROUND2_PENALTY_RATE,
-    penalty_count: 0,
     penalty_total: 0,
     total_marks: 0,
+    max_marks: DEFAULT_ROUND2_TOTAL_TIME,
+    gain_marks: 0,
+    penalty_count: 0,
   };
 }
 
@@ -115,27 +122,53 @@ export function createDefaultScoreDetails(): ScoreDetails {
 
 /**
  * Calculates Round 2 Total Marks based on the formula:
- * penalty_total = penalty_count * penalty_rate
- * total_marks = max(0, gain_marks - penalty_total)
+ * S = (720 - T) - H + V
+ * Where:
+ * T = Time taken to complete the track in seconds
+ * H = Number of hand touches (penalty of 1 point per hand touch)
+ * V = Viva marks obtained (out of 10)
+ * Base time = 720 seconds (12 mins)
  */
 export function calculateRound2(details?: Partial<Round2Details> | null): Round2Details {
   const completion_time = details?.completion_time || "00:00";
-  const max_marks = Math.max(0, Number(details?.max_marks ?? DEFAULT_ROUND2_MAX_MARKS));
-  const gain_marks = Math.max(0, Number(details?.gain_marks ?? 0));
-  const penalty_rate = Math.max(0, Number(details?.penalty_rate ?? DEFAULT_ROUND2_PENALTY_RATE));
-  const penalty_count = Math.max(0, Number(details?.penalty_count ?? 0));
+  const total_time = Math.max(0, Number(details?.total_time ?? DEFAULT_ROUND2_TOTAL_TIME));
+  const time_taken_seconds = parseTimeToSeconds(completion_time);
 
-  const penalty_total = penalty_count * penalty_rate;
-  const total_marks = Math.max(0, gain_marks - penalty_total);
+  // Time score = (total_time - T) if a valid completion time > 0 was recorded
+  const time_score = time_taken_seconds > 0 ? Math.max(0, total_time - time_taken_seconds) : 0;
+
+  // Viva marks (V) out of 10
+  const viva_marks = Math.max(0, Number(details?.viva_marks ?? 0));
+
+  // Hand touches (H) and penalty rate (1 pt deduction per hand touch)
+  const hand_touches = Math.max(0, Number(details?.hand_touches ?? details?.penalty_count ?? 0));
+  const penalty_rate = Math.max(0, Number(details?.penalty_rate ?? DEFAULT_ROUND2_PENALTY_RATE));
+  const penalty_total = hand_touches * penalty_rate;
+
+  // Total Marks: S = (total_time - T) - H + V (>= 0)
+  let total_marks = 0;
+  if (time_taken_seconds > 0) {
+    total_marks = Math.max(0, time_score - penalty_total + viva_marks);
+  } else if (viva_marks > 0 || penalty_total > 0) {
+    total_marks = Math.max(0, viva_marks - penalty_total);
+  } else if (details?.gain_marks && !details?.viva_marks && !time_taken_seconds) {
+    // Fallback for legacy score representations
+    total_marks = Math.max(0, Number(details.gain_marks) - penalty_total);
+  }
 
   return {
     completion_time,
-    max_marks,
-    gain_marks,
+    total_time,
+    time_taken_seconds,
+    time_score,
+    viva_marks,
+    hand_touches,
     penalty_rate,
-    penalty_count,
     penalty_total,
     total_marks,
+    max_marks: total_time,
+    gain_marks: time_score + viva_marks,
+    penalty_count: hand_touches,
   };
 }
 

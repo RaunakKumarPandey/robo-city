@@ -18,12 +18,17 @@ export interface TeamMember {
 
 export interface Round2Details {
   completion_time: string;
-  max_marks: number;
-  gain_marks: number;
-  penalty_rate: number;
-  penalty_count: number;
-  penalty_total: number;
+  total_time?: number;
+  time_taken_seconds?: number;
+  time_score?: number;
+  viva_marks?: number;
+  hand_touches?: number;
+  penalty_rate?: number;
+  penalty_total?: number;
   total_marks: number;
+  max_marks?: number;
+  gain_marks?: number;
+  penalty_count?: number;
 }
 
 export interface StageDetails {

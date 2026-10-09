@@ -119,9 +119,16 @@ export function updateLocalTeamScore(payload: DetailedScoreUpdatePayload): Initi
     round1_score: payload.round1_score ?? (payload.round1_status === "qualified" ? 1 : 0),
     round2: {
       completion_time: r2.completion_time,
+      total_time: r2.total_time,
+      time_taken_seconds: r2.time_taken_seconds,
+      time_score: r2.time_score,
+      viva_marks: r2.viva_marks,
+      hand_touches: r2.hand_touches,
+      penalty_rate: r2.penalty_rate,
+      penalty_total: r2.penalty_total,
+      total_marks: r2.total_marks,
       max_marks: r2.max_marks,
       gain_marks: r2.gain_marks,
-      penalty_rate: r2.penalty_rate,
       penalty_count: r2.penalty_count,
     },
     round3: {

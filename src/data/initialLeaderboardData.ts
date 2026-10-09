@@ -14,10 +14,17 @@ export interface InitialTeamSeed {
   round1_score: number;
   round2: {
     completion_time: string;
-    max_marks: number;
-    gain_marks: number;
-    penalty_rate: number;
-    penalty_count: number;
+    total_time?: number;
+    time_taken_seconds?: number;
+    time_score?: number;
+    viva_marks?: number;
+    hand_touches?: number;
+    penalty_rate?: number;
+    penalty_total?: number;
+    total_marks?: number;
+    max_marks?: number;
+    gain_marks?: number;
+    penalty_count?: number;
   };
   round3: {
     stages: {
@@ -52,10 +59,10 @@ export const initialTournamentTeams: InitialTeamSeed[] = [
     round1_score: 1,
     round2: {
       completion_time: "03:20",
-      max_marks: 100,
-      gain_marks: 90,
-      penalty_rate: 5,
-      penalty_count: 1,
+      total_time: 720,
+      viva_marks: 9,
+      hand_touches: 1,
+      penalty_rate: 1,
     },
     round3: {
       stages: [
@@ -84,10 +91,10 @@ export const initialTournamentTeams: InitialTeamSeed[] = [
     round1_score: 1,
     round2: {
       completion_time: "03:45",
-      max_marks: 100,
-      gain_marks: 85,
-      penalty_rate: 5,
-      penalty_count: 1,
+      total_time: 720,
+      viva_marks: 8,
+      hand_touches: 1,
+      penalty_rate: 1,
     },
     round3: {
       stages: [
@@ -117,10 +124,10 @@ export const initialTournamentTeams: InitialTeamSeed[] = [
     round1_score: 1,
     round2: {
       completion_time: "04:10",
-      max_marks: 100,
-      gain_marks: 80,
-      penalty_rate: 5,
-      penalty_count: 1,
+      total_time: 720,
+      viva_marks: 8,
+      hand_touches: 1,
+      penalty_rate: 1,
     },
     round3: {
       stages: [
@@ -149,10 +156,10 @@ export const initialTournamentTeams: InitialTeamSeed[] = [
     round1_score: 1,
     round2: {
       completion_time: "04:40",
-      max_marks: 100,
-      gain_marks: 75,
-      penalty_rate: 5,
-      penalty_count: 2,
+      total_time: 720,
+      viva_marks: 7,
+      hand_touches: 2,
+      penalty_rate: 1,
     },
     round3: {
       stages: [
@@ -181,10 +188,10 @@ export const initialTournamentTeams: InitialTeamSeed[] = [
     round1_score: 0,
     round2: {
       completion_time: "00:00",
-      max_marks: 100,
-      gain_marks: 0,
-      penalty_rate: 5,
-      penalty_count: 0,
+      total_time: 720,
+      viva_marks: 0,
+      hand_touches: 0,
+      penalty_rate: 1,
     },
     round3: {
       stages: [
@@ -213,10 +220,10 @@ export const initialTournamentTeams: InitialTeamSeed[] = [
     round1_score: 0,
     round2: {
       completion_time: "00:00",
-      max_marks: 100,
-      gain_marks: 0,
-      penalty_rate: 5,
-      penalty_count: 0,
+      total_time: 720,
+      viva_marks: 0,
+      hand_touches: 0,
+      penalty_rate: 1,
     },
     round3: {
       stages: [
@@ -245,10 +252,10 @@ export const initialTournamentTeams: InitialTeamSeed[] = [
     round1_score: 0,
     round2: {
       completion_time: "00:00",
-      max_marks: 100,
-      gain_marks: 0,
-      penalty_rate: 5,
-      penalty_count: 0,
+      total_time: 720,
+      viva_marks: 0,
+      hand_touches: 0,
+      penalty_rate: 1,
     },
     round3: {
       stages: [

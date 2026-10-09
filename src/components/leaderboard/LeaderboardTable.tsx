@@ -2,6 +2,7 @@
 
 import { useState, useMemo } from "react";
 import { LeaderboardEntry } from "@/types/database";
+import { parseTimeToSeconds } from "@/lib/scoringUtils";
 import {
   Search,
   Trophy,
@@ -228,7 +229,7 @@ export default function LeaderboardTable({
                   <td className="py-3.5 px-3 text-center border-y border-white/10 group-hover:border-[#35D9FF]/40">
                     <button
                       onClick={() => handleOpenRoundModal(team, "round2")}
-                      title="Click to view First Arena details (Time, Marks, Penalties)"
+                      title="Click to view First Arena details (Time, Viva, Hand Touches)"
                       className="inline-flex flex-col items-center rounded-lg border border-white/10 bg-white/5 px-2.5 py-1 transition-all hover:border-[#FF7A3D] hover:bg-[#FF7A3D]/10 cursor-pointer shadow-sm"
                     >
                       <span className="font-bold text-white text-xs text-[#FF7A3D]">
@@ -236,7 +237,7 @@ export default function LeaderboardTable({
                       </span>
                       {r2 && (
                         <span className="text-[9px] text-zinc-400">
-                          {r2.completion_time !== "00:00" ? r2.completion_time : "Time"} &bull; -{r2.penalty_total}p
+                          {r2.completion_time !== "00:00" ? r2.completion_time : "—"} &bull; H:{r2.hand_touches ?? r2.penalty_count ?? 0} &bull; V:+{r2.viva_marks ?? 0}
                         </span>
                       )}
                     </button>
@@ -674,69 +675,85 @@ export default function LeaderboardTable({
               </div>
             )}
 
-            {/* TAB: ROUND 2 (FIRST ARENA MARKS BREAKDOWN) */}
+            {/* TAB: ROUND 2 (FIRST ARENA / BOAT RACE & VIVA BREAKDOWN) */}
             {modalActiveTab === "round2" && (
               <div className="space-y-4 font-mono">
                 <div className="rounded-xl border border-white/10 bg-[#08070D] p-4 space-y-4">
-                  <div className="flex items-center justify-between border-b border-white/10 pb-2">
-                    <span className="text-xs font-bold text-[#FF7A3D] uppercase">
-                      ROUND 2: FIRST ARENA SCORING TABLE
-                    </span>
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between border-b border-white/10 pb-2 gap-2">
+                    <div>
+                      <span className="text-xs font-bold text-[#FF7A3D] uppercase block">
+                        ROUND 2: FIRST ARENA SCORING TABLE (BOAT TRACK &amp; VIVA)
+                      </span>
+                      <span className="text-[11px] text-zinc-400 font-mono">
+                        Formula: S = (720 &minus; T) &minus; H + V
+                      </span>
+                    </div>
                     <span className="font-black text-sm text-[#FF7A3D]">
                       TOTAL: {inspectingTeam.round2_score} PTS
                     </span>
                   </div>
 
-                  {/* Standard Parameter Table as specified */}
+                  {/* Standard Parameter Table matching exact evaluation formula */}
                   <div className="overflow-hidden rounded-lg border border-white/10 bg-black/40">
                     <table className="w-full text-left text-xs">
                       <thead className="bg-white/5 text-zinc-400 uppercase text-[10px]">
                         <tr>
                           <th className="py-2.5 px-3">PARAMETER</th>
-                          <th className="py-2.5 px-3 text-right">VALUE</th>
+                          <th className="py-2.5 px-3 text-center">CALCULATION</th>
+                          <th className="py-2.5 px-3 text-right">SCORE</th>
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-white/5 text-zinc-300">
                         <tr>
-                          <td className="py-2 px-3 text-zinc-400">Completion Time</td>
+                          <td className="py-2 px-3 text-zinc-400">Total Track Time Limit</td>
+                          <td className="py-2 px-3 text-center text-zinc-400">12 &times; 60</td>
                           <td className="py-2 px-3 text-right font-bold text-white">
+                            {inspectingTeam.round2_details?.total_time ?? 720} sec
+                          </td>
+                        </tr>
+                        <tr>
+                          <td className="py-2 px-3 text-zinc-400">Time Taken (T)</td>
+                          <td className="py-2 px-3 text-center text-zinc-400">
                             {inspectingTeam.round2_details?.completion_time || "00:00"}
                           </td>
-                        </tr>
-                        <tr>
-                          <td className="py-2 px-3 text-zinc-400">Gain Marks</td>
-                          <td className="py-2 px-3 text-right font-bold text-[#00F0FF]">
-                            {inspectingTeam.round2_details?.gain_marks ?? inspectingTeam.round2_score}
-                          </td>
-                        </tr>
-                        <tr>
-                          <td className="py-2 px-3 text-zinc-400">Full Marks / Maximum Score</td>
                           <td className="py-2 px-3 text-right font-bold text-white">
-                            {inspectingTeam.round2_details?.max_marks ?? 100}
+                            {inspectingTeam.round2_details?.time_taken_seconds ?? parseTimeToSeconds(inspectingTeam.round2_details?.completion_time)} sec
                           </td>
                         </tr>
                         <tr>
-                          <td className="py-2 px-3 text-zinc-400">Number of Penalties</td>
-                          <td className="py-2 px-3 text-right font-bold text-red-400">
-                            {inspectingTeam.round2_details?.penalty_count ?? 0}
+                          <td className="py-2 px-3 text-zinc-400">Time Score</td>
+                          <td className="py-2 px-3 text-center text-zinc-400">
+                            720 &minus; {inspectingTeam.round2_details?.time_taken_seconds ?? parseTimeToSeconds(inspectingTeam.round2_details?.completion_time)}
+                          </td>
+                          <td className="py-2 px-3 text-right font-bold text-[#00F0FF]">
+                            {inspectingTeam.round2_details?.time_score ?? Math.max(0, (inspectingTeam.round2_details?.total_time ?? 720) - (inspectingTeam.round2_details?.time_taken_seconds ?? parseTimeToSeconds(inspectingTeam.round2_details?.completion_time)))} pts
                           </td>
                         </tr>
                         <tr>
-                          <td className="py-2 px-3 text-zinc-400">Negative Marks per Penalty</td>
+                          <td className="py-2 px-3 text-zinc-400">Hand-Touch Penalty (H)</td>
+                          <td className="py-2 px-3 text-center text-red-400">
+                            {inspectingTeam.round2_details?.hand_touches ?? inspectingTeam.round2_details?.penalty_count ?? 0} &times; (-1)
+                          </td>
                           <td className="py-2 px-3 text-right font-bold text-red-400">
-                            {inspectingTeam.round2_details?.penalty_rate ?? 5}
+                            -{inspectingTeam.round2_details?.penalty_total ?? ((inspectingTeam.round2_details?.hand_touches ?? inspectingTeam.round2_details?.penalty_count ?? 0) * (inspectingTeam.round2_details?.penalty_rate ?? 1))} pts
                           </td>
                         </tr>
                         <tr>
-                          <td className="py-2 px-3 text-zinc-400">Total Penalty Marks</td>
-                          <td className="py-2 px-3 text-right font-bold text-red-400">
-                            {inspectingTeam.round2_details?.penalty_total ?? 0}
+                          <td className="py-2 px-3 text-zinc-400">Viva Marks (V - out of 10)</td>
+                          <td className="py-2 px-3 text-center text-emerald-400">
+                            Direct Addition
+                          </td>
+                          <td className="py-2 px-3 text-right font-bold text-emerald-400">
+                            +{inspectingTeam.round2_details?.viva_marks ?? 0} pts
                           </td>
                         </tr>
                         <tr className="bg-[#FF7A3D]/10 font-bold">
-                          <td className="py-2.5 px-3 text-[#FF7A3D]">ROUND 2 TOTAL MARKS</td>
+                          <td className="py-2.5 px-3 text-[#FF7A3D]">ROUND 2 FINAL SCORE</td>
+                          <td className="py-2.5 px-3 text-center text-[#FF7A3D]">
+                            ({inspectingTeam.round2_details?.time_score ?? 0}) &minus; ({inspectingTeam.round2_details?.penalty_total ?? 0}) + ({inspectingTeam.round2_details?.viva_marks ?? 0})
+                          </td>
                           <td className="py-2.5 px-3 text-right text-base text-[#FF7A3D]">
-                            {inspectingTeam.round2_score}
+                            {inspectingTeam.round2_score} PTS
                           </td>
                         </tr>
                       </tbody>
@@ -745,9 +762,9 @@ export default function LeaderboardTable({
 
                   {/* Calculation Formula Note */}
                   <div className="rounded-lg border border-[#FF7A3D]/30 bg-[#FF7A3D]/5 p-3 text-xs text-zinc-300 space-y-1">
-                    <span className="font-bold text-white block">Formula Calculation:</span>
-                    <p className="text-[11px] text-zinc-400 font-mono">
-                      Gain Marks ({inspectingTeam.round2_details?.gain_marks ?? inspectingTeam.round2_score}) &minus; (Number of Penalties ({inspectingTeam.round2_details?.penalty_count ?? 0}) &times; Negative per Penalty ({inspectingTeam.round2_details?.penalty_rate ?? 5})) = <strong className="text-[#FF7A3D]">{inspectingTeam.round2_score} Total</strong>
+                    <span className="font-bold text-white block">Formula Note:</span>
+                    <p className="text-[11px] text-zinc-400 font-mono leading-relaxed">
+                      S = (720 &minus; T) &minus; H + V &bull; 1 point per second saved from total 720s (12 min), penalty of 1 point per hand touch, and viva marks (out of 10) added directly. Maximum theoretical score is 730 points.
                     </p>
                   </div>
                 </div>

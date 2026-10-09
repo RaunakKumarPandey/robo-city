@@ -18,8 +18,9 @@ import {
   calculateStage,
   calculateRound3,
   calculateOverallCompletionTime,
-  DEFAULT_ROUND2_MAX_MARKS,
+  DEFAULT_ROUND2_TOTAL_TIME,
   DEFAULT_ROUND2_PENALTY_RATE,
+  DEFAULT_ROUND2_MAX_VIVA,
   DEFAULT_STAGE_MAX_MARKS,
   DEFAULT_STAGE_PENALTY_RATE,
 } from "@/lib/scoringUtils";
@@ -69,12 +70,12 @@ export default function AdminScoresPage() {
   const [screeningStatus, setScreeningStatus] = useState<"qualified" | "not_qualified">("qualified");
   const [round1Status, setRound1Status] = useState<"qualified" | "not_qualified" | "pending">("pending");
   
-  // Round 2 Form State
+  // Round 2 Form State (Formula: S = (720 - T) - H + V)
   const [round2Time, setRound2Time] = useState<string>("00:00");
-  const [round2MaxMarks, setRound2MaxMarks] = useState<string>("100");
-  const [round2GainMarks, setRound2GainMarks] = useState<string>("0");
-  const [round2PenaltyRate, setRound2PenaltyRate] = useState<string>("5");
-  const [round2PenaltyCount, setRound2PenaltyCount] = useState<string>("0");
+  const [round2TotalTime, setRound2TotalTime] = useState<string>("720");
+  const [round2VivaMarks, setRound2VivaMarks] = useState<string>("0");
+  const [round2HandTouches, setRound2HandTouches] = useState<string>("0");
+  const [round2PenaltyRate, setRound2PenaltyRate] = useState<string>("1");
 
   // Round 3 Form State (3 Stages)
   const [activeStageIndex, setActiveStageIndex] = useState<number>(0);
@@ -142,13 +143,13 @@ export default function AdminScoresPage() {
     setScreeningStatus(team.screening_status || "qualified");
     setRound1Status(team.round1_status || "pending");
 
-    // Initialize Round 2
+    // Initialize Round 2 (Boat Race: S = (720 - T) - H + V)
     const r2 = team.round2_details || team.details?.round2;
     setRound2Time(r2?.completion_time || "00:00");
-    setRound2MaxMarks(String(r2?.max_marks ?? DEFAULT_ROUND2_MAX_MARKS));
-    setRound2GainMarks(String(r2?.gain_marks ?? (team.score?.round2_score ?? 0)));
+    setRound2TotalTime(String(r2?.total_time ?? DEFAULT_ROUND2_TOTAL_TIME));
+    setRound2VivaMarks(String(r2?.viva_marks ?? 0));
+    setRound2HandTouches(String(r2?.hand_touches ?? r2?.penalty_count ?? 0));
     setRound2PenaltyRate(String(r2?.penalty_rate ?? DEFAULT_ROUND2_PENALTY_RATE));
-    setRound2PenaltyCount(String(r2?.penalty_count ?? 0));
 
     // Initialize Round 3 (3 Stages)
     const r3 = team.round3_details || team.details?.round3;
@@ -175,7 +176,7 @@ export default function AdminScoresPage() {
       teamId: team.id,
       screening_status: newStatus,
       round1_status: team.round1_status || "pending",
-      round2: team.round2_details || { max_marks: 100, gain_marks: team.score?.round2_score || 0 },
+      round2: team.round2_details || { total_time: 720, completion_time: "00:00", viva_marks: 0, hand_touches: 0, penalty_rate: 1 },
       round3: team.round3_details?.stages || [
         { stage_number: 1, max_marks: 50, gain_marks: team.score?.round3_score || 0 },
         { stage_number: 2, max_marks: 50, gain_marks: 0 },
@@ -194,21 +195,21 @@ export default function AdminScoresPage() {
     }
   };
 
-  // Live Calculations for Modal Preview
+  // Live Calculations for Modal Preview (Round 2: S = (720 - T) - H + V)
   const computedRound2 = useMemo(() => {
-    const maxMarks = Math.max(0, parseFloat(round2MaxMarks) || 0);
-    const gainMarks = Math.max(0, parseFloat(round2GainMarks) || 0);
-    const penaltyRate = Math.max(0, parseFloat(round2PenaltyRate) || 0);
-    const penaltyCount = Math.max(0, parseFloat(round2PenaltyCount) || 0);
+    const totalTime = Math.max(0, parseFloat(round2TotalTime) || DEFAULT_ROUND2_TOTAL_TIME);
+    const vivaMarks = Math.max(0, parseFloat(round2VivaMarks) || 0);
+    const handTouches = Math.max(0, parseFloat(round2HandTouches) || 0);
+    const penaltyRate = Math.max(0, parseFloat(round2PenaltyRate) || DEFAULT_ROUND2_PENALTY_RATE);
 
     return calculateRound2({
       completion_time: round2Time || "00:00",
-      max_marks: maxMarks,
-      gain_marks: gainMarks,
+      total_time: totalTime,
+      viva_marks: vivaMarks,
+      hand_touches: handTouches,
       penalty_rate: penaltyRate,
-      penalty_count: penaltyCount,
     });
-  }, [round2Time, round2MaxMarks, round2GainMarks, round2PenaltyRate, round2PenaltyCount]);
+  }, [round2Time, round2TotalTime, round2VivaMarks, round2HandTouches, round2PenaltyRate]);
 
   const computedStages = useMemo(() => {
     return stagesState.map((st, idx) => {
@@ -662,7 +663,7 @@ export default function AdminScoresPage() {
                             </span>
                             {r2 && (
                               <span className="text-[10px] text-zinc-400 font-mono">
-                                {r2.gain_marks}/{r2.max_marks} &bull; -{r2.penalty_total}p ({r2.completion_time})
+                                {r2.completion_time !== "00:00" ? r2.completion_time : "—"} &bull; H:{r2.hand_touches ?? r2.penalty_count ?? 0} &bull; V:+{r2.viva_marks ?? 0}
                               </span>
                             )}
                           </div>
@@ -1052,71 +1053,107 @@ export default function AdminScoresPage() {
                 </div>
               )}
 
-              {/* TAB 3: ROUND 2 (FIRST ARENA MARKS) */}
+              {/* TAB 3: ROUND 2 (FIRST ARENA / BOAT RACE & VIVA) */}
               {activeTab === "round2" && (
                 <div className="space-y-4">
                   <div className="rounded-xl border border-white/10 bg-white/[0.02] p-4 space-y-4">
-                    <div className="flex items-center justify-between border-b border-white/10 pb-2">
-                      <span className="text-xs font-bold text-[#00F0FF] uppercase">
-                        ROUND 2: FIRST ARENA SCORING
-                      </span>
-                      <span className="text-[11px] text-zinc-400">
-                        Formula: Gain Marks &minus; (Penalties &times; Rate)
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between border-b border-white/10 pb-3 gap-2">
+                      <div>
+                        <span className="text-xs font-bold text-[#00F0FF] uppercase tracking-wider block">
+                          ROUND 2: FIRST ARENA SCORING (BOAT RACE &amp; VIVA)
+                        </span>
+                        <span className="text-[11px] text-zinc-400 font-mono">
+                          Formula: S = (720 &minus; T) &minus; H + V
+                        </span>
+                      </div>
+                      <span className="inline-flex items-center gap-1.5 rounded-full bg-[#00F0FF]/10 border border-[#00F0FF]/30 px-3 py-1 text-[11px] font-mono font-bold text-[#00F0FF]">
+                        <Timer className="h-3.5 w-3.5" />
+                        <span>BASE TIME: {computedRound2.total_time}s (12 MIN)</span>
                       </span>
                     </div>
 
                     {/* Completion Time */}
                     <div>
-                      <label className="block text-xs font-bold tracking-wider text-zinc-300 uppercase mb-1">
-                        1. COMPLETION TIME (MM:SS)
-                      </label>
+                      <div className="flex items-center justify-between mb-1">
+                        <label className="block text-xs font-bold tracking-wider text-zinc-300 uppercase">
+                          1. COMPLETION TIME (MM:SS or SECONDS)
+                        </label>
+                        <span className="text-[11px] text-[#00F0FF] font-mono">
+                          T = {computedRound2.time_taken_seconds || 0}s &bull; Time Score: {computedRound2.time_score} pts
+                        </span>
+                      </div>
                       <input
                         type="text"
                         value={round2Time}
                         onChange={(e) => setRound2Time(e.target.value)}
-                        placeholder="e.g. 02:45"
-                        className="w-full rounded-lg border border-white/10 bg-black/40 py-2 px-3 text-xs font-bold text-white focus:border-[#00F0FF] focus:outline-none"
+                        placeholder="e.g. 09:20 or 560"
+                        className="w-full rounded-lg border border-white/10 bg-black/40 py-2.5 px-3 text-xs font-bold text-white focus:border-[#00F0FF] focus:outline-none font-mono"
                       />
+                      <p className="mt-1 text-[10px] text-zinc-400 font-mono">
+                        Remaining time gives base score: ({computedRound2.total_time} &minus; {computedRound2.time_taken_seconds || 0}) = <strong className="text-white">{computedRound2.time_score} pts</strong>
+                      </p>
                     </div>
 
-                    {/* Marks Configuration: Full Marks & Gain Marks */}
+                    {/* Viva Marks & Hand Touches */}
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                       <div>
                         <label className="block text-xs font-bold tracking-wider text-zinc-300 uppercase mb-1">
-                          2A. FULL MARKS (TOTAL MAXIMUM)
+                          2. VIVA MARKS (V - OUT OF 10)
+                        </label>
+                        <input
+                          type="number"
+                          min="0"
+                          max="10"
+                          step="0.5"
+                          value={round2VivaMarks}
+                          onChange={(e) => setRound2VivaMarks(e.target.value)}
+                          placeholder="8"
+                          className="w-full rounded-lg border border-white/10 bg-black/40 py-2.5 px-3 text-xs font-bold text-emerald-400 focus:border-emerald-400 focus:outline-none font-mono"
+                        />
+                        <p className="mt-1 text-[10px] text-zinc-400 font-mono">
+                          Viva marks added directly to round score (+{computedRound2.viva_marks})
+                        </p>
+                      </div>
+
+                      <div>
+                        <label className="block text-xs font-bold tracking-wider text-zinc-300 uppercase mb-1">
+                          3. NO. OF HAND TOUCHES (H - PENALTIES)
                         </label>
                         <input
                           type="number"
                           min="0"
                           step="1"
-                          value={round2MaxMarks}
-                          onChange={(e) => setRound2MaxMarks(e.target.value)}
-                          placeholder="100"
-                          className="w-full rounded-lg border border-white/10 bg-black/40 py-2 px-3 text-xs font-bold text-white focus:border-[#00F0FF] focus:outline-none"
+                          value={round2HandTouches}
+                          onChange={(e) => setRound2HandTouches(e.target.value)}
+                          placeholder="3"
+                          className="w-full rounded-lg border border-white/10 bg-black/40 py-2.5 px-3 text-xs font-bold text-red-400 focus:border-red-400 focus:outline-none font-mono"
                         />
+                        <p className="mt-1 text-[10px] text-zinc-400 font-mono">
+                          Penalties: {computedRound2.hand_touches} &times; (-{computedRound2.penalty_rate}) = <strong className="text-red-400">-{computedRound2.penalty_total} pts</strong>
+                        </p>
                       </div>
+                    </div>
 
+                    {/* Advanced Parameters: Total Time Limit & Deduction per Touch */}
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-2 border-t border-white/5">
                       <div>
-                        <label className="block text-xs font-bold tracking-wider text-zinc-300 uppercase mb-1">
-                          2B. GAIN MARKS (OBTAINED SCORE)
+                        <label className="block text-[11px] font-bold tracking-wider text-zinc-400 uppercase mb-1">
+                          4. TRACK TIME LIMIT (SECONDS)
                         </label>
                         <input
                           type="number"
                           min="0"
                           step="1"
-                          value={round2GainMarks}
-                          onChange={(e) => setRound2GainMarks(e.target.value)}
-                          placeholder="80"
-                          className="w-full rounded-lg border border-white/10 bg-black/40 py-2 px-3 text-xs font-bold text-[#00F0FF] focus:border-[#00F0FF] focus:outline-none"
+                          value={round2TotalTime}
+                          onChange={(e) => setRound2TotalTime(e.target.value)}
+                          placeholder="720"
+                          className="w-full rounded-lg border border-white/10 bg-black/40 py-2 px-3 text-xs font-bold text-zinc-300 focus:border-[#00F0FF] focus:outline-none font-mono"
                         />
                       </div>
-                    </div>
 
-                    {/* Penalties: Negative marks per touch & No. of touches */}
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                       <div>
-                        <label className="block text-xs font-bold tracking-wider text-zinc-300 uppercase mb-1">
-                          3A. DEDUCTION PER TOUCH (NEGATIVE)
+                        <label className="block text-[11px] font-bold tracking-wider text-zinc-400 uppercase mb-1">
+                          5. DEDUCTION PER HAND TOUCH (PTS)
                         </label>
                         <input
                           type="number"
@@ -1124,38 +1161,51 @@ export default function AdminScoresPage() {
                           step="1"
                           value={round2PenaltyRate}
                           onChange={(e) => setRound2PenaltyRate(e.target.value)}
-                          placeholder="5"
-                          className="w-full rounded-lg border border-white/10 bg-black/40 py-2 px-3 text-xs font-bold text-white focus:border-[#FF2A85] focus:outline-none"
-                        />
-                      </div>
-
-                      <div>
-                        <label className="block text-xs font-bold tracking-wider text-zinc-300 uppercase mb-1">
-                          3B. NO. OF PENALTIES (OBSTACLE TOUCHES)
-                        </label>
-                        <input
-                          type="number"
-                          min="0"
-                          step="1"
-                          value={round2PenaltyCount}
-                          onChange={(e) => setRound2PenaltyCount(e.target.value)}
-                          placeholder="0"
-                          className="w-full rounded-lg border border-white/10 bg-black/40 py-2 px-3 text-xs font-bold text-red-400 focus:border-red-400 focus:outline-none"
+                          placeholder="1"
+                          className="w-full rounded-lg border border-white/10 bg-black/40 py-2 px-3 text-xs font-bold text-zinc-300 focus:border-[#FF2A85] focus:outline-none font-mono"
                         />
                       </div>
                     </div>
 
-                    {/* Live Calculation Preview */}
-                    <div className="rounded-lg border border-[#00F0FF]/30 bg-[#00F0FF]/10 p-3.5 space-y-1">
-                      <div className="flex items-center justify-between text-xs">
-                        <span className="text-zinc-300">
-                          Gain: <strong className="text-white">{computedRound2.gain_marks}</strong> / {computedRound2.max_marks} &bull; Penalties:{" "}
-                          <strong className="text-red-400">
-                            {computedRound2.penalty_count} &times; -{computedRound2.penalty_rate} = -{computedRound2.penalty_total} pts
-                          </strong>
+                    {/* Live Calculation Preview Cards */}
+                    <div className="rounded-xl border border-[#00F0FF]/30 bg-[#00F0FF]/5 p-4 space-y-3 font-mono">
+                      <div className="text-[11px] font-bold uppercase tracking-wider text-[#00F0FF]">
+                        LIVE SCORE CALCULATION BREAKDOWN
+                      </div>
+                      
+                      <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-center text-xs">
+                        <div className="rounded-lg bg-black/50 border border-white/5 p-2.5">
+                          <span className="text-[10px] text-zinc-400 uppercase block">Time Score (720-T)</span>
+                          <span className="font-bold text-sm text-[#00F0FF]">
+                            {computedRound2.time_score} pts
+                          </span>
+                        </div>
+                        <div className="rounded-lg bg-black/50 border border-white/5 p-2.5">
+                          <span className="text-[10px] text-zinc-400 uppercase block">Hand Touch (-H)</span>
+                          <span className="font-bold text-sm text-red-400">
+                            -{computedRound2.penalty_total} pts
+                          </span>
+                        </div>
+                        <div className="rounded-lg bg-black/50 border border-white/5 p-2.5">
+                          <span className="text-[10px] text-zinc-400 uppercase block">Viva Marks (+V)</span>
+                          <span className="font-bold text-sm text-emerald-400">
+                            +{computedRound2.viva_marks} pts
+                          </span>
+                        </div>
+                        <div className="rounded-lg bg-[#00F0FF]/15 border border-[#00F0FF]/40 p-2.5 shadow-[0_0_15px_rgba(0,240,255,0.2)]">
+                          <span className="text-[10px] text-[#00F0FF] uppercase block font-bold">ROUND 2 TOTAL</span>
+                          <span className="font-black text-base text-white">
+                            {computedRound2.total_marks} PTS
+                          </span>
+                        </div>
+                      </div>
+
+                      <div className="flex items-center justify-between text-xs border-t border-white/10 pt-2 text-zinc-300">
+                        <span className="text-zinc-400">
+                          Formula: ({(computedRound2.total_time ?? DEFAULT_ROUND2_TOTAL_TIME)} &minus; {computedRound2.time_taken_seconds || 0}) &minus; {computedRound2.penalty_total} + {computedRound2.viva_marks}
                         </span>
                         <span className="font-black text-sm text-[#00F0FF]">
-                          = {computedRound2.total_marks} PTS
+                          = {computedRound2.total_marks} / {(computedRound2.total_time ?? DEFAULT_ROUND2_TOTAL_TIME) + 10} PTS
                         </span>
                       </div>
                     </div>
