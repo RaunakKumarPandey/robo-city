@@ -133,8 +133,19 @@ export default function AdminScoresPage() {
       setRound2Settings(s);
     };
     window.addEventListener("round2_settings_updated", handleSettingsUpdated);
+
+    // Prevent mouse scroll / wheel from incrementing or decrementing number inputs
+    const handleWheel = (e: WheelEvent) => {
+      const active = document.activeElement;
+      if (active instanceof HTMLInputElement && active.type === "number") {
+        active.blur();
+      }
+    };
+    window.addEventListener("wheel", handleWheel, { passive: true });
+
     return () => {
       window.removeEventListener("round2_settings_updated", handleSettingsUpdated);
+      window.removeEventListener("wheel", handleWheel);
     };
   }, []);
 
@@ -1167,6 +1178,7 @@ export default function AdminScoresPage() {
                     step="1"
                     value={tempSkipCost}
                     onChange={(e) => setTempSkipCost(e.target.value)}
+                    onWheel={(e) => e.currentTarget.blur()}
                     placeholder="50"
                     className="w-full rounded-lg border border-white/10 bg-black/40 py-2.5 px-3 text-xs font-bold text-white focus:border-[#FF7A3D] focus:outline-none"
                     required
@@ -1192,6 +1204,7 @@ export default function AdminScoresPage() {
                     step="1"
                     value={tempTouchCost}
                     onChange={(e) => setTempTouchCost(e.target.value)}
+                    onWheel={(e) => e.currentTarget.blur()}
                     placeholder="10"
                     className="w-full rounded-lg border border-white/10 bg-black/40 py-2.5 px-3 text-xs font-bold text-white focus:border-[#FF7A3D] focus:outline-none"
                     required
@@ -1485,6 +1498,7 @@ export default function AdminScoresPage() {
                           const val = e.target.value;
                           setRound2VivaMarks(val);
                         }}
+                        onWheel={(e) => e.currentTarget.blur()}
                         placeholder="e.g. 40 (0 to 60)"
                         className="w-full rounded-lg border border-white/10 bg-black/40 py-2.5 px-3 text-xs font-bold text-emerald-400 focus:border-emerald-400 focus:outline-none font-mono"
                         required
@@ -1510,6 +1524,7 @@ export default function AdminScoresPage() {
                         step="0.01"
                         value={round2CompletionMinutes}
                         onChange={(e) => setRound2CompletionMinutes(e.target.value)}
+                        onWheel={(e) => e.currentTarget.blur()}
                         placeholder="e.g. 2.5 (minutes)"
                         className="w-full rounded-lg border border-white/10 bg-black/40 py-2.5 px-3 text-xs font-bold text-white focus:border-[#00F0FF] focus:outline-none font-mono"
                         required
@@ -1536,6 +1551,7 @@ export default function AdminScoresPage() {
                           step="1"
                           value={round2SkipPenalties}
                           onChange={(e) => setRound2SkipPenalties(e.target.value)}
+                          onWheel={(e) => e.currentTarget.blur()}
                           placeholder="2"
                           className="w-full rounded-lg border border-white/10 bg-black/40 py-2.5 px-3 text-xs font-bold text-red-400 focus:border-red-400 focus:outline-none font-mono"
                           required
@@ -1560,6 +1576,7 @@ export default function AdminScoresPage() {
                           step="1"
                           value={round2TouchPenalties}
                           onChange={(e) => setRound2TouchPenalties(e.target.value)}
+                          onWheel={(e) => e.currentTarget.blur()}
                           placeholder="3"
                           className="w-full rounded-lg border border-white/10 bg-black/40 py-2.5 px-3 text-xs font-bold text-red-400 focus:border-red-400 focus:outline-none font-mono"
                           required
@@ -1582,6 +1599,7 @@ export default function AdminScoresPage() {
                           step="1"
                           value={round2SkipCost}
                           onChange={(e) => setRound2SkipCost(e.target.value)}
+                          onWheel={(e) => e.currentTarget.blur()}
                           placeholder="50"
                           className="w-full rounded-lg border border-white/10 bg-black/40 py-2 px-3 text-xs font-bold text-zinc-300 focus:border-[#FF7A3D] focus:outline-none font-mono"
                         />
@@ -1597,6 +1615,7 @@ export default function AdminScoresPage() {
                           step="1"
                           value={round2TouchCost}
                           onChange={(e) => setRound2TouchCost(e.target.value)}
+                          onWheel={(e) => e.currentTarget.blur()}
                           placeholder="10"
                           className="w-full rounded-lg border border-white/10 bg-black/40 py-2 px-3 text-xs font-bold text-zinc-300 focus:border-[#FF7A3D] focus:outline-none font-mono"
                         />
@@ -1714,6 +1733,7 @@ export default function AdminScoresPage() {
                           onChange={(e) =>
                             handleStageFieldChange(activeStageIndex, "maxMarks", e.target.value)
                           }
+                          onWheel={(e) => e.currentTarget.blur()}
                           placeholder="50"
                           className="w-full rounded-lg border border-white/10 bg-black/40 py-2 px-3 text-xs font-bold text-white focus:border-[#8A2BE2] focus:outline-none"
                         />
@@ -1731,6 +1751,7 @@ export default function AdminScoresPage() {
                           onChange={(e) =>
                             handleStageFieldChange(activeStageIndex, "gainMarks", e.target.value)
                           }
+                          onWheel={(e) => e.currentTarget.blur()}
                           placeholder="45"
                           className="w-full rounded-lg border border-white/10 bg-black/40 py-2 px-3 text-xs font-bold text-[#8A2BE2] focus:border-[#8A2BE2] focus:outline-none"
                         />
@@ -1751,6 +1772,7 @@ export default function AdminScoresPage() {
                           onChange={(e) =>
                             handleStageFieldChange(activeStageIndex, "penaltyRate", e.target.value)
                           }
+                          onWheel={(e) => e.currentTarget.blur()}
                           placeholder="5"
                           className="w-full rounded-lg border border-white/10 bg-black/40 py-2 px-3 text-xs font-bold text-white focus:border-[#8A2BE2] focus:outline-none"
                         />
@@ -1768,6 +1790,7 @@ export default function AdminScoresPage() {
                           onChange={(e) =>
                             handleStageFieldChange(activeStageIndex, "penaltyCount", e.target.value)
                           }
+                          onWheel={(e) => e.currentTarget.blur()}
                           placeholder="0"
                           className="w-full rounded-lg border border-white/10 bg-black/40 py-2 px-3 text-xs font-bold text-red-400 focus:border-red-400 focus:outline-none"
                         />
