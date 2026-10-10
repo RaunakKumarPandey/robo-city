@@ -25,7 +25,7 @@ export default function ChampionsHQ() {
   const [error, setError] = useState<string | null>(null);
   const [connectionStatus, setConnectionStatus] = useState<"CONNECTING" | "LIVE" | "OFFLINE">("LIVE");
   const [recentlyUpdatedId, setRecentlyUpdatedId] = useState<string | null>(null);
-  const [viewMode, setViewMode] = useState<"all_rounds" | "round2_arena">("all_rounds");
+  const [viewMode, setViewMode] = useState<"all_rounds" | "round2_arena">("round2_arena");
 
   // Load Leaderboard data
   const loadLeaderboard = useCallback(async (showLoading = true) => {
@@ -161,13 +161,8 @@ export default function ChampionsHQ() {
     };
   }, [loadLeaderboard]);
 
-  // Derive ranked teams based on active view mode
+  // Derive ranked teams based on active view mode (lowest overall time is always ranked #1)
   const displayedTeams = useMemo(() => {
-    if (viewMode === "all_rounds") {
-      return teams;
-    }
-
-    // ROUND 2 ARENA RANKING
     const qualified = teams.filter((t) => t.screening_status === "qualified");
     const notQualified = teams.filter((t) => t.screening_status === "not_qualified");
 
@@ -208,7 +203,7 @@ export default function ChampionsHQ() {
     }));
 
     return [...rankedQualified, ...rankedNotQualified];
-  }, [teams, viewMode]);
+  }, [teams]);
 
   const topThree = useMemo(() => {
     return displayedTeams.filter((t) => t.screening_status === "qualified").slice(0, 3);
