@@ -94,7 +94,7 @@ export function getInitialLeaderboardEntries(): LeaderboardEntry[] {
       round2_details: t.round2,
       round3_details: t.round3,
     };
-    const norm = normalizeScoreData(rawScore);
+    const norm = normalizeScoreData(rawScore, t.team_name, t.leader_name, t.members);
 
     return {
       id: t.id,

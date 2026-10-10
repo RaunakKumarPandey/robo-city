@@ -5,6 +5,8 @@ import { supabase, isSupabaseConfigured } from "@/lib/supabase";
 import { fetchLeaderboardData } from "@/lib/leaderboard";
 import { LeaderboardEntry } from "@/types/database";
 import { compareRound2ArenaTeams } from "@/lib/scoringUtils";
+import { getLocalTournamentTeams, formatLeaderboardEntries } from "@/lib/teamsStorage";
+import { getInitialLeaderboardEntries } from "@/data/initialLeaderboardData";
 import Podium from "./Podium";
 import LeaderboardTable from "./LeaderboardTable";
 import {
@@ -20,22 +22,49 @@ import {
 } from "lucide-react";
 
 export default function ChampionsHQ() {
-  const [teams, setTeams] = useState<LeaderboardEntry[]>([]);
-  const [loading, setLoading] = useState(true);
+  // Initialize with in-browser cached leaderboard, local tournament storage, or initial seed
+  const [teams, setTeams] = useState<LeaderboardEntry[]>(() => {
+    if (typeof window !== "undefined") {
+      try {
+        const cached = localStorage.getItem("robocity_leaderboard_cache");
+        if (cached) {
+          const parsed = JSON.parse(cached);
+          if (Array.isArray(parsed) && parsed.length > 0) {
+            return parsed;
+          }
+        }
+        const local = getLocalTournamentTeams();
+        if (local && local.length > 0) {
+          return formatLeaderboardEntries(local);
+        }
+      } catch {}
+    }
+    return getInitialLeaderboardEntries();
+  });
+  const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [connectionStatus, setConnectionStatus] = useState<"CONNECTING" | "LIVE" | "OFFLINE">("LIVE");
   const [recentlyUpdatedId, setRecentlyUpdatedId] = useState<string | null>(null);
   const [viewMode, setViewMode] = useState<"all_rounds" | "round2_arena">("round2_arena");
 
   // Load Leaderboard data
-  const loadLeaderboard = useCallback(async (showLoading = true) => {
+  const loadLeaderboard = useCallback(async (showLoading = false) => {
     if (showLoading) setLoading(true);
     setError(null);
 
     try {
       const data = await fetchLeaderboardData();
       if (Array.isArray(data) && data.length > 0) {
-        setTeams(data);
+        setTeams((prevTeams) => {
+          const prevQual = prevTeams.filter((t) => t.screening_status === "qualified").length;
+          const newQual = data.filter((t) => t.screening_status === "qualified").length;
+          // Never overwrite existing valid teams with empty/unqualified fallback data
+          if (prevQual > 0 && newQual === 0) {
+            console.warn("Retaining active leaderboard data — ignoring 0-qualified payload");
+            return prevTeams;
+          }
+          return data;
+        });
       }
     } catch (err) {
       console.error("Leaderboard load error:", err);
@@ -50,8 +79,8 @@ export default function ChampionsHQ() {
 
   // Initial Load + Multi-channel Realtime Subscriptions
   useEffect(() => {
-    // 1. Initial Load
-    loadLeaderboard(true);
+    // 1. Initial Load in background
+    loadLeaderboard(false);
 
     // 2. Local Realtime DOM Event Listener
     const handleScoresUpdated = (event: any) => {

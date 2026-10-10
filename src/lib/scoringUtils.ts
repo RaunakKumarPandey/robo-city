@@ -416,12 +416,14 @@ export function normalizeScoreData(
 } {
   const details = rawScore?.details || {};
 
-  // If explicitly overridden by admin (flagged via admin_manually_set), respect it.
-  // Otherwise, determine screening status by matching against the PDF qualified schedule.
+  // Authoritatively respect screening_status from database scores or details.
+  // Fall back to PDF schedule matching only when not recorded in database.
   let screening_status: "qualified" | "not_qualified";
 
-  if (details?.admin_manually_set === true && (rawScore?.screening_status || details?.screening_status)) {
-    screening_status = (rawScore?.screening_status || details?.screening_status) as "qualified" | "not_qualified";
+  if (rawScore?.screening_status === "qualified" || rawScore?.screening_status === "not_qualified") {
+    screening_status = rawScore.screening_status;
+  } else if (details?.screening_status === "qualified" || details?.screening_status === "not_qualified") {
+    screening_status = details.screening_status;
   } else {
     screening_status = getDefaultScreeningStatus(teamName, leaderName, members);
   }

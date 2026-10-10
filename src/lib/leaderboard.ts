@@ -16,8 +16,9 @@ export async function fetchLeaderboardData(client?: any): Promise<LeaderboardEnt
     return formatLeaderboardEntries(getLocalTournamentTeams());
   }
 
-  // If running in browser and Supabase is configured, try /api/leaderboard
+  // If running in browser and Supabase is configured, use server APIs with service-role access
   if (typeof window !== "undefined" && !client && isSupabaseConfigured) {
+    // 1. Primary: /api/leaderboard
     try {
       const controller = new AbortController();
       const timer = setTimeout(() => controller.abort(), 10000);
@@ -29,15 +30,50 @@ export async function fetchLeaderboardData(client?: any): Promise<LeaderboardEnt
       if (res.ok) {
         const json = await res.json();
         if (json.success && Array.isArray(json.data) && json.data.length > 0) {
+          const qualCount = json.data.filter((t: any) => t.screening_status === "qualified").length;
+          if (qualCount > 0) {
+            try {
+              localStorage.setItem("robocity_leaderboard_cache", JSON.stringify(json.data));
+            } catch {}
+          }
           return json.data;
         }
       }
     } catch {
-      // Fall through to direct query
+      // Primary API timed out or had network error
     }
+
+    // 2. Secondary: /api/admin/scores (service-role direct endpoint fallback)
+    try {
+      const res2 = await fetch(`/api/admin/scores?_t=${Date.now()}`, { cache: "no-store" });
+      if (res2.ok) {
+        const json2 = await res2.json();
+        if (json2.success && Array.isArray(json2.data) && json2.data.length > 0) {
+          const formatted = formatLeaderboardEntries(json2.data);
+          try {
+            localStorage.setItem("robocity_leaderboard_cache", JSON.stringify(formatted));
+          } catch {}
+          return formatted;
+        }
+      }
+    } catch {}
+
+    // 3. Tertiary: In-browser cached leaderboard from previous successful fetch
+    try {
+      const cached = localStorage.getItem("robocity_leaderboard_cache");
+      if (cached) {
+        const parsed = JSON.parse(cached);
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          return parsed;
+        }
+      }
+    } catch {}
+
+    // Never execute direct Supabase anon queries in browser that strip scores due to RLS
+    return formatLeaderboardEntries(getLocalTournamentTeams());
   }
 
-  const db = client || (typeof window === "undefined" ? getServiceSupabase() : supabase);
+  const db = client || getServiceSupabase();
 
   try {
     // Parallel queries to reliably fetch all data without embedding/foreign-key failures

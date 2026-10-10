@@ -6,12 +6,25 @@ import { getInitialLeaderboardEntries } from "@/data/initialLeaderboardData";
 
 export const dynamic = "force-dynamic";
 
+let cachedLeaderboardData: { data: any[]; timestamp: number } | null = null;
+const CACHE_TTL_MS = 5000; // 5-second in-memory server cache
+
 /**
  * GET /api/leaderboard
  * Fetches all official tournament teams with their scores and returns live ranked leaderboard.
  */
 export async function GET() {
   try {
+    // 1. Serve from in-memory cache if fresh
+    if (cachedLeaderboardData && Date.now() - cachedLeaderboardData.timestamp < CACHE_TTL_MS) {
+      return NextResponse.json({
+        success: true,
+        count: cachedLeaderboardData.data.length,
+        data: cachedLeaderboardData.data,
+        cached: true,
+      });
+    }
+
     if (!isSupabaseConfigured) {
       const fallback = getInitialLeaderboardEntries();
       return NextResponse.json({ success: true, count: fallback.length, data: fallback });
@@ -128,6 +141,9 @@ export async function GET() {
     }));
 
     const results = [...rankedQualified, ...rankedNotQualified];
+    if (results.length > 0) {
+      cachedLeaderboardData = { data: results, timestamp: Date.now() };
+    }
     return NextResponse.json({ success: true, count: results.length, data: results });
   } catch (err: any) {
     console.error("GET /api/leaderboard error:", err);
