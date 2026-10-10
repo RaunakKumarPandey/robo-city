@@ -6,13 +6,9 @@ import { getInitialLeaderboardEntries } from "@/data/initialLeaderboardData";
 
 /**
  * Fetches real leaderboard data with bulletproof multi-tier fallback:
- * 1. If Supabase is configured, attempts database query / API query.
- * 2. If Supabase is offline or unconfigured, uses local tournament teams storage / initial seed.
- * 
- * Guarantees:
- * - Qualified teams appear at top, ranked by total_score (Round 2 + Round 3) DESC, team_name ASC.
- * - Not qualified teams appear at the bottom.
- * - Real-time responsive and never crashes.
+ * 1. If running in browser, fetches /api/leaderboard which queries Supabase with service role.
+ * 2. If running on server or API fails, queries Supabase parallel tables directly.
+ * 3. If Supabase is offline or empty, uses local tournament teams storage / initial seed.
  */
 export async function fetchLeaderboardData(client?: any): Promise<LeaderboardEntry[]> {
   // If Supabase is not configured, directly return local tournament store
@@ -20,11 +16,11 @@ export async function fetchLeaderboardData(client?: any): Promise<LeaderboardEnt
     return formatLeaderboardEntries(getLocalTournamentTeams());
   }
 
-  // If running in browser and Supabase is configured, try /api/leaderboard with timeout
+  // If running in browser and Supabase is configured, try /api/leaderboard
   if (typeof window !== "undefined" && !client && isSupabaseConfigured) {
     try {
       const controller = new AbortController();
-      const timer = setTimeout(() => controller.abort(), 3500);
+      const timer = setTimeout(() => controller.abort(), 10000);
       const res = await fetch(`/api/leaderboard?_t=${Date.now()}`, {
         cache: "no-store",
         signal: controller.signal,
@@ -37,101 +33,53 @@ export async function fetchLeaderboardData(client?: any): Promise<LeaderboardEnt
         }
       }
     } catch {
-      // API call failed or timed out. In browser, NEVER hang on direct Supabase query!
+      // Fall through to direct query
     }
-
-    // Direct browser fallback: return local tournament data immediately with zero delay
-    return formatLeaderboardEntries(getLocalTournamentTeams());
   }
 
   const db = client || (typeof window === "undefined" ? getServiceSupabase() : supabase);
 
   try {
-    const fetchDb = async () => {
-      // 1. First attempt: Direct join query with wildcard scores(*)
-      const { data, error } = await db
-        .from("teams")
-        .select(`
-          id,
-          team_name,
-          team_logo_url,
-          robot_image_url,
-          scores (*),
-          team_members (*),
-          registrations (
-            captain_name
-          )
-        `);
+    // Parallel queries to reliably fetch all data without embedding/foreign-key failures
+    const [teamsRes, scoresRes, membersRes, regsRes] = await Promise.all([
+      db.from("teams").select("id, team_name, team_logo_url, robot_image_url, created_at, updated_at").order("created_at", { ascending: false }),
+      db.from("scores").select("*"),
+      db.from("team_members").select("id, team_id, name, branch, year"),
+      db.from("registrations").select("team_id, captain_name"),
+    ]);
 
-      if (!error && data && data.length > 0) {
-        return data;
-      }
-
-      // 2. Fallback: Parallel queries to avoid any join or foreign-key mismatch
-      const [teamsRes, scoresRes, membersRes, regsRes] = await Promise.all([
-        db.from("teams").select("id, team_name, team_logo_url, robot_image_url"),
-        db.from("scores").select("*"),
-        db.from("team_members").select("team_id, name, branch, year"),
-        db.from("registrations").select("team_id, captain_name"),
-      ]);
-
-      const teamsData = teamsRes.data || [];
-      if (teamsData.length === 0) {
-        return [];
-      }
-
-      const scoreMap = new Map<string, any>();
-      (scoresRes.data || []).forEach((s: any) => {
-        if (s.team_id) scoreMap.set(s.team_id, s);
-      });
-
-      const memberMap = new Map<string, any[]>();
-      (membersRes.data || []).forEach((m: any) => {
-        if (m.team_id) {
-          const list = memberMap.get(m.team_id) || [];
-          list.push(m);
-          memberMap.set(m.team_id, list);
-        }
-      });
-
-      const regMap = new Map<string, string>();
-      (regsRes.data || []).forEach((r: any) => {
-        if (r.team_id && r.captain_name) regMap.set(r.team_id, r.captain_name);
-      });
-
-      return teamsData.map((t: any) => ({
-        id: t.id,
-        team_name: t.team_name,
-        team_logo_url: t.team_logo_url,
-        robot_image_url: t.robot_image_url,
-        scores: scoreMap.get(t.id) || null,
-        team_members: memberMap.get(t.id) || [],
-        registrations: regMap.has(t.id) ? [{ captain_name: regMap.get(t.id) }] : [],
-      }));
-    };
-
-    // Strict 3000ms timeout for database query so it never blocks the request
-    const timeoutPromise = new Promise<any[]>((resolve) => setTimeout(() => resolve([]), 3000));
-    const rawTeamsList: any[] = await Promise.race([fetchDb(), timeoutPromise]);
-
-    if (!rawTeamsList || rawTeamsList.length === 0) {
+    const teamsData = teamsRes.data || [];
+    if (teamsData.length === 0) {
       if (typeof window !== "undefined") {
         return formatLeaderboardEntries(getLocalTournamentTeams());
       }
       return getInitialLeaderboardEntries();
     }
 
-    // Flatten score objects, members and leader name with normalization
-    const list: Omit<LeaderboardEntry, "rank">[] = rawTeamsList.map((t: any) => {
-      const rawScores = t.scores || t.score;
-      const scoreObj = Array.isArray(rawScores) ? rawScores[0] : rawScores;
-      const rawMembers = t.team_members || t.members || [];
-      const regObj = Array.isArray(t.registrations) ? t.registrations[0] : t.registrations;
-      const leaderName =
-        regObj?.captain_name?.trim() ||
-        (Array.isArray(rawMembers) && rawMembers[0]?.name ? rawMembers[0].name.trim() : null);
+    const scoreMap = new Map<string, any>();
+    (scoresRes.data || []).forEach((s: any) => {
+      if (s.team_id) scoreMap.set(s.team_id, s);
+    });
 
-      const normalized = normalizeScoreData(scoreObj, t.team_name, leaderName, rawMembers);
+    const memberMap = new Map<string, any[]>();
+    (membersRes.data || []).forEach((m: any) => {
+      if (m.team_id) {
+        const list = memberMap.get(m.team_id) || [];
+        list.push(m);
+        memberMap.set(m.team_id, list);
+      }
+    });
+
+    const regMap = new Map<string, string>();
+    (regsRes.data || []).forEach((r: any) => {
+      if (r.team_id && r.captain_name) regMap.set(r.team_id, r.captain_name);
+    });
+
+    const list: Omit<LeaderboardEntry, "rank">[] = teamsData.map((t: any) => {
+      const rawScore = scoreMap.get(t.id) || null;
+      const rawMembers = memberMap.get(t.id) || [];
+      const leaderName = regMap.get(t.id) || (rawMembers[0]?.name ? rawMembers[0].name.trim() : null);
+      const normalized = normalizeScoreData(rawScore, t.team_name, leaderName, rawMembers);
 
       return {
         id: t.id,
@@ -149,8 +97,8 @@ export async function fetchLeaderboardData(client?: any): Promise<LeaderboardEnt
         round2_details: normalized.round2_details,
         round3_details: normalized.round3_details,
         details: normalized.details,
-        updated_at: scoreObj?.updated_at,
-        members: Array.isArray(rawMembers) ? rawMembers : [],
+        updated_at: rawScore?.updated_at || t.updated_at,
+        members: rawMembers,
       };
     });
 

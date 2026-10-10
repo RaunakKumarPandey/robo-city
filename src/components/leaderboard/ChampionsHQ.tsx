@@ -5,8 +5,6 @@ import { supabase, isSupabaseConfigured } from "@/lib/supabase";
 import { fetchLeaderboardData } from "@/lib/leaderboard";
 import { LeaderboardEntry } from "@/types/database";
 import { compareRound2ArenaTeams } from "@/lib/scoringUtils";
-import { getLocalTournamentTeams, formatLeaderboardEntries } from "@/lib/teamsStorage";
-import { getInitialLeaderboardEntries } from "@/data/initialLeaderboardData";
 import Podium from "./Podium";
 import LeaderboardTable from "./LeaderboardTable";
 import {
@@ -22,26 +20,15 @@ import {
 } from "lucide-react";
 
 export default function ChampionsHQ() {
-  // Pre-populate with local tournament cache / initial seed data immediately so user never sees a stuck blank screen
-  const [teams, setTeams] = useState<LeaderboardEntry[]>(() => {
-    if (typeof window !== "undefined") {
-      try {
-        const local = getLocalTournamentTeams();
-        if (local && local.length > 0) {
-          return formatLeaderboardEntries(local);
-        }
-      } catch {}
-    }
-    return getInitialLeaderboardEntries();
-  });
-  const [loading, setLoading] = useState(false);
+  const [teams, setTeams] = useState<LeaderboardEntry[]>([]);
+  const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [connectionStatus, setConnectionStatus] = useState<"CONNECTING" | "LIVE" | "OFFLINE">("LIVE");
   const [recentlyUpdatedId, setRecentlyUpdatedId] = useState<string | null>(null);
   const [viewMode, setViewMode] = useState<"all_rounds" | "round2_arena">("round2_arena");
 
-  // Load Leaderboard data in background
-  const loadLeaderboard = useCallback(async (showLoading = false) => {
+  // Load Leaderboard data
+  const loadLeaderboard = useCallback(async (showLoading = true) => {
     if (showLoading) setLoading(true);
     setError(null);
 
@@ -52,15 +39,19 @@ export default function ChampionsHQ() {
       }
     } catch (err) {
       console.error("Leaderboard load error:", err);
+      // Don't show hard error if teams are already loaded
+      if (teams.length === 0) {
+        setError("Unable to load leaderboard data. Please try again.");
+      }
     } finally {
-      setLoading(false);
+      if (showLoading) setLoading(false);
     }
-  }, []);
+  }, [teams.length]);
 
   // Initial Load + Multi-channel Realtime Subscriptions
   useEffect(() => {
-    // 1. Initial Load in background
-    loadLeaderboard(false);
+    // 1. Initial Load
+    loadLeaderboard(true);
 
     // 2. Local Realtime DOM Event Listener
     const handleScoresUpdated = (event: any) => {
