@@ -40,14 +40,28 @@ export async function GET() {
       db.from("registrations").select("team_id, captain_name"),
     ]);
 
-    const teamsData = teamsRes.data || [];
+    let teamsData = teamsRes.data || [];
+    if (teamsData.length === 0) {
+      // Resilient fallback query if specific columns or ordering had a PostgREST issue
+      const retryTeams = await db.from("teams").select("*");
+      if (retryTeams.data && retryTeams.data.length > 0) {
+        teamsData = retryTeams.data;
+      }
+    }
+
     if (teamsData.length === 0) {
       const fallback = getInitialLeaderboardEntries();
       return NextResponse.json({ success: true, count: fallback.length, data: fallback });
     }
 
+    let scoresData = scoresRes.data || [];
+    if (scoresData.length === 0 && scoresRes.error) {
+      const retryScores = await db.from("scores").select("*");
+      if (retryScores.data) scoresData = retryScores.data;
+    }
+
     const scoreMap = new Map<string, any>();
-    (scoresRes.data || []).forEach((s: any) => {
+    scoresData.forEach((s: any) => {
       if (s.team_id) scoreMap.set(s.team_id, s);
     });
 

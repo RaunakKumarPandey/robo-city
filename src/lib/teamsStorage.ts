@@ -4,8 +4,17 @@ import { normalizeScoreData, calculateRound2, calculateRound3, compareRound2Aren
 import { TeamScoreItem, DetailedScoreUpdatePayload } from "@/lib/scores";
 import { TeamWithDetails } from "@/types/database";
 
-const TEAMS_STORAGE_KEY = "robocity_tournament_teams_v2";
+const TEAMS_STORAGE_KEY = "robocity_tournament_teams_v5_live";
 const BROADCAST_CHANNEL_NAME = "robocity_scores_realtime_channel";
+
+// Auto-purge legacy dummy storage keys
+if (typeof window !== "undefined") {
+  try {
+    localStorage.removeItem("robocity_tournament_teams_v2");
+    localStorage.removeItem("robocity_tournament_teams");
+    localStorage.removeItem("robocity_leaderboard_cache");
+  } catch {}
+}
 
 // In-memory cache for instant synchronous access
 let memoryTeamsCache: InitialTeamSeed[] | null = null;
