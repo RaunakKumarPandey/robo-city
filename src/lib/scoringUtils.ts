@@ -306,15 +306,13 @@ export function compareRound2ArenaTeams(
     (a.completion_time_seconds !== undefined && a.completion_time_seconds !== null && a.completion_time_seconds > 0) ||
     (a.viva_marks !== undefined && a.viva_marks !== null && a.viva_marks > 0) ||
     (a.skip_penalties !== undefined && a.skip_penalties !== null && a.skip_penalties > 0) ||
-    (a.touch_penalties !== undefined && a.touch_penalties !== null && a.touch_penalties > 0) ||
-    (a.overall_time_seconds !== undefined && a.overall_time_seconds !== null && a.overall_time_seconds > 0);
+    (a.touch_penalties !== undefined && a.touch_penalties !== null && a.touch_penalties > 0);
 
   const isBEvaluated =
     (b.completion_time_seconds !== undefined && b.completion_time_seconds !== null && b.completion_time_seconds > 0) ||
     (b.viva_marks !== undefined && b.viva_marks !== null && b.viva_marks > 0) ||
     (b.skip_penalties !== undefined && b.skip_penalties !== null && b.skip_penalties > 0) ||
-    (b.touch_penalties !== undefined && b.touch_penalties !== null && b.touch_penalties > 0) ||
-    (b.overall_time_seconds !== undefined && b.overall_time_seconds !== null && b.overall_time_seconds > 0);
+    (b.touch_penalties !== undefined && b.touch_penalties !== null && b.touch_penalties > 0);
 
   // Evaluated teams appear before unevaluated teams
   if (isAEvaluated && !isBEvaluated) return -1;
@@ -323,7 +321,7 @@ export function compareRound2ArenaTeams(
   const aTime = a.overall_time_seconds ?? 999999;
   const bTime = b.overall_time_seconds ?? 999999;
 
-  // 1. Lowest Overall Time first (ascending: lowest time = Rank #1)
+  // 1. Lowest Overall Time first (ascending)
   if (aTime !== bTime) {
     return aTime - bTime;
   }

@@ -1,6 +1,6 @@
 import { supabase, getServiceSupabase, isSupabaseConfigured } from "@/lib/supabase";
 import { LeaderboardEntry } from "@/types/database";
-import { normalizeScoreData, compareRound2ArenaTeams } from "./scoringUtils";
+import { normalizeScoreData } from "./scoringUtils";
 import { getLocalTournamentTeams, formatLeaderboardEntries } from "./teamsStorage";
 import { getInitialLeaderboardEntries } from "@/data/initialLeaderboardData";
 
@@ -147,31 +147,14 @@ export async function fetchLeaderboardData(client?: any): Promise<LeaderboardEnt
     const qualifiedTeams = list.filter((t) => t.screening_status === "qualified");
     const notQualifiedTeams = list.filter((t) => t.screening_status === "not_qualified");
 
-    // Sort qualified teams by lowest Round 2 Arena Overall Time ASC (lowest time ranks #1)
+    // Sort qualified teams by total_score DESC, tiebreak by team_name ASC, then stable id tiebreak
     qualifiedTeams.sort((a, b) => {
-      const aR2 = a.round2_details;
-      const bR2 = b.round2_details;
-
-      return compareRound2ArenaTeams(
-        {
-          overall_time_seconds: aR2?.overall_time_seconds ?? a.round2_score,
-          viva_marks: aR2?.viva_marks ?? 0,
-          completion_time_seconds: aR2?.completion_time_seconds ?? (aR2?.time_taken_seconds ?? 0),
-          skip_penalties: aR2?.skip_penalties ?? 0,
-          touch_penalties: aR2?.touch_penalties ?? aR2?.hand_touches ?? 0,
-          team_name: a.team_name,
-          id: a.id,
-        },
-        {
-          overall_time_seconds: bR2?.overall_time_seconds ?? b.round2_score,
-          viva_marks: bR2?.viva_marks ?? 0,
-          completion_time_seconds: bR2?.completion_time_seconds ?? (bR2?.time_taken_seconds ?? 0),
-          skip_penalties: bR2?.skip_penalties ?? 0,
-          touch_penalties: bR2?.touch_penalties ?? bR2?.hand_touches ?? 0,
-          team_name: b.team_name,
-          id: b.id,
-        }
-      );
+      if (b.total_score !== a.total_score) {
+        return b.total_score - a.total_score;
+      }
+      const nameCompare = (a.team_name || "").localeCompare(b.team_name || "");
+      if (nameCompare !== 0) return nameCompare;
+      return (a.id || "").localeCompare(b.id || "");
     });
 
     // Sort not qualified teams by name ASC

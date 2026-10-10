@@ -363,7 +363,7 @@ export default function LeaderboardTable({
                       className="inline-flex flex-col items-center rounded-lg border border-white/10 bg-white/5 px-2.5 py-1 transition-all hover:border-[#FF7A3D] hover:bg-[#FF7A3D]/10 cursor-pointer shadow-sm"
                     >
                       <span className="font-bold text-white text-xs text-[#FF7A3D]">
-                        {team.round2_score} PTS
+                        {team.round2_score} SEC
                       </span>
                       {r2 && (
                         <span className="text-[9px] text-zinc-400">
@@ -620,7 +620,7 @@ export default function LeaderboardTable({
                 <div className="rounded bg-black/40 p-1.5 border border-white/5">
                   <span className="text-[9px] text-zinc-400 block">R2 ARENA</span>
                   <span className="font-bold text-[#FF7A3D] text-[11px]">
-                    {team.round2_score} PTS
+                    {team.round2_score} SEC
                   </span>
                 </div>
                 <div className="rounded bg-black/40 p-1.5 border border-white/5">
@@ -790,7 +790,7 @@ export default function LeaderboardTable({
                     <div className="mt-1 text-base font-black text-[#FF7A3D]">
                       {inspectingTeam.screening_status === "not_qualified"
                         ? "—"
-                        : `${inspectingTeam.round2_score} pts`}
+                        : `${inspectingTeam.round2_score} SEC`}
                     </div>
                     {inspectingTeam.round2_details?.completion_time_seconds !== undefined && (
                       <div className="text-[9px] text-zinc-500 mt-0.5">

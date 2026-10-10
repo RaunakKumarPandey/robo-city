@@ -765,7 +765,7 @@ export default function AdminTeamsPage() {
                   <div className="rounded bg-black/40 p-2">
                     <span className="text-[10px] text-zinc-400 uppercase block">R2 ARENA 1</span>
                     <span className="font-bold text-white">
-                      {viewingTeam.score?.round2_score ?? 0} pts
+                      {viewingTeam.score?.round2_score ?? 0} sec
                     </span>
                   </div>
                   <div className="rounded bg-black/40 p-2">
