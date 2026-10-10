@@ -7,15 +7,6 @@ import { TeamWithDetails } from "@/types/database";
 const TEAMS_STORAGE_KEY = "robocity_tournament_teams_v5_live";
 const BROADCAST_CHANNEL_NAME = "robocity_scores_realtime_channel";
 
-// Auto-purge legacy dummy storage keys
-if (typeof window !== "undefined") {
-  try {
-    localStorage.removeItem("robocity_tournament_teams_v2");
-    localStorage.removeItem("robocity_tournament_teams");
-    localStorage.removeItem("robocity_leaderboard_cache");
-  } catch {}
-}
-
 // In-memory cache for instant synchronous access
 let memoryTeamsCache: InitialTeamSeed[] | null = null;
 let broadcastChannel: BroadcastChannel | null = null;
@@ -56,8 +47,18 @@ export function getLocalTournamentTeams(): InitialTeamSeed[] {
       if (stored) {
         const parsed = JSON.parse(stored);
         if (Array.isArray(parsed) && parsed.length > 0) {
-          memoryTeamsCache = parsed;
-          return parsed;
+          // Merge with initialTournamentTeams to guarantee evaluated scores (MAVE-X, AKAGN, etc.) are never lost
+          const merged = parsed.map((item: InitialTeamSeed) => {
+            const seed = initialTournamentTeams.find(
+              (s) => s.team_name.toLowerCase().trim() === item.team_name.toLowerCase().trim()
+            );
+            if (seed && (seed.round2.overall_time_seconds ?? 0) > 0 && (item.round2.overall_time_seconds ?? 0) === 0) {
+              return { ...item, round2: seed.round2, screening_status: seed.screening_status };
+            }
+            return item;
+          });
+          memoryTeamsCache = merged;
+          return merged;
         }
       }
     } catch {}

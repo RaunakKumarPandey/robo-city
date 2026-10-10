@@ -76,46 +76,108 @@ export async function fetchLeaderboardData(client?: any): Promise<LeaderboardEnt
   const db = client || getServiceSupabase();
 
   try {
-    // Parallel queries to reliably fetch all data without embedding/foreign-key failures
-    const [teamsRes, scoresRes, membersRes, regsRes] = await Promise.all([
-      db.from("teams").select("id, team_name, team_logo_url, robot_image_url, created_at, updated_at").order("created_at", { ascending: false }),
-      db.from("scores").select("*"),
-      db.from("team_members").select("id, team_id, name, branch, year"),
-      db.from("registrations").select("team_id, captain_name"),
-    ]);
+    const fetchDb = async () => {
+      // 1. Direct join query
+      try {
+        const { data, error } = await db
+          .from("teams")
+          .select(`
+            id,
+            team_name,
+            team_logo_url,
+            robot_image_url,
+            created_at,
+            updated_at,
+            scores (*),
+            team_members (*)
+          `);
 
-    const teamsData = teamsRes.data || [];
-    if (teamsData.length === 0) {
+        if (!error && data && data.length > 0) {
+          return data;
+        }
+      } catch (e) {
+        console.warn("Direct join query notice:", e);
+      }
+
+      // 2. Parallel queries fallback
+      try {
+        const [teamsRes, scoresRes, membersRes] = await Promise.all([
+          db.from("teams").select("id, team_name, team_logo_url, robot_image_url, created_at, updated_at"),
+          db.from("scores").select("*"),
+          db.from("team_members").select("id, team_id, name, branch, year"),
+        ]);
+
+        const teamsData = teamsRes.data || [];
+        if (teamsData.length === 0) return [];
+
+        const scoreMap = new Map<string, any>();
+        (scoresRes.data || []).forEach((s: any) => {
+          if (s.team_id) scoreMap.set(s.team_id, s);
+        });
+
+        const memberMap = new Map<string, any[]>();
+        (membersRes.data || []).forEach((m: any) => {
+          if (m.team_id) {
+            const list = memberMap.get(m.team_id) || [];
+            list.push(m);
+            memberMap.set(m.team_id, list);
+          }
+        });
+
+        return teamsData.map((t: any) => ({
+          id: t.id,
+          team_name: t.team_name,
+          team_logo_url: t.team_logo_url,
+          robot_image_url: t.robot_image_url,
+          created_at: t.created_at,
+          updated_at: t.updated_at,
+          scores: scoreMap.get(t.id) || null,
+          team_members: memberMap.get(t.id) || [],
+        }));
+      } catch (e) {
+        console.warn("Parallel query notice:", e);
+        return [];
+      }
+    };
+
+    const timeoutPromise = new Promise<any[]>((resolve) => setTimeout(() => resolve([]), 5000));
+    const rawTeamsList: any[] = await Promise.race([fetchDb(), timeoutPromise]);
+
+    if (!rawTeamsList || rawTeamsList.length === 0) {
       if (typeof window !== "undefined") {
         return formatLeaderboardEntries(getLocalTournamentTeams());
       }
       return getInitialLeaderboardEntries();
     }
 
-    const scoreMap = new Map<string, any>();
-    (scoresRes.data || []).forEach((s: any) => {
-      if (s.team_id) scoreMap.set(s.team_id, s);
-    });
+    const fallbackList = getInitialLeaderboardEntries();
 
-    const memberMap = new Map<string, any[]>();
-    (membersRes.data || []).forEach((m: any) => {
-      if (m.team_id) {
-        const list = memberMap.get(m.team_id) || [];
-        list.push(m);
-        memberMap.set(m.team_id, list);
+    const list: Omit<LeaderboardEntry, "rank">[] = rawTeamsList.map((t: any) => {
+      const rawScores = t.scores || t.score;
+      let scoreObj = Array.isArray(rawScores) ? rawScores[0] : rawScores;
+      const rawMembers = t.team_members || t.members || [];
+      const leaderName = Array.isArray(rawMembers) && rawMembers[0]?.name ? rawMembers[0].name.trim() : null;
+
+      // Preserve known tournament scores if team has not yet been recorded in database
+      if (!scoreObj || ((scoreObj.round2_score ?? 0) === 0 && !scoreObj.round2_details)) {
+        const seedMatch = fallbackList.find(
+          (f) => f.team_name.toLowerCase().trim() === (t.team_name || "").toLowerCase().trim()
+        );
+        if (seedMatch && seedMatch.round2_score > 0) {
+          scoreObj = {
+            screening_status: seedMatch.screening_status,
+            round1_status: seedMatch.round1_status,
+            round1_score: seedMatch.round1_score,
+            round2_score: seedMatch.round2_score,
+            round3_score: seedMatch.round3_score,
+            round2_details: seedMatch.round2_details,
+            round3_details: seedMatch.round3_details,
+            details: seedMatch.details,
+          };
+        }
       }
-    });
 
-    const regMap = new Map<string, string>();
-    (regsRes.data || []).forEach((r: any) => {
-      if (r.team_id && r.captain_name) regMap.set(r.team_id, r.captain_name);
-    });
-
-    const list: Omit<LeaderboardEntry, "rank">[] = teamsData.map((t: any) => {
-      const rawScore = scoreMap.get(t.id) || null;
-      const rawMembers = memberMap.get(t.id) || [];
-      const leaderName = regMap.get(t.id) || (rawMembers[0]?.name ? rawMembers[0].name.trim() : null);
-      const normalized = normalizeScoreData(rawScore, t.team_name, leaderName, rawMembers);
+      const normalized = normalizeScoreData(scoreObj, t.team_name, leaderName, rawMembers);
 
       return {
         id: t.id,
@@ -133,8 +195,8 @@ export async function fetchLeaderboardData(client?: any): Promise<LeaderboardEnt
         round2_details: normalized.round2_details,
         round3_details: normalized.round3_details,
         details: normalized.details,
-        updated_at: rawScore?.updated_at || t.updated_at,
-        members: rawMembers,
+        updated_at: scoreObj?.updated_at || t.updated_at,
+        members: Array.isArray(rawMembers) ? rawMembers : [],
       };
     });
 

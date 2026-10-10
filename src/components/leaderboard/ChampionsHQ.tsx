@@ -22,8 +22,25 @@ import {
 } from "lucide-react";
 
 export default function ChampionsHQ() {
-  const [teams, setTeams] = useState<LeaderboardEntry[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [teams, setTeams] = useState<LeaderboardEntry[]>(() => {
+    if (typeof window !== "undefined") {
+      try {
+        const cached = localStorage.getItem("robocity_leaderboard_cache");
+        if (cached) {
+          const parsed = JSON.parse(cached);
+          if (Array.isArray(parsed) && parsed.length > 0) {
+            return parsed;
+          }
+        }
+        const local = getLocalTournamentTeams();
+        if (local && local.length > 0) {
+          return formatLeaderboardEntries(local);
+        }
+      } catch {}
+    }
+    return getInitialLeaderboardEntries();
+  });
+  const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [connectionStatus, setConnectionStatus] = useState<"CONNECTING" | "LIVE" | "OFFLINE">("LIVE");
   const [recentlyUpdatedId, setRecentlyUpdatedId] = useState<string | null>(null);
@@ -51,17 +68,8 @@ export default function ChampionsHQ() {
 
   // Initial Load + Multi-channel Realtime Subscriptions
   useEffect(() => {
-    // 0. Clean up any legacy dummy localStorage keys from user browser
-    if (typeof window !== "undefined") {
-      try {
-        localStorage.removeItem("robocity_tournament_teams_v2");
-        localStorage.removeItem("robocity_tournament_teams");
-        localStorage.removeItem("robocity_leaderboard_cache");
-      } catch {}
-    }
-
-    // 1. Initial Load with visible loader
-    loadLeaderboard(true);
+    // 1. Initial Load in background without blocking current display
+    loadLeaderboard(false);
 
     // 2. Local Realtime DOM Event Listener
     const handleScoresUpdated = (event: any) => {

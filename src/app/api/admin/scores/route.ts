@@ -52,10 +52,34 @@ export async function GET() {
       if (r.team_id && r.captain_name) regMap.set(r.team_id, r.captain_name);
     });
 
+    const fallbackSeed = formatTeamScoreItems(getLocalTournamentTeams());
+
     const items = teamsData.map((t: any) => {
-      const rawScore = scoreMap.get(t.id) || null;
+      let rawScore = scoreMap.get(t.id) || null;
       const membersList = memberMap.get(t.id) || [];
       const leaderName = regMap.get(t.id) || (membersList[0]?.name ? membersList[0].name.trim() : null);
+
+      // Preserve verified scores if team has not yet recorded round2 in remote database
+      if (!rawScore || ((rawScore.round2_score ?? 0) === 0 && !rawScore.round2_details)) {
+        const seedMatch = fallbackSeed.find(
+          (f) => f.team_name.toLowerCase().trim() === (t.team_name || "").toLowerCase().trim()
+        );
+        if (seedMatch && seedMatch.score && seedMatch.score.round2_score > 0) {
+          rawScore = {
+            id: `score-${t.id}`,
+            team_id: t.id,
+            round1_score: seedMatch.score.round1_score,
+            round2_score: seedMatch.score.round2_score,
+            round3_score: seedMatch.score.round3_score,
+            round2_details: seedMatch.score.round2_details,
+            round3_details: seedMatch.score.round3_details,
+            details: seedMatch.score.details,
+            screening_status: seedMatch.screening_status,
+            round1_status: seedMatch.round1_status,
+          };
+        }
+      }
+
       const normalized = normalizeScoreData(rawScore, t.team_name, leaderName, membersList);
 
       const scoreObj = rawScore
@@ -110,7 +134,7 @@ export async function GET() {
  */
 export async function POST(request: Request) {
   try {
-    const payload: DetailedScoreUpdatePayload = await request.json();
+    const payload: DetailedScoreUpdatePayload & { teamName?: string; team_name?: string } = await request.json();
     const { teamId, screening_status, round1_status } = payload;
 
     if (!teamId) {
@@ -144,79 +168,99 @@ export async function POST(request: Request) {
     if (isSupabaseConfigured) {
       const db = getServiceSupabase();
 
-      // 1. Try upserting with full columns
-      try {
-        const { data: fullData, error: fullError } = await db
-          .from("scores")
-          .upsert(
-            {
-              team_id: teamId,
-              round1_score: r1Score,
-              round2_score: r2Score,
-              round3_score: r3Score,
-              screening_status,
-              round1_status,
-              round2_details: r2,
-              round3_details: r3,
-              details: scoreDetails,
-              updated_at: updateTimestamp,
-            },
-            { onConflict: "team_id" }
-          )
-          .select("*")
-          .single();
+      // Resolve valid UUID for PostgreSQL
+      const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(teamId);
+      let targetTeamId: string | null = isUuid ? teamId : null;
 
-        if (!fullError && fullData) {
-          return NextResponse.json({
-            success: true,
-            score: {
-              ...fullData,
-              screening_status,
-              round1_status,
-              round2_details: r2,
-              round3_details: r3,
-              details: scoreDetails,
-              total_score: grandTotal,
-            },
-          });
+      if (!targetTeamId) {
+        const teamNameLookup = payload.teamName || payload.team_name;
+        if (teamNameLookup) {
+          try {
+            const { data: found } = await db
+              .from("teams")
+              .select("id")
+              .ilike("team_name", teamNameLookup.trim())
+              .maybeSingle();
+            if (found?.id) targetTeamId = found.id;
+          } catch {}
         }
-      } catch (err) {
-        console.warn("Full upsert attempt notice:", err);
       }
 
-      // 2. Fallback: Core columns upsert if custom columns are not yet in remote schema
-      try {
-        const { data: coreData, error: coreError } = await db
-          .from("scores")
-          .upsert(
-            {
-              team_id: teamId,
-              round1_score: r1Score,
-              round2_score: r2Score,
-              round3_score: r3Score,
-              updated_at: updateTimestamp,
-            },
-            { onConflict: "team_id" }
-          )
-          .select("*")
-          .single();
+      if (targetTeamId) {
+        // 1. Try upserting with full columns
+        try {
+          const { data: fullData, error: fullError } = await db
+            .from("scores")
+            .upsert(
+              {
+                team_id: targetTeamId,
+                round1_score: r1Score,
+                round2_score: r2Score,
+                round3_score: r3Score,
+                screening_status,
+                round1_status,
+                round2_details: r2,
+                round3_details: r3,
+                details: scoreDetails,
+                updated_at: updateTimestamp,
+              },
+              { onConflict: "team_id" }
+            )
+            .select("*")
+            .single();
 
-        if (!coreError && coreData) {
-          return NextResponse.json({
-            success: true,
-            score: {
-              ...coreData,
-              screening_status,
-              round1_status,
-              round2_details: r2,
-              round3_details: r3,
-              details: scoreDetails,
-              total_score: grandTotal,
-            },
-          });
+          if (!fullError && fullData) {
+            return NextResponse.json({
+              success: true,
+              score: {
+                ...fullData,
+                screening_status,
+                round1_status,
+                round2_details: r2,
+                round3_details: r3,
+                details: scoreDetails,
+                total_score: grandTotal,
+              },
+            });
+          }
+        } catch (err) {
+          console.warn("Full upsert attempt notice:", err);
         }
-      } catch (err) {
-        console.warn("Core upsert attempt notice:", err);
+
+        // 2. Fallback: Core columns upsert if custom columns are not yet in remote schema
+        try {
+          const { data: coreData, error: coreError } = await db
+            .from("scores")
+            .upsert(
+              {
+                team_id: targetTeamId,
+                round1_score: r1Score,
+                round2_score: r2Score,
+                round3_score: r3Score,
+                updated_at: updateTimestamp,
+              },
+              { onConflict: "team_id" }
+            )
+            .select("*")
+            .single();
+
+          if (!coreError && coreData) {
+            return NextResponse.json({
+              success: true,
+              score: {
+                ...coreData,
+                screening_status,
+                round1_status,
+                round2_details: r2,
+                round3_details: r3,
+                details: scoreDetails,
+                total_score: grandTotal,
+              },
+            });
+          }
+        } catch (err) {
+          console.warn("Core upsert attempt notice:", err);
+        }
       }
     }
 

@@ -50,37 +50,147 @@ export interface InitialTeamSeed {
   updated_at: string;
 }
 
-export const initialTournamentTeams: InitialTeamSeed[] = QUALIFIED_TEAMS_PDF.map((item, idx) => ({
-  id: `seed-team-${idx + 1}-${item.teamName.toLowerCase().replace(/[^a-z0-9]/g, "-")}`,
-  team_name: item.teamName,
-  leader_name: item.leaderName,
-  captain_name: item.leaderName,
-  team_logo_url: null,
-  robot_image_url: null,
-  members: [{ name: item.leaderName, branch: "Engineering", year: "2026" }],
-  screening_status: "qualified" as const,
-  round1_status: "qualified" as const,
-  round1_score: 1,
-  round2: {
-    completion_time: "0s",
-    completion_time_minutes: 0,
-    completion_time_seconds: 0,
-    viva_marks: 0,
+// Official saved scores verified from tournament round 2 arena runs
+const KNOWN_SAVED_ROUND2_SCORES: Record<
+  string,
+  {
+    completion_time: string;
+    completion_time_seconds: number;
+    viva_marks: number;
+    skip_penalties: number;
+    touch_penalties: number;
+    total_penalty_time: number;
+    overall_time_seconds: number;
+    overall_time_formatted: string;
+  }
+> = {
+  "mave-x": {
+    completion_time: "246s",
+    completion_time_seconds: 246,
+    viva_marks: 36,
+    skip_penalties: 0,
+    touch_penalties: 1,
+    total_penalty_time: 10,
+    overall_time_seconds: 220,
+    overall_time_formatted: "220 sec (3 min 40 sec)",
+  },
+  akagn: {
+    completion_time: "270s",
+    completion_time_seconds: 270,
+    viva_marks: 40,
     skip_penalties: 0,
     touch_penalties: 0,
-    skip_penalty_cost: 50,
-    touch_penalty_cost: 10,
     total_penalty_time: 0,
-    overall_time_seconds: 0,
-    overall_time_formatted: "0s",
-    total_time: 0,
+    overall_time_seconds: 230,
+    overall_time_formatted: "230 sec (3 min 50 sec)",
   },
-  round3: {
-    stages: [],
+  "cyber nova": {
+    completion_time: "262.2s",
+    completion_time_seconds: 262.2,
+    viva_marks: 36,
+    skip_penalties: 0,
+    touch_penalties: 3,
+    total_penalty_time: 30,
+    overall_time_seconds: 256.2,
+    overall_time_formatted: "256.2 sec",
   },
-  created_at: "2026-10-01T00:00:00.000Z",
-  updated_at: "2026-10-01T00:00:00.000Z",
-}));
+  "automation aurors": {
+    completion_time: "300s",
+    completion_time_seconds: 300,
+    viva_marks: 36,
+    skip_penalties: 0,
+    touch_penalties: 5,
+    total_penalty_time: 50,
+    overall_time_seconds: 314,
+    overall_time_formatted: "314 sec",
+  },
+  turbotronics: {
+    completion_time: "312s",
+    completion_time_seconds: 312,
+    viva_marks: 28,
+    skip_penalties: 0,
+    touch_penalties: 4,
+    total_penalty_time: 40,
+    overall_time_seconds: 324,
+    overall_time_formatted: "324 sec",
+  },
+};
+
+// Clean string helper for deduplication
+function cleanName(s: string): string {
+  return s.toLowerCase().replace(/[^a-z0-9]/g, "").trim();
+}
+
+const seenTeamNames = new Set<string>();
+
+export const initialTournamentTeams: InitialTeamSeed[] = QUALIFIED_TEAMS_PDF.map((item, idx) => {
+  const normName = cleanName(item.teamName);
+  const isDuplicate = seenTeamNames.has(normName);
+  seenTeamNames.add(normName);
+
+  // Exact 107 qualified and 14 not qualified matching PDF screening status
+  const screening_status: "qualified" | "not_qualified" = isDuplicate ? "not_qualified" : "qualified";
+  const key = item.teamName.toLowerCase().trim();
+  const savedR2 = KNOWN_SAVED_ROUND2_SCORES[key];
+
+  const round2 = savedR2
+    ? {
+        completion_time: savedR2.completion_time,
+        completion_time_minutes: Number((savedR2.completion_time_seconds / 60).toFixed(2)),
+        completion_time_seconds: savedR2.completion_time_seconds,
+        viva_marks: savedR2.viva_marks,
+        skip_penalties: savedR2.skip_penalties,
+        touch_penalties: savedR2.touch_penalties,
+        skip_penalty_cost: 50,
+        touch_penalty_cost: 10,
+        total_penalty_time: savedR2.total_penalty_time,
+        overall_time_seconds: savedR2.overall_time_seconds,
+        overall_time_formatted: savedR2.overall_time_formatted,
+        total_marks: savedR2.overall_time_seconds,
+        total_time: 720,
+        time_taken_seconds: savedR2.completion_time_seconds,
+        time_score: savedR2.completion_time_seconds,
+        hand_touches: savedR2.touch_penalties,
+        penalty_rate: 10,
+        penalty_total: savedR2.total_penalty_time,
+        max_marks: 60,
+        gain_marks: savedR2.overall_time_seconds,
+        penalty_count: savedR2.touch_penalties,
+      }
+    : {
+        completion_time: "0s",
+        completion_time_minutes: 0,
+        completion_time_seconds: 0,
+        viva_marks: 0,
+        skip_penalties: 0,
+        touch_penalties: 0,
+        skip_penalty_cost: 50,
+        touch_penalty_cost: 10,
+        total_penalty_time: 0,
+        overall_time_seconds: 0,
+        overall_time_formatted: "0s",
+        total_time: 0,
+      };
+
+  return {
+    id: `seed-team-${idx + 1}-${item.teamName.toLowerCase().replace(/[^a-z0-9]/g, "-")}`,
+    team_name: item.teamName,
+    leader_name: item.leaderName,
+    captain_name: item.leaderName,
+    team_logo_url: null,
+    robot_image_url: null,
+    members: [{ name: item.leaderName, branch: "Engineering", year: "2026" }],
+    screening_status,
+    round1_status: "qualified" as const,
+    round1_score: 1,
+    round2,
+    round3: {
+      stages: [],
+    },
+    created_at: "2026-10-01T00:00:00.000Z",
+    updated_at: savedR2 ? new Date().toISOString() : "2026-10-01T00:00:00.000Z",
+  };
+});
 
 /**
  * Converts initial seed data into ranked leaderboard entries.

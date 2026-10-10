@@ -14,6 +14,8 @@ const CACHE_TTL_MS = 5000; // 5-second in-memory server cache
  * Fetches all official tournament teams with their scores and returns live ranked leaderboard.
  */
 export async function GET() {
+  const fallbackList = getInitialLeaderboardEntries();
+
   try {
     // 1. Serve from in-memory cache if fresh
     if (cachedLeaderboardData && Date.now() - cachedLeaderboardData.timestamp < CACHE_TTL_MS) {
@@ -26,64 +28,109 @@ export async function GET() {
     }
 
     if (!isSupabaseConfigured) {
-      const fallback = getInitialLeaderboardEntries();
-      return NextResponse.json({ success: true, count: fallback.length, data: fallback });
+      return NextResponse.json({ success: true, count: fallbackList.length, data: fallbackList });
     }
 
     const db = getServiceSupabase();
 
-    // Fetch teams, scores, members, and captain registrations in a single parallel query
-    const [teamsRes, scoresRes, membersRes, regsRes] = await Promise.all([
-      db.from("teams").select("id, team_name, team_logo_url, robot_image_url, created_at, updated_at").order("created_at", { ascending: false }),
-      db.from("scores").select("*"),
-      db.from("team_members").select("id, team_id, name, branch, year"),
-      db.from("registrations").select("team_id, captain_name"),
-    ]);
+    const fetchDb = async () => {
+      // Attempt 1: Direct Supabase join query with wildcards
+      try {
+        const { data, error } = await db
+          .from("teams")
+          .select(`
+            id,
+            team_name,
+            team_logo_url,
+            robot_image_url,
+            created_at,
+            updated_at,
+            scores (*),
+            team_members (*)
+          `);
 
-    let teamsData = teamsRes.data || [];
-    if (teamsData.length === 0) {
-      // Resilient fallback query if specific columns or ordering had a PostgREST issue
-      const retryTeams = await db.from("teams").select("*");
-      if (retryTeams.data && retryTeams.data.length > 0) {
-        teamsData = retryTeams.data;
+        if (!error && data && data.length > 0) {
+          return data;
+        }
+      } catch (e) {
+        console.warn("Direct join query notice:", e);
       }
-    }
 
-    if (teamsData.length === 0) {
-      const fallback = getInitialLeaderboardEntries();
-      return NextResponse.json({ success: true, count: fallback.length, data: fallback });
-    }
+      // Attempt 2: Parallel queries
+      try {
+        const [teamsRes, scoresRes, membersRes] = await Promise.all([
+          db.from("teams").select("id, team_name, team_logo_url, robot_image_url, created_at, updated_at"),
+          db.from("scores").select("*"),
+          db.from("team_members").select("id, team_id, name, branch, year"),
+        ]);
 
-    let scoresData = scoresRes.data || [];
-    if (scoresData.length === 0 && scoresRes.error) {
-      const retryScores = await db.from("scores").select("*");
-      if (retryScores.data) scoresData = retryScores.data;
-    }
+        const teamsData = teamsRes.data || [];
+        if (teamsData.length === 0) return [];
 
-    const scoreMap = new Map<string, any>();
-    scoresData.forEach((s: any) => {
-      if (s.team_id) scoreMap.set(s.team_id, s);
-    });
+        const scoreMap = new Map<string, any>();
+        (scoresRes.data || []).forEach((s: any) => {
+          if (s.team_id) scoreMap.set(s.team_id, s);
+        });
 
-    const memberMap = new Map<string, any[]>();
-    (membersRes.data || []).forEach((m: any) => {
-      if (m.team_id) {
-        const list = memberMap.get(m.team_id) || [];
-        list.push(m);
-        memberMap.set(m.team_id, list);
+        const memberMap = new Map<string, any[]>();
+        (membersRes.data || []).forEach((m: any) => {
+          if (m.team_id) {
+            const list = memberMap.get(m.team_id) || [];
+            list.push(m);
+            memberMap.set(m.team_id, list);
+          }
+        });
+
+        return teamsData.map((t: any) => ({
+          id: t.id,
+          team_name: t.team_name,
+          team_logo_url: t.team_logo_url,
+          robot_image_url: t.robot_image_url,
+          created_at: t.created_at,
+          updated_at: t.updated_at,
+          scores: scoreMap.get(t.id) || null,
+          team_members: memberMap.get(t.id) || [],
+        }));
+      } catch (e) {
+        console.warn("Parallel query notice:", e);
+        return [];
       }
-    });
+    };
 
-    const regMap = new Map<string, string>();
-    (regsRes.data || []).forEach((r: any) => {
-      if (r.team_id && r.captain_name) regMap.set(r.team_id, r.captain_name);
-    });
+    // Strict 5000ms timeout race so request never hangs or 504s
+    const timeoutPromise = new Promise<any[]>((resolve) => setTimeout(() => resolve([]), 5000));
+    const rawTeamsList: any[] = await Promise.race([fetchDb(), timeoutPromise]);
 
-    const list: Omit<LeaderboardEntry, "rank">[] = teamsData.map((t: any) => {
-      const rawScore = scoreMap.get(t.id) || null;
-      const rawMembers = memberMap.get(t.id) || [];
-      const leaderName = regMap.get(t.id) || (rawMembers[0]?.name ? rawMembers[0].name.trim() : null);
-      const normalized = normalizeScoreData(rawScore, t.team_name, leaderName, rawMembers);
+    if (!rawTeamsList || rawTeamsList.length === 0) {
+      return NextResponse.json({ success: true, count: fallbackList.length, data: fallbackList });
+    }
+
+    const list: Omit<LeaderboardEntry, "rank">[] = rawTeamsList.map((t: any) => {
+      const rawScores = t.scores || t.score;
+      let scoreObj = Array.isArray(rawScores) ? rawScores[0] : rawScores;
+      const rawMembers = t.team_members || t.members || [];
+      const leaderName = Array.isArray(rawMembers) && rawMembers[0]?.name ? rawMembers[0].name.trim() : null;
+
+      // Retain verified scores if database has not recorded round2 yet for this team
+      if (!scoreObj || ((scoreObj.round2_score ?? 0) === 0 && !scoreObj.round2_details)) {
+        const seedMatch = fallbackList.find(
+          (f) => f.team_name.toLowerCase().trim() === (t.team_name || "").toLowerCase().trim()
+        );
+        if (seedMatch && seedMatch.round2_score > 0) {
+          scoreObj = {
+            screening_status: seedMatch.screening_status,
+            round1_status: seedMatch.round1_status,
+            round1_score: seedMatch.round1_score,
+            round2_score: seedMatch.round2_score,
+            round3_score: seedMatch.round3_score,
+            round2_details: seedMatch.round2_details,
+            round3_details: seedMatch.round3_details,
+            details: seedMatch.details,
+          };
+        }
+      }
+
+      const normalized = normalizeScoreData(scoreObj, t.team_name, leaderName, rawMembers);
 
       return {
         id: t.id,
@@ -101,8 +148,8 @@ export async function GET() {
         round2_details: normalized.round2_details,
         round3_details: normalized.round3_details,
         details: normalized.details,
-        updated_at: rawScore?.updated_at || t.updated_at,
-        members: rawMembers,
+        updated_at: scoreObj?.updated_at || t.updated_at,
+        members: Array.isArray(rawMembers) ? rawMembers : [],
       };
     });
 
@@ -161,7 +208,6 @@ export async function GET() {
     return NextResponse.json({ success: true, count: results.length, data: results });
   } catch (err: any) {
     console.error("GET /api/leaderboard error:", err);
-    const fallback = getInitialLeaderboardEntries();
-    return NextResponse.json({ success: true, count: fallback.length, data: fallback });
+    return NextResponse.json({ success: true, count: fallbackList.length, data: fallbackList });
   }
 }
