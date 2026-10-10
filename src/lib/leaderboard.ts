@@ -24,7 +24,7 @@ export async function fetchLeaderboardData(client?: any): Promise<LeaderboardEnt
   if (typeof window !== "undefined" && !client && isSupabaseConfigured) {
     try {
       const controller = new AbortController();
-      const timer = setTimeout(() => controller.abort(), 4000);
+      const timer = setTimeout(() => controller.abort(), 3500);
       const res = await fetch(`/api/leaderboard?_t=${Date.now()}`, {
         cache: "no-store",
         signal: controller.signal,
@@ -37,33 +37,36 @@ export async function fetchLeaderboardData(client?: any): Promise<LeaderboardEnt
         }
       }
     } catch {
-      // Fall through to local/supabase direct query
+      // API call failed or timed out. In browser, NEVER hang on direct Supabase query!
     }
+
+    // Direct browser fallback: return local tournament data immediately with zero delay
+    return formatLeaderboardEntries(getLocalTournamentTeams());
   }
 
   const db = client || (typeof window === "undefined" ? getServiceSupabase() : supabase);
 
   try {
-    // 1. First attempt: Direct join query with wildcard scores(*)
-    const { data, error } = await db
-      .from("teams")
-      .select(`
-        id,
-        team_name,
-        team_logo_url,
-        robot_image_url,
-        scores (*),
-        team_members (*),
-        registrations (
-          captain_name
-        )
-      `);
+    const fetchDb = async () => {
+      // 1. First attempt: Direct join query with wildcard scores(*)
+      const { data, error } = await db
+        .from("teams")
+        .select(`
+          id,
+          team_name,
+          team_logo_url,
+          robot_image_url,
+          scores (*),
+          team_members (*),
+          registrations (
+            captain_name
+          )
+        `);
 
-    let rawTeamsList: any[] = [];
+      if (!error && data && data.length > 0) {
+        return data;
+      }
 
-    if (!error && data && data.length > 0) {
-      rawTeamsList = data;
-    } else {
       // 2. Fallback: Parallel queries to avoid any join or foreign-key mismatch
       const [teamsRes, scoresRes, membersRes, regsRes] = await Promise.all([
         db.from("teams").select("id, team_name, team_logo_url, robot_image_url"),
@@ -74,10 +77,7 @@ export async function fetchLeaderboardData(client?: any): Promise<LeaderboardEnt
 
       const teamsData = teamsRes.data || [];
       if (teamsData.length === 0) {
-        if (typeof window !== "undefined") {
-          return formatLeaderboardEntries(getLocalTournamentTeams());
-        }
-        return getInitialLeaderboardEntries();
+        return [];
       }
 
       const scoreMap = new Map<string, any>();
@@ -99,7 +99,7 @@ export async function fetchLeaderboardData(client?: any): Promise<LeaderboardEnt
         if (r.team_id && r.captain_name) regMap.set(r.team_id, r.captain_name);
       });
 
-      rawTeamsList = teamsData.map((t: any) => ({
+      return teamsData.map((t: any) => ({
         id: t.id,
         team_name: t.team_name,
         team_logo_url: t.team_logo_url,
@@ -108,6 +108,17 @@ export async function fetchLeaderboardData(client?: any): Promise<LeaderboardEnt
         team_members: memberMap.get(t.id) || [],
         registrations: regMap.has(t.id) ? [{ captain_name: regMap.get(t.id) }] : [],
       }));
+    };
+
+    // Strict 3000ms timeout for database query so it never blocks the request
+    const timeoutPromise = new Promise<any[]>((resolve) => setTimeout(() => resolve([]), 3000));
+    const rawTeamsList: any[] = await Promise.race([fetchDb(), timeoutPromise]);
+
+    if (!rawTeamsList || rawTeamsList.length === 0) {
+      if (typeof window !== "undefined") {
+        return formatLeaderboardEntries(getLocalTournamentTeams());
+      }
+      return getInitialLeaderboardEntries();
     }
 
     // Flatten score objects, members and leader name with normalization
