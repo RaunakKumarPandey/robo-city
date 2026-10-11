@@ -13,12 +13,21 @@ const CACHE_TTL_MS = 5000; // 5-second in-memory server cache
  * GET /api/leaderboard
  * Fetches all official tournament teams with their scores and returns live ranked leaderboard.
  */
-export async function GET() {
+export async function GET(request: Request) {
   const fallbackList = getInitialLeaderboardEntries();
+  const url = new URL(request.url);
+  const isDebug = url.searchParams.get("debug") === "true";
+
+  let debugInfo: any = {
+    isSupabaseConfigured,
+    supabaseUrlConfigured: Boolean(process.env.NEXT_PUBLIC_SUPABASE_URL),
+    anonKeyConfigured: Boolean(process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY),
+    serviceKeyConfigured: Boolean(process.env.SUPABASE_SERVICE_ROLE_KEY),
+  };
 
   try {
-    // 1. Serve from in-memory cache if fresh
-    if (cachedLeaderboardData && Date.now() - cachedLeaderboardData.timestamp < CACHE_TTL_MS) {
+    // 1. Serve from in-memory cache if fresh (unless debug query)
+    if (!isDebug && cachedLeaderboardData && Date.now() - cachedLeaderboardData.timestamp < CACHE_TTL_MS) {
       return NextResponse.json({
         success: true,
         count: cachedLeaderboardData.data.length,
@@ -28,6 +37,8 @@ export async function GET() {
     }
 
     if (!isSupabaseConfigured) {
+      debugInfo.reason = "!isSupabaseConfigured";
+      if (isDebug) return NextResponse.json({ success: true, count: fallbackList.length, debug: debugInfo, data: fallbackList });
       return NextResponse.json({ success: true, count: fallbackList.length, data: fallbackList });
     }
 
@@ -39,30 +50,35 @@ export async function GET() {
         const { data, error } = await db
           .from("teams")
           .select(`
-            id,
-            team_name,
-            team_logo_url,
-            robot_image_url,
-            created_at,
-            updated_at,
+            *,
             scores (*),
             team_members (*)
           `);
 
-        if (!error && data && data.length > 0) {
+        if (error) {
+          debugInfo.attempt1Error = error.message || error;
+        } else if (data && data.length > 0) {
+          debugInfo.attempt1Count = data.length;
           return data;
         }
-      } catch (e) {
-        console.warn("Direct join query notice:", e);
+      } catch (e: any) {
+        debugInfo.attempt1Exception = e?.message;
       }
 
-      // Attempt 2: Parallel queries
+      // Attempt 2: Resilient parallel queries with wildcard select(*)
       try {
         const [teamsRes, scoresRes, membersRes] = await Promise.all([
-          db.from("teams").select("id, team_name, team_logo_url, robot_image_url, created_at, updated_at"),
+          db.from("teams").select("*"),
           db.from("scores").select("*"),
-          db.from("team_members").select("id, team_id, name, branch, year"),
+          db.from("team_members").select("*"),
         ]);
+
+        debugInfo.attempt2TeamsCount = teamsRes.data?.length ?? 0;
+        debugInfo.attempt2TeamsError = teamsRes.error?.message;
+        debugInfo.attempt2ScoresCount = scoresRes.data?.length ?? 0;
+        debugInfo.attempt2ScoresError = scoresRes.error?.message;
+        debugInfo.attempt2MembersCount = membersRes.data?.length ?? 0;
+        debugInfo.attempt2MembersError = membersRes.error?.message;
 
         const teamsData = teamsRes.data || [];
         if (teamsData.length === 0) return [];
@@ -82,26 +98,26 @@ export async function GET() {
         });
 
         return teamsData.map((t: any) => ({
-          id: t.id,
-          team_name: t.team_name,
-          team_logo_url: t.team_logo_url,
-          robot_image_url: t.robot_image_url,
-          created_at: t.created_at,
-          updated_at: t.updated_at,
+          ...t,
           scores: scoreMap.get(t.id) || null,
           team_members: memberMap.get(t.id) || [],
         }));
-      } catch (e) {
-        console.warn("Parallel query notice:", e);
+      } catch (e: any) {
+        debugInfo.attempt2Exception = e?.message;
         return [];
       }
     };
 
-    // Strict 5000ms timeout race so request never hangs or 504s
-    const timeoutPromise = new Promise<any[]>((resolve) => setTimeout(() => resolve([]), 5000));
+    // 12000ms timeout race so request has ample time to connect without premature abort
+    const startTime = Date.now();
+    const timeoutPromise = new Promise<any[]>((resolve) => setTimeout(() => resolve([]), 12000));
     const rawTeamsList: any[] = await Promise.race([fetchDb(), timeoutPromise]);
+    debugInfo.fetchElapsedMs = Date.now() - startTime;
+    debugInfo.rawTeamsListCount = rawTeamsList?.length ?? 0;
 
     if (!rawTeamsList || rawTeamsList.length === 0) {
+      debugInfo.fellBackToSeed = true;
+      if (isDebug) return NextResponse.json({ success: true, count: fallbackList.length, debug: debugInfo, data: fallbackList });
       return NextResponse.json({ success: true, count: fallbackList.length, data: fallbackList });
     }
 
