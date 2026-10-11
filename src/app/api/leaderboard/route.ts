@@ -45,30 +45,32 @@ export async function GET(request: Request) {
     const db = getServiceSupabase();
 
     const fetchDb = async () => {
-      // Direct, fast parallel table queries (never deadlocks or hangs like nested resource embedding)
       try {
-        const [teamsRes, scoresRes, membersRes, regsRes] = await Promise.all([
-          db.from("teams").select("*"),
-          db.from("scores").select("*"),
-          db.from("team_members").select("*"),
-          db.from("registrations").select("team_id, captain_name"),
-        ]);
-
+        const t0 = Date.now();
+        const teamsRes = await db.from("teams").select("*");
+        debugInfo.teamsTimeMs = Date.now() - t0;
         debugInfo.teamsCount = teamsRes.data?.length ?? 0;
         debugInfo.teamsError = teamsRes.error?.message;
-        debugInfo.scoresCount = scoresRes.data?.length ?? 0;
-        debugInfo.scoresError = scoresRes.error?.message;
-        debugInfo.membersCount = membersRes.data?.length ?? 0;
-        debugInfo.membersError = membersRes.error?.message;
-        debugInfo.regsCount = regsRes.data?.length ?? 0;
 
         const teamsData = teamsRes.data || [];
         if (teamsData.length === 0) return [];
+
+        const t1 = Date.now();
+        const scoresRes = await db.from("scores").select("*");
+        debugInfo.scoresTimeMs = Date.now() - t1;
+        debugInfo.scoresCount = scoresRes.data?.length ?? 0;
+        debugInfo.scoresError = scoresRes.error?.message;
 
         const scoreMap = new Map<string, any>();
         (scoresRes.data || []).forEach((s: any) => {
           if (s.team_id) scoreMap.set(s.team_id, s);
         });
+
+        const t2 = Date.now();
+        const membersRes = await db.from("team_members").select("team_id, name");
+        debugInfo.membersTimeMs = Date.now() - t2;
+        debugInfo.membersCount = membersRes.data?.length ?? 0;
+        debugInfo.membersError = membersRes.error?.message;
 
         const memberMap = new Map<string, any[]>();
         (membersRes.data || []).forEach((m: any) => {
@@ -79,19 +81,13 @@ export async function GET(request: Request) {
           }
         });
 
-        const regMap = new Map<string, string>();
-        (regsRes.data || []).forEach((r: any) => {
-          if (r.team_id && r.captain_name) regMap.set(r.team_id, r.captain_name);
-        });
-
         return teamsData.map((t: any) => ({
           ...t,
-          leader_name: regMap.get(t.id) || null,
           scores: scoreMap.get(t.id) || null,
           team_members: memberMap.get(t.id) || [],
         }));
       } catch (e: any) {
-        debugInfo.parallelException = e?.message;
+        debugInfo.queryException = e?.message;
         return [];
       }
     };
