@@ -50,7 +50,7 @@ export async function GET(request: Request) {
     debugInfo.anonKeyPrefix = anonKey ? anonKey.slice(0, 12) + "..." : "missing";
     debugInfo.serviceKeyPrefix = serviceKey ? serviceKey.slice(0, 12) + "..." : "missing";
 
-    const fetchRest = async (endpoint: string, key: string, timeoutMs = 3500) => {
+    const fetchRest = async (endpoint: string, key: string, timeoutMs = 12000) => {
       const controller = new AbortController();
       const timer = setTimeout(() => controller.abort(), timeoutMs);
       try {
@@ -80,34 +80,36 @@ export async function GET(request: Request) {
     const fetchDb = async () => {
       try {
         const t0 = Date.now();
-        // 1. Try Direct REST with serviceKey first, then anonKey
-        let teamsData = await fetchRest("teams?select=*", serviceKey);
-        if (!Array.isArray(teamsData) || teamsData.length === 0) {
-          teamsData = await fetchRest("teams?select=*", anonKey);
+        const primaryKey = serviceKey || anonKey;
+
+        // 1. Fire parallel REST queries with primary key
+        let [teamsData, scoresData, membersData] = await Promise.all([
+          fetchRest("teams?select=*", primaryKey),
+          fetchRest("scores?select=*", primaryKey),
+          fetchRest("team_members?select=team_id,name", primaryKey),
+        ]);
+
+        // If primaryKey returned unauthorized or null, fallback to anonKey
+        if (!Array.isArray(teamsData) && anonKey && anonKey !== primaryKey) {
+          debugInfo.triedAnonFallback = true;
+          [teamsData, scoresData, membersData] = await Promise.all([
+            fetchRest("teams?select=*", anonKey),
+            fetchRest("scores?select=*", anonKey),
+            fetchRest("team_members?select=team_id,name", anonKey),
+          ]);
         }
 
-        // If direct REST succeeded
         if (Array.isArray(teamsData) && teamsData.length > 0) {
-          debugInfo.fetchMethod = "direct-rest";
-          debugInfo.teamsTimeMs = Date.now() - t0;
+          debugInfo.fetchMethod = "parallel-direct-rest";
+          debugInfo.fetchTotalMs = Date.now() - t0;
           debugInfo.teamsCount = teamsData.length;
-
-          const t1 = Date.now();
-          let scoresData = await fetchRest("scores?select=*", serviceKey);
-          if (!Array.isArray(scoresData)) scoresData = await fetchRest("scores?select=*", anonKey);
-          debugInfo.scoresTimeMs = Date.now() - t1;
           debugInfo.scoresCount = Array.isArray(scoresData) ? scoresData.length : 0;
+          debugInfo.membersCount = Array.isArray(membersData) ? membersData.length : 0;
 
           const scoreMap = new Map<string, any>();
           (scoresData || []).forEach((s: any) => {
             if (s.team_id) scoreMap.set(s.team_id, s);
           });
-
-          const t2 = Date.now();
-          let membersData = await fetchRest("team_members?select=team_id,name", serviceKey);
-          if (!Array.isArray(membersData)) membersData = await fetchRest("team_members?select=team_id,name", anonKey);
-          debugInfo.membersTimeMs = Date.now() - t2;
-          debugInfo.membersCount = Array.isArray(membersData) ? membersData.length : 0;
 
           const memberMap = new Map<string, any[]>();
           (membersData || []).forEach((m: any) => {
@@ -158,9 +160,9 @@ export async function GET(request: Request) {
       }
     };
 
-    // 8000ms timeout race
+    // 15000ms timeout race
     const startTime = Date.now();
-    const timeoutPromise = new Promise<any[]>((resolve) => setTimeout(() => resolve([]), 8000));
+    const timeoutPromise = new Promise<any[]>((resolve) => setTimeout(() => resolve([]), 15000));
     const rawTeamsList: any[] = await Promise.race([fetchDb(), timeoutPromise]);
     debugInfo.fetchElapsedMs = Date.now() - startTime;
     debugInfo.rawTeamsListCount = rawTeamsList?.length ?? 0;
