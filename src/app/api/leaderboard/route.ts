@@ -46,6 +46,10 @@ export async function GET(request: Request) {
     const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || "";
     const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY || anonKey;
 
+    debugInfo.supabaseUrlHost = supabaseUrl ? new URL(supabaseUrl).host : "missing";
+    debugInfo.anonKeyPrefix = anonKey ? anonKey.slice(0, 12) + "..." : "missing";
+    debugInfo.serviceKeyPrefix = serviceKey ? serviceKey.slice(0, 12) + "..." : "missing";
+
     const fetchRest = async (endpoint: string, key: string, timeoutMs = 3500) => {
       const controller = new AbortController();
       const timer = setTimeout(() => controller.abort(), timeoutMs);
@@ -60,9 +64,14 @@ export async function GET(request: Request) {
           signal: controller.signal,
         });
         clearTimeout(timer);
-        if (!res.ok) return null;
+        if (!res.ok) {
+          debugInfo.restStatus = res.status;
+          debugInfo.restError = await res.text();
+          return null;
+        }
         return await res.json();
-      } catch {
+      } catch (err: any) {
+        debugInfo.restCatch = err?.message;
         clearTimeout(timer);
         return null;
       }
