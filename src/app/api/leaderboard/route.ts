@@ -42,36 +42,93 @@ export async function GET(request: Request) {
       return NextResponse.json({ success: true, count: fallbackList.length, data: fallbackList });
     }
 
-    const db = getServiceSupabase();
+    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || "";
+    const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || "";
+    const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY || anonKey;
+
+    const fetchRest = async (endpoint: string, key: string, timeoutMs = 3500) => {
+      const controller = new AbortController();
+      const timer = setTimeout(() => controller.abort(), timeoutMs);
+      try {
+        const res = await fetch(`${supabaseUrl}/rest/v1/${endpoint}`, {
+          headers: {
+            apikey: key,
+            Authorization: `Bearer ${key}`,
+            "Content-Type": "application/json",
+          },
+          cache: "no-store",
+          signal: controller.signal,
+        });
+        clearTimeout(timer);
+        if (!res.ok) return null;
+        return await res.json();
+      } catch {
+        clearTimeout(timer);
+        return null;
+      }
+    };
 
     const fetchDb = async () => {
       try {
         const t0 = Date.now();
+        // 1. Try Direct REST with serviceKey first, then anonKey
+        let teamsData = await fetchRest("teams?select=*", serviceKey);
+        if (!Array.isArray(teamsData) || teamsData.length === 0) {
+          teamsData = await fetchRest("teams?select=*", anonKey);
+        }
+
+        // If direct REST succeeded
+        if (Array.isArray(teamsData) && teamsData.length > 0) {
+          debugInfo.fetchMethod = "direct-rest";
+          debugInfo.teamsTimeMs = Date.now() - t0;
+          debugInfo.teamsCount = teamsData.length;
+
+          const t1 = Date.now();
+          let scoresData = await fetchRest("scores?select=*", serviceKey);
+          if (!Array.isArray(scoresData)) scoresData = await fetchRest("scores?select=*", anonKey);
+          debugInfo.scoresTimeMs = Date.now() - t1;
+          debugInfo.scoresCount = Array.isArray(scoresData) ? scoresData.length : 0;
+
+          const scoreMap = new Map<string, any>();
+          (scoresData || []).forEach((s: any) => {
+            if (s.team_id) scoreMap.set(s.team_id, s);
+          });
+
+          const t2 = Date.now();
+          let membersData = await fetchRest("team_members?select=team_id,name", serviceKey);
+          if (!Array.isArray(membersData)) membersData = await fetchRest("team_members?select=team_id,name", anonKey);
+          debugInfo.membersTimeMs = Date.now() - t2;
+          debugInfo.membersCount = Array.isArray(membersData) ? membersData.length : 0;
+
+          const memberMap = new Map<string, any[]>();
+          (membersData || []).forEach((m: any) => {
+            if (m.team_id) {
+              const list = memberMap.get(m.team_id) || [];
+              list.push(m);
+              memberMap.set(m.team_id, list);
+            }
+          });
+
+          return teamsData.map((t: any) => ({
+            ...t,
+            scores: scoreMap.get(t.id) || null,
+            team_members: memberMap.get(t.id) || [],
+          }));
+        }
+
+        // 2. Client fallback via @supabase/supabase-js
+        const db = getServiceSupabase();
         const teamsRes = await db.from("teams").select("*");
-        debugInfo.teamsTimeMs = Date.now() - t0;
-        debugInfo.teamsCount = teamsRes.data?.length ?? 0;
-        debugInfo.teamsError = teamsRes.error?.message;
+        const clientTeams = teamsRes.data || [];
+        if (clientTeams.length === 0) return [];
 
-        const teamsData = teamsRes.data || [];
-        if (teamsData.length === 0) return [];
-
-        const t1 = Date.now();
         const scoresRes = await db.from("scores").select("*");
-        debugInfo.scoresTimeMs = Date.now() - t1;
-        debugInfo.scoresCount = scoresRes.data?.length ?? 0;
-        debugInfo.scoresError = scoresRes.error?.message;
-
         const scoreMap = new Map<string, any>();
         (scoresRes.data || []).forEach((s: any) => {
           if (s.team_id) scoreMap.set(s.team_id, s);
         });
 
-        const t2 = Date.now();
         const membersRes = await db.from("team_members").select("team_id, name");
-        debugInfo.membersTimeMs = Date.now() - t2;
-        debugInfo.membersCount = membersRes.data?.length ?? 0;
-        debugInfo.membersError = membersRes.error?.message;
-
         const memberMap = new Map<string, any[]>();
         (membersRes.data || []).forEach((m: any) => {
           if (m.team_id) {
@@ -81,7 +138,7 @@ export async function GET(request: Request) {
           }
         });
 
-        return teamsData.map((t: any) => ({
+        return clientTeams.map((t: any) => ({
           ...t,
           scores: scoreMap.get(t.id) || null,
           team_members: memberMap.get(t.id) || [],
@@ -92,9 +149,9 @@ export async function GET(request: Request) {
       }
     };
 
-    // 12000ms timeout race so request has ample time to connect without premature abort
+    // 8000ms timeout race
     const startTime = Date.now();
-    const timeoutPromise = new Promise<any[]>((resolve) => setTimeout(() => resolve([]), 12000));
+    const timeoutPromise = new Promise<any[]>((resolve) => setTimeout(() => resolve([]), 8000));
     const rawTeamsList: any[] = await Promise.race([fetchDb(), timeoutPromise]);
     debugInfo.fetchElapsedMs = Date.now() - startTime;
     debugInfo.rawTeamsListCount = rawTeamsList?.length ?? 0;

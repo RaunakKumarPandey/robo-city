@@ -9,8 +9,8 @@ import VisitorCounter from "@/components/VisitorCounter";
 export default function Footer() {
   const pathname = usePathname();
 
-  // Do not render public footer on admin pages
-  if (pathname.startsWith("/admin") && pathname !== "/admin/login") {
+  // Do not render public footer on admin pages or locked audit pages
+  if ((pathname.startsWith("/admin") && pathname !== "/admin/login") || pathname === "/" || pathname === "/leaderboard") {
     return null;
   }
 
