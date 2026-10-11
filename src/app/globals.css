@@ -159,3 +159,51 @@ input[type="number"] {
   appearance: textfield;
 }
 
+/* ==============================================================================
+   PRINT & PDF EXPORT OPTIMIZATIONS
+   ============================================================================== */
+@media print {
+  @page {
+    size: A4 landscape;
+    margin: 8mm 6mm;
+  }
+
+  /* Hide interactive, animated, and ambient UI elements */
+  nav,
+  footer,
+  .hud-cursor,
+  #dynamic-bg,
+  canvas,
+  button,
+  .print-hidden,
+  .no-print {
+    display: none !important;
+  }
+
+  /* Force white background and black text on all printed elements */
+  html,
+  body {
+    background: #ffffff !important;
+    color: #09090b !important;
+    font-size: 10pt !important;
+    overflow: visible !important;
+  }
+
+  /* Ensure tables don't get cut across page splits */
+  tr,
+  .page-break-inside-avoid {
+    page-break-inside: avoid !important;
+    break-inside: avoid !important;
+  }
+
+  table {
+    border-collapse: collapse !important;
+    width: 100% !important;
+  }
+
+  th,
+  td {
+    color: #09090b !important;
+  }
+}
+

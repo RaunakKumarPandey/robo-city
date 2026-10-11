@@ -7,6 +7,7 @@ import { LeaderboardEntry } from "@/types/database";
 import { compareRound2ArenaTeams } from "@/lib/scoringUtils";
 import { getLocalTournamentTeams, formatLeaderboardEntries } from "@/lib/teamsStorage";
 import { getInitialLeaderboardEntries } from "@/data/initialLeaderboardData";
+import Link from "next/link";
 import Podium from "./Podium";
 import LeaderboardTable from "./LeaderboardTable";
 import {
@@ -19,6 +20,7 @@ import {
   Flame,
   Timer,
   Layers,
+  Printer,
 } from "lucide-react";
 
 export default function ChampionsHQ() {
@@ -282,6 +284,17 @@ export default function ChampionsHQ() {
               <RefreshCw className={`h-3 w-3 ${loading ? "animate-spin text-[#35D9FF]" : ""}`} />
               <span>REFRESH SCORES</span>
             </button>
+
+            {/* Print / Export PDF Button */}
+            <Link
+              href="/leaderboard/print"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center gap-1.5 rounded-full border border-[#35D9FF]/40 bg-[#35D9FF]/10 px-3.5 py-1.5 font-mono text-xs font-bold text-[#35D9FF] hover:border-[#35D9FF] hover:bg-[#35D9FF]/20 hover:text-white transition-all shadow-[0_0_15px_rgba(53,217,255,0.2)] cursor-pointer"
+            >
+              <Printer className="h-3.5 w-3.5" />
+              <span>PRINT / PDF REPORT</span>
+            </Link>
           </div>
 
           {/* View Mode Switcher Tabs */}
