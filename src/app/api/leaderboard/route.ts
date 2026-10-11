@@ -45,40 +45,22 @@ export async function GET(request: Request) {
     const db = getServiceSupabase();
 
     const fetchDb = async () => {
-      // Attempt 1: Direct Supabase join query with wildcards
+      // Direct, fast parallel table queries (never deadlocks or hangs like nested resource embedding)
       try {
-        const { data, error } = await db
-          .from("teams")
-          .select(`
-            *,
-            scores (*),
-            team_members (*)
-          `);
-
-        if (error) {
-          debugInfo.attempt1Error = error.message || error;
-        } else if (data && data.length > 0) {
-          debugInfo.attempt1Count = data.length;
-          return data;
-        }
-      } catch (e: any) {
-        debugInfo.attempt1Exception = e?.message;
-      }
-
-      // Attempt 2: Resilient parallel queries with wildcard select(*)
-      try {
-        const [teamsRes, scoresRes, membersRes] = await Promise.all([
+        const [teamsRes, scoresRes, membersRes, regsRes] = await Promise.all([
           db.from("teams").select("*"),
           db.from("scores").select("*"),
           db.from("team_members").select("*"),
+          db.from("registrations").select("team_id, captain_name"),
         ]);
 
-        debugInfo.attempt2TeamsCount = teamsRes.data?.length ?? 0;
-        debugInfo.attempt2TeamsError = teamsRes.error?.message;
-        debugInfo.attempt2ScoresCount = scoresRes.data?.length ?? 0;
-        debugInfo.attempt2ScoresError = scoresRes.error?.message;
-        debugInfo.attempt2MembersCount = membersRes.data?.length ?? 0;
-        debugInfo.attempt2MembersError = membersRes.error?.message;
+        debugInfo.teamsCount = teamsRes.data?.length ?? 0;
+        debugInfo.teamsError = teamsRes.error?.message;
+        debugInfo.scoresCount = scoresRes.data?.length ?? 0;
+        debugInfo.scoresError = scoresRes.error?.message;
+        debugInfo.membersCount = membersRes.data?.length ?? 0;
+        debugInfo.membersError = membersRes.error?.message;
+        debugInfo.regsCount = regsRes.data?.length ?? 0;
 
         const teamsData = teamsRes.data || [];
         if (teamsData.length === 0) return [];
@@ -97,13 +79,19 @@ export async function GET(request: Request) {
           }
         });
 
+        const regMap = new Map<string, string>();
+        (regsRes.data || []).forEach((r: any) => {
+          if (r.team_id && r.captain_name) regMap.set(r.team_id, r.captain_name);
+        });
+
         return teamsData.map((t: any) => ({
           ...t,
+          leader_name: regMap.get(t.id) || null,
           scores: scoreMap.get(t.id) || null,
           team_members: memberMap.get(t.id) || [],
         }));
       } catch (e: any) {
-        debugInfo.attempt2Exception = e?.message;
+        debugInfo.parallelException = e?.message;
         return [];
       }
     };

@@ -77,34 +77,12 @@ export async function fetchLeaderboardData(client?: any): Promise<LeaderboardEnt
 
   try {
     const fetchDb = async () => {
-      // 1. Direct join query
       try {
-        const { data, error } = await db
-          .from("teams")
-          .select(`
-            id,
-            team_name,
-            team_logo_url,
-            robot_image_url,
-            created_at,
-            updated_at,
-            scores (*),
-            team_members (*)
-          `);
-
-        if (!error && data && data.length > 0) {
-          return data;
-        }
-      } catch (e) {
-        console.warn("Direct join query notice:", e);
-      }
-
-      // 2. Parallel queries fallback
-      try {
-        const [teamsRes, scoresRes, membersRes] = await Promise.all([
-          db.from("teams").select("id, team_name, team_logo_url, robot_image_url, created_at, updated_at"),
+        const [teamsRes, scoresRes, membersRes, regsRes] = await Promise.all([
+          db.from("teams").select("*"),
           db.from("scores").select("*"),
-          db.from("team_members").select("id, team_id, name, branch, year"),
+          db.from("team_members").select("*"),
+          db.from("registrations").select("team_id, captain_name"),
         ]);
 
         const teamsData = teamsRes.data || [];
@@ -124,13 +102,14 @@ export async function fetchLeaderboardData(client?: any): Promise<LeaderboardEnt
           }
         });
 
+        const regMap = new Map<string, string>();
+        (regsRes.data || []).forEach((r: any) => {
+          if (r.team_id && r.captain_name) regMap.set(r.team_id, r.captain_name);
+        });
+
         return teamsData.map((t: any) => ({
-          id: t.id,
-          team_name: t.team_name,
-          team_logo_url: t.team_logo_url,
-          robot_image_url: t.robot_image_url,
-          created_at: t.created_at,
-          updated_at: t.updated_at,
+          ...t,
+          leader_name: regMap.get(t.id) || null,
           scores: scoreMap.get(t.id) || null,
           team_members: memberMap.get(t.id) || [],
         }));
