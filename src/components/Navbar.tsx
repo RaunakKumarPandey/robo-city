@@ -34,8 +34,8 @@ export default function Navbar() {
     setIsOpen(false);
   }, [pathname]);
 
-  // Hide public navbar inside admin portal pages (admin has its own sidebar) or locked audit pages
-  if ((pathname.startsWith("/admin") && pathname !== "/admin/login") || pathname === "/" || pathname === "/leaderboard") {
+  // Hide public navbar inside admin portal pages (admin has its own sidebar)
+  if (pathname.startsWith("/admin") && pathname !== "/admin/login") {
     return null;
   }
 
